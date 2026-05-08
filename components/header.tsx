@@ -19,11 +19,6 @@ import { app } from "@/lib/firebase";
 
 export default function Header() {
   const { user } = useAuth();
-
-  useEffect(() => {
-    console.log("🔥 USER DESDE AUTH:", user);
-  }, [user]);
-
   const db = getFirestore(app);
 
   const [role, setRole] = useState<string | null>(null);
@@ -31,58 +26,34 @@ export default function Header() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const notificationRef = useRef<HTMLDivElement>(null);
-const profileRef = useRef<HTMLDivElement>(null);
-  // 🧠 AUTH READY (NUEVO)
-  const [authReady, setAuthReady] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
-  // 🔔 Notificaciones
+  const [authReady, setAuthReady] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  // 👤 Perfil dropdown
-const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // ==========================
-  // 🧠 Detectar cuando Auth ya está listo (NUEVO)
-  // ==========================
   useEffect(() => {
-    if (user) {
-      setAuthReady(true);
-    }
+    if (user) setAuthReady(true);
   }, [user]);
 
-
-
   useEffect(() => {
-  const handleClickOutside = (event: MouseEvent) => {
-    const target = event.target as Node;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
 
-    if (
-      notificationRef.current &&
-      !notificationRef.current.contains(target)
-    ) {
-      setShowNotifications(false);
-    }
+      if (notificationRef.current && !notificationRef.current.contains(target))
+        setShowNotifications(false);
 
-    if (
-      profileRef.current &&
-      !profileRef.current.contains(target)
-    ) {
-      setShowProfileMenu(false);
-    }
-  };
+      if (profileRef.current && !profileRef.current.contains(target))
+        setShowProfileMenu(false);
+    };
 
-  document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  };
-}, []);
-
-  // ==========================
-  // 🔥 ESCUCHAR USUARIO (ROL + SALDO)
-  // ==========================
   useEffect(() => {
     if (!user) return;
 
@@ -99,9 +70,6 @@ const [showProfileMenu, setShowProfileMenu] = useState(false);
     return () => unsubscribe();
   }, [user, db]);
 
-  // ==========================
-  // 🔔 ESCUCHAR NOTIFICACIONES (FIX REAL)
-  // ==========================
   useEffect(() => {
     if (!authReady || !user) return;
 
@@ -117,23 +85,16 @@ const [showProfileMenu, setShowProfileMenu] = useState(false);
         ...d.data(),
       }));
       setNotifications(data);
-      console.log("🔔 NOTIFICACIONES:", data);
     });
 
     return () => unsubscribe();
   }, [authReady, user, db]);
 
-  // ==========================
-  // LOGOUT
-  // ==========================
   const handleLogout = async () => {
     await logoutUser();
     window.location.href = "/prestadores";
   };
 
-  // ==========================
-  // RECARGA CON WOMPI
-  // ==========================
   const handleRecharge = async () => {
     const input = document.getElementById(
       "rechargeAmount"
@@ -159,188 +120,164 @@ const [showProfileMenu, setShowProfileMenu] = useState(false);
 
     const data = await res.json();
 
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert("Error generando el pago");
-    }
+    if (data.url) window.location.href = data.url;
+    else alert("Error generando el pago");
   };
 
   return (
     <>
-      {/* ================= HEADER ================= */}
-      <header className="sticky top-0 z-40 bg-white dark:bg-black border-b border-zinc-300 px-4 py-0 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-white dark:bg-black border-b border-zinc-300 shadow-sm">
+        <div className="w-full px-4 sm:px-6">
+  <div className="flex items-center justify-between h-14 sm:h-16">
 
-          {/* LOGO */}
-          <Link href="/prestadores" className="flex items-center gap-2">
-            <Image
-  src="/logofinal.svg"
-  alt="logo"
-  width={34}
-  height={34}
-  className="w-7 h-7 md:w-9 md:h-9"
-/>
+            {/* LOGO */}
+            <Link href="/prestadores" className="flex items-center gap-2">
+              <Image
+                src="/logofinal.svg"
+                alt="logo"
+                width={36}
+                height={36}
+                className="w-7 h-7 sm:w-9 sm:h-9"
+              />
+              <span className="text-lg sm:text-xl font-bold">
+                BelaClub
+              </span>
+            </Link>
 
-         <span className="text-lg md:text-xl font-bold">
-  BelaClub
-</span>
-
-          </Link>
-
-          {/* NO USER */}
-          {!user && (
-            <div className="flex gap-2">
-              <Link href="/login" className="px-4 py-1.5 border rounded text-sm">
-                Login
-              </Link>
-              <Link
-                href="/register"
-                className="px-4 py-1.5 bg-black text-white rounded text-sm"
-              >
-                Registrarse
-              </Link>
-            </div>
-          )}
-
-          {/* USER */}
-          {user && (
-            <div className="flex items-center justify-end gap-3 relative ">
-              {/* 🔔 CAMPANA */}
-              <button
-                className="relative p-2 md:p-3 text-1xl md:text-2xl"
-                title="Notificaciones"
-                onClick={async () => {
-  setShowNotifications((v) => !v);
-
-  if (unreadCount > 0 && user) {
-    await fetch("/api/notifications/mark-read", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.uid }),
-    });
-  }
-}}
-
-              >
-                🔔
-                {unreadCount > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1
-                               bg-red-500 text-white text-[10px]
-                               w-4 h-4 flex items-center justify-center
-                               rounded-full"
-                  >
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {/* 🔽 DROPDOWN NOTIFICACIONES */}
-              {showNotifications && (
-                <div
-                  className="absolute right-0 top-10 w-80
-                             bg-white dark:bg-zinc-900
-                             border border-zinc-300 dark:border-zinc-700
-                             rounded-lg shadow-lg z-50"
+            {!user && (
+              <div className="flex gap-2">
+                <Link
+                  href="/login"
+                  className="px-3 py-1.5 border rounded text-sm"
                 >
-                  <div className="p-3 font-semibold border-b">
-                    Notificaciones
-                  </div>
+                  Login
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-3 py-1.5 bg-black text-white rounded text-sm"
+                >
+                  Registrarse
+                </Link>
+              </div>
+            )}
 
-                  {notifications.length === 0 ? (
-                    <p className="p-4 text-sm text-zinc-500 text-center">
-                      No tienes notificaciones
-                    </p>
-                  ) : (
-                    notifications.map((n) => (
-                      <div
-                        key={n.id}
-                        className={`p-3 text-sm border-b last:border-b-0
-                          ${!n.read ? "bg-zinc-100 dark:bg-zinc-800" : ""}`}
-                      >
-                        <p className="font-medium">{n.message}</p>
-                        <p className="text-xs text-zinc-500 mt-1">
-                          {n.createdAt?.toDate?.().toLocaleString()}
-                        </p>
+            {user && (
+              <div className="flex items-center gap-2 sm:gap-4 relative">
+
+                {/* NOTIFICACIONES */}
+                <div className="relative" ref={notificationRef}>
+                  <button
+                    className="relative p-2 text-lg"
+                    onClick={async () => {
+                      setShowNotifications((v) => !v);
+
+                      if (unreadCount > 0 && user) {
+                        await fetch("/api/notifications/mark-read", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ userId: user.uid }),
+                        });
+                      }
+                    }}
+                  >
+                    🔔
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {showNotifications && (
+                    <div className="absolute right-0 mt-2 w-[90vw] max-w-sm sm:w-80 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-lg z-50">
+                      <div className="p-3 font-semibold border-b">
+                        Notificaciones
                       </div>
-                    ))
+
+                      {notifications.length === 0 ? (
+                        <p className="p-4 text-sm text-zinc-500 text-center">
+                          No tienes notificaciones
+                        </p>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            className={`p-3 text-sm border-b last:border-b-0 ${
+                              !n.read
+                                ? "bg-zinc-100 dark:bg-zinc-800"
+                                : ""
+                            }`}
+                          >
+                            <p className="font-medium">{n.message}</p>
+                            <p className="text-xs text-zinc-500 mt-1">
+                              {n.createdAt?.toDate?.().toLocaleString()}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
 
-              {/* SALDO */}
-              <span
-                onClick={() => setModalOpen(true)}
-className="cursor-pointer text-[10px] md:text-sm font-semibold px-2 md:px-3 py-1 bg-green-500 text-white rounded-md whitespace-nowrap"
+                {/* SALDO */}
+                <span
+                  onClick={() => setModalOpen(true)}
+                  className="cursor-pointer text-xs sm:text-sm font-semibold px-2 sm:px-3 py-1 bg-green-500 text-white rounded-md whitespace-nowrap"
+                >
+                  ${balance.toLocaleString()}
+                </span>
 
+                {/* PERFIL */}
+                <div className="relative" ref={profileRef}>
+                  <button
+                    onClick={() => setShowProfileMenu((v) => !v)}
+                    className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="currentColor"
+                      viewBox="0 0 22 22"
+                      className="w-5 h-5 text-zinc-700 dark:text-zinc-300"
+                    >
+                      <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/>
+                    </svg>
+                  </button>
 
-              >
-                Saldo: ${balance.toLocaleString()}
-              </span>
+                  {showProfileMenu && (
+                    <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-lg z-50">
+                      <Link
+                        href={
+                          role === "prestador"
+                            ? "/prestador/perfil"
+                            : "/usuario/perfil"
+                        }
+                        onClick={() => setShowProfileMenu(false)}
+                        className="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      >
+                        Mi perfil
+                      </Link>
 
-              {/* PERFIL */}
-            
-{/* 👤 PERFIL DROPDOWN */}
-<div className="relative">
-  <button
-    onClick={() => setShowProfileMenu((v) => !v)}
-    className="w-6 h-6 flex items-center justify-center"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="currentColor"
-      viewBox="0 0 22 22"
-      className="w-10 h-10 text-red-500 hover:text-black transition"
-    >
-      <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/>
-    </svg>
-  </button>
-
-  {showProfileMenu && (
-    <div
-      className="absolute right-0 top-10 w-40
-                 bg-white dark:bg-zinc-900
-                 border border-zinc-300 dark:border-zinc-700
-                 rounded-lg shadow-lg z-50"
-    >
-      <Link
-        href={
-          role === "prestador"
-            ? "/prestador/perfil"
-            : "/usuario/perfil"
-        }
-        onClick={() => setShowProfileMenu(false)}
-        className="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
-      >
-        Mi perfil
-      </Link>
-
-      <button
-        onClick={() => {
-          setShowProfileMenu(false);
-          handleLogout();
-        }}
-        className="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
-      >
-        Salir
-      </button>
-    </div>
-  )}
-</div>
-
-
-
-       
-            </div>
-          )}
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          handleLogout();
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      >
+                        Salir
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* ================= MODAL SALDO ================= */}
       {modalOpen && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
           onClick={() => setModalOpen(false)}
         >
           <div

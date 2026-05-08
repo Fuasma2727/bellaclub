@@ -4,14 +4,8 @@ import admin from "firebase-admin";
 
 export async function POST(req: Request) {
   try {
-    // ======================
-    // Leer body
-    // ======================
     const { buyerId, sellerId, amount } = await req.json();
 
-    // ======================
-    // Validaciones básicas
-    // ======================
     if (!buyerId || !sellerId || !amount || isNaN(amount)) {
       return NextResponse.json(
         { error: "Datos inválidos" },
@@ -19,7 +13,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ❌ No permitir abonarse a sí mismo
     if (buyerId === sellerId) {
       return NextResponse.json(
         { error: "No puedes abonarte a ti mismo" },
@@ -27,9 +20,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ======================
-    // Referencias
-    // ======================
     const buyerRef = adminDb.collection("users").doc(buyerId);
     const sellerRef = adminDb.collection("users").doc(sellerId);
 
@@ -43,7 +33,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const buyerBalance = Number(buyerSnap.data()?.balance || 0);
+    const buyerData = buyerSnap.data();
+    const sellerData = sellerSnap.data();
+
+    const buyerBalance = Number(buyerData?.balance || 0);
 
     if (buyerBalance < amount) {
       return NextResponse.json(
@@ -52,17 +45,19 @@ export async function POST(req: Request) {
       );
     }
 
+    // 🔥 Nombre del comprador
+const buyerName =
+  buyerData?.name ||
+  buyerData?.displayName ||
+  buyerData?.fullName ||
+  buyerData?.username ||
+  "Usuario";
+
     // ======================
     // Cálculo del 10%
     // ======================
-    const releasedAmount = Math.floor(amount * 0.1);
+    const releasedAmount = Math.floor(Number(amount) * 1);
 
-    // 🔑 UID REAL del prestador (EL FIX)
-    const sellerAuthUid = sellerRef.id;
-
-    // ======================
-    // 🔥 TRANSACCIÓN SEGURA
-    // ======================
     await adminDb.runTransaction(async (tx) => {
       // 1️⃣ Restar saldo al comprador
       tx.update(buyerRef, {
@@ -78,30 +73,28 @@ export async function POST(req: Request) {
       const depositRef = adminDb.collection("serviceDeposits").doc();
       tx.set(depositRef, {
         buyerId,
-        sellerId: sellerAuthUid,
+        sellerId,
         totalAmount: amount,
         releasedAmount,
         status: "pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // 4️⃣ 🔔 Crear notificación (CORREGIDO)
+      // 4️⃣ 🔔 Crear notificación CORRECTA
       const notificationRef = adminDb.collection("notifications").doc();
       tx.set(notificationRef, {
-        userId: sellerAuthUid, // ✅ ESTE ahora coincide con user.uid
+        userId: sellerId,
         type: "deposit",
         title: "Nuevo abono recibido",
-        message: `Recibiste un abono de $${amount.toLocaleString("es-CO")}`,
-        amount,
+        message: `${buyerName} te abonó $${releasedAmount.toLocaleString("es-CO")}`,
+        totalAmount: amount,
+        releasedAmount,
         fromUserId: buyerId,
         read: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
 
-    // ======================
-    // Respuesta OK
-    // ======================
     return NextResponse.json({ success: true }, { status: 200 });
 
   } catch (error) {
