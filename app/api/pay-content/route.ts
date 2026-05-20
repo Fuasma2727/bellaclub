@@ -1,29 +1,33 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import admin from "firebase-admin";
+import { calculateCommission } from "@/lib/commission";
+import { createPrivateMediaUrl } from "@/lib/privateMediaAccess";
+import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+
+type MediaItem = {
+  id?: string;
+  url?: string;
+  private?: boolean;
+  price?: number | string | null;
+};
 
 export async function POST(req: Request) {
-  console.log("🔥 PAY-CONTENT API HIT");
-
   try {
+    const decoded = await requireAuthenticatedUser(req);
     const body = await req.json();
 
-    const buyerId = body.buyerId;
+    const buyerId = decoded.uid;
     const sellerId = body.sellerId;
-    const price = Number(body.price);
-    const mediaUrl = body.mediaUrl;
+    const mediaId = body.mediaId;
 
-    // ======================
-    // Validaciones básicas
-    // ======================
-    if (!buyerId || !sellerId || !price || isNaN(price) || !mediaUrl) {
+    if (!buyerId || !sellerId || !mediaId) {
       return NextResponse.json(
-        { error: "Datos incompletos o inválidos" },
+        { error: "Datos incompletos o invalidos" },
         { status: 400 }
       );
     }
 
-    // ❌ NO permitir comprarse a sí mismo
     if (buyerId === sellerId) {
       return NextResponse.json(
         { error: "No puedes comprar tu propio contenido" },
@@ -34,56 +38,152 @@ export async function POST(req: Request) {
     const buyerRef = adminDb.collection("users").doc(buyerId);
     const sellerRef = adminDb.collection("users").doc(sellerId);
 
-    const buyerSnap = await buyerRef.get();
     const sellerSnap = await sellerRef.get();
 
-    if (!buyerSnap.exists || !sellerSnap.exists) {
+    if (!sellerSnap.exists) {
       return NextResponse.json(
         { error: "Usuario no encontrado" },
         { status: 404 }
       );
     }
 
-    const buyerData = buyerSnap.data()!;
     const sellerData = sellerSnap.data()!;
 
-    const buyerBalance = Number(buyerData.balance || 0);
-    const sellerBalance = Number(sellerData.balance || 0);
+    if (
+      sellerData.role !== "prestador" ||
+      sellerData.profileVisible !== true ||
+      sellerData.verificationStatus !== "approved" ||
+      sellerData.blocked === true
+    ) {
+      return NextResponse.json(
+        { error: "Prestador no disponible" },
+        { status: 404 }
+      );
+    }
 
-    if (buyerBalance < price) {
+    const sellerMedia = Array.isArray(sellerData.media)
+      ? (sellerData.media as MediaItem[])
+      : [];
+    const targetIndex = sellerMedia.findIndex(
+      (item, index) => (item.id || `legacy-${index}`) === mediaId
+    );
+    const targetMedia = targetIndex >= 0 ? sellerMedia[targetIndex] : null;
+
+    if (!targetMedia?.private || !targetMedia.url) {
+      return NextResponse.json(
+        { error: "Contenido privado no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    const price = Number(targetMedia.price || 0);
+
+    if (!price || isNaN(price)) {
+      return NextResponse.json(
+        { error: "Precio invalido" },
+        { status: 400 }
+      );
+    }
+
+    const {
+      commissionAmount,
+      commissionRate,
+      releasedAmount,
+      totalAmount,
+    } = calculateCommission(price);
+
+    await adminDb.runTransaction(async (tx) => {
+      const buyerSnap = await tx.get(buyerRef);
+
+      if (!buyerSnap.exists) {
+        throw new Error("BUYER_NOT_FOUND");
+      }
+
+      const buyerData = buyerSnap.data() || {};
+      const buyerBalance = Number(buyerData.balance || 0);
+      const purchasedContent = Array.isArray(buyerData.purchasedContent)
+        ? buyerData.purchasedContent
+        : [];
+
+      const alreadyPurchased = purchasedContent.some(
+        (item) => item?.sellerId === sellerId && item?.mediaId === mediaId
+      );
+
+      if (alreadyPurchased) return;
+
+      if (buyerBalance < totalAmount) {
+        throw new Error("INSUFFICIENT_BALANCE");
+      }
+
+      tx.update(buyerRef, {
+        balance: admin.firestore.FieldValue.increment(-totalAmount),
+        purchasedContent: admin.firestore.FieldValue.arrayUnion({
+          sellerId,
+          mediaId,
+          totalAmount,
+          commissionAmount,
+          commissionRate,
+          releasedAmount,
+          purchasedAt: new Date().toISOString(),
+        }),
+      });
+
+      tx.update(sellerRef, {
+        balance: admin.firestore.FieldValue.increment(releasedAmount),
+      });
+
+      tx.set(adminDb.collection("contentPurchases").doc(), {
+        buyerId,
+        sellerId,
+        mediaId,
+        totalAmount,
+        commissionAmount,
+        commissionRate,
+        releasedAmount,
+        status: "completed",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        mediaId,
+        commissionAmount,
+        releasedAmount,
+        mediaUrl: createPrivateMediaUrl(req, {
+          buyerId,
+          sellerId,
+          mediaId,
+        }),
+      },
+      { status: 200 }
+    );
+  } catch (err) {
+    if (err instanceof Error && err.message === "INSUFFICIENT_BALANCE") {
       return NextResponse.json(
         { error: "Saldo insuficiente" },
         { status: 400 }
       );
     }
 
-    // ======================
-    // 🔥 TRANSACCIÓN SEGURA
-    // ======================
-    await adminDb.runTransaction(async (tx) => {
-      tx.update(buyerRef, {
-        balance: buyerBalance - price,
-        purchasedContent: admin.firestore.FieldValue.arrayUnion({
-          sellerId,
-          mediaUrl,
-        }),
-      });
+    if (err instanceof Error && err.message === "BUYER_NOT_FOUND") {
+      return NextResponse.json(
+        { error: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
 
-      tx.update(sellerRef, {
-        balance: sellerBalance + price,
-      });
-    });
+    const authError = authRouteError(err);
 
-    // ======================
-    // RESPUESTA OK
-    // ======================
-    return NextResponse.json(
-      { success: true },
-      { status: 200 }
-    );
+    if (authError.status !== 401 || authError.message !== "No autorizado") {
+      return NextResponse.json(
+        { error: authError.message },
+        { status: authError.status }
+      );
+    }
 
-  } catch (err) {
-    console.error("❌ PAY CONTENT ERROR:", err);
+    console.error("PAY CONTENT ERROR:", err);
 
     return NextResponse.json(
       { error: "Error interno del servidor" },

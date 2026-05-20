@@ -17,27 +17,40 @@ import {
 } from "firebase/firestore";
 import { app } from "@/lib/firebase";
 
+const rechargeOptions = [100000, 200000, 500000];
+
+type NotificationItem = {
+  id: string;
+  message?: string;
+  read?: boolean;
+  createdAt?: {
+    toDate?: () => Date;
+  };
+};
+
 export default function Header() {
   const { user } = useAuth();
   const db = getFirestore(app);
+  const ownerEmail =
+    process.env.NEXT_PUBLIC_OWNER_EMAIL?.toLowerCase() ||
+    "jace127127@gmail.com";
+  const isOwner = user?.email?.toLowerCase() === ownerEmail;
 
   const [role, setRole] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(0);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<
+    number | null
+  >(null);
 
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const [authReady, setAuthReady] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-
-  useEffect(() => {
-    if (user) setAuthReady(true);
-  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -71,7 +84,7 @@ export default function Header() {
   }, [user, db]);
 
   useEffect(() => {
-    if (!authReady || !user) return;
+    if (!user) return;
 
     const q = query(
       collection(db, "notifications"),
@@ -83,12 +96,12 @@ export default function Header() {
       const data = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
-      }));
+      })) as NotificationItem[];
       setNotifications(data);
     });
 
     return () => unsubscribe();
-  }, [authReady, user, db]);
+  }, [user, db]);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -96,25 +109,27 @@ export default function Header() {
   };
 
   const handleRecharge = async () => {
-    const input = document.getElementById(
-      "rechargeAmount"
-    ) as HTMLInputElement;
-
-    const amount = Number(input.value);
-
-    if (!amount || amount < 1000) {
-      alert("Ingresa un monto válido (mínimo $1.000)");
+    if (!selectedRechargeAmount) {
+      alert("Selecciona un monto para recargar");
       return;
     }
 
-    const amountInCents = amount * 100;
+    if (!user) {
+      alert("Debes iniciar sesion para recargar");
+      return;
+    }
+
+    const amountInCents = selectedRechargeAmount * 100;
+    const token = await user.getIdToken();
 
     const res = await fetch("/api/wompi/checkout", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         amountInCents,
-        userId: user?.uid,
       }),
     });
 
@@ -126,35 +141,35 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-white dark:bg-black border-b border-zinc-300 shadow-sm">
-        <div className="w-full px-4 sm:px-6">
-  <div className="flex items-center justify-between h-14 sm:h-16">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.08] bg-black/95 shadow-sm backdrop-blur">
+        <div className="w-full px-3 sm:px-6">
+          <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-3">
 
             {/* LOGO */}
-            <Link href="/prestadores" className="flex items-center gap-2">
+            <Link href="/prestadores" className="flex min-w-0 items-center gap-2">
               <Image
                 src="/logofinal.svg"
                 alt="logo"
                 width={36}
                 height={36}
-                className="w-7 h-7 sm:w-9 sm:h-9"
+                className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
               />
-              <span className="text-lg sm:text-xl font-bold">
+              <span className="hidden truncate text-lg font-bold text-white min-[360px]:inline sm:text-xl">
                 BelaClub
               </span>
             </Link>
 
             {!user && (
-              <div className="flex gap-2">
+              <div className="flex shrink-0 items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] p-1 shadow-lg shadow-black/20 sm:gap-2">
                 <Link
                   href="/login"
-                  className="px-3 py-1.5 border rounded text-sm"
+                  className="rounded-full px-3 py-2 text-xs font-semibold text-neutral-200 transition hover:bg-white/[0.07] hover:text-white sm:px-4 sm:text-sm"
                 >
                   Login
                 </Link>
                 <Link
                   href="/register"
-                  className="px-3 py-1.5 bg-black text-white rounded text-sm"
+                  className="rounded-full border border-blue-400/25 bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/25 transition hover:bg-blue-500 sm:px-4 sm:text-sm"
                 >
                   Registrarse
                 </Link>
@@ -162,20 +177,23 @@ export default function Header() {
             )}
 
             {user && (
-              <div className="flex items-center gap-2 sm:gap-4 relative">
+              <div className="relative flex shrink-0 items-center gap-1 sm:gap-4">
 
                 {/* NOTIFICACIONES */}
                 <div className="relative" ref={notificationRef}>
                   <button
-                    className="relative p-2 text-lg"
+                    className="relative flex h-8 w-8 items-center justify-center rounded-full text-sm transition hover:bg-white/[0.06] min-[380px]:h-9 min-[380px]:w-9 sm:text-lg"
                     onClick={async () => {
                       setShowNotifications((v) => !v);
 
                       if (unreadCount > 0 && user) {
+                        const token = await user.getIdToken();
                         await fetch("/api/notifications/mark-read", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ userId: user.uid }),
+                          headers: {
+                            Authorization: `Bearer ${token}`,
+                            "Content-Type": "application/json",
+                          },
                         });
                       }
                     }}
@@ -189,8 +207,8 @@ export default function Header() {
                   </button>
 
                   {showNotifications && (
-                    <div className="absolute right-0 mt-2 w-[90vw] max-w-sm sm:w-80 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-lg z-50">
-                      <div className="p-3 font-semibold border-b">
+                    <div className="absolute right-[-88px] z-50 mt-2 w-[calc(100vw-24px)] max-w-sm rounded-lg border border-white/10 bg-zinc-950 text-white shadow-2xl shadow-black/50 sm:right-0 sm:w-80">
+                      <div className="border-b border-white/10 p-3 font-semibold">
                         Notificaciones
                       </div>
 
@@ -202,9 +220,9 @@ export default function Header() {
                         notifications.map((n) => (
                           <div
                             key={n.id}
-                            className={`p-3 text-sm border-b last:border-b-0 ${
+                            className={`border-b border-white/10 p-3 text-sm last:border-b-0 ${
                               !n.read
-                                ? "bg-zinc-100 dark:bg-zinc-800"
+                                ? "bg-white/[0.06]"
                                 : ""
                             }`}
                           >
@@ -221,8 +239,11 @@ export default function Header() {
 
                 {/* SALDO */}
                 <span
-                  onClick={() => setModalOpen(true)}
-                  className="cursor-pointer text-xs sm:text-sm font-semibold px-2 sm:px-3 py-1 bg-green-500 text-white rounded-md whitespace-nowrap"
+                  onClick={() => {
+                    setSelectedRechargeAmount(null);
+                    setModalOpen(true);
+                  }}
+                  className="cursor-pointer whitespace-nowrap rounded-md bg-green-500 px-2 py-1 text-[11px] font-semibold text-white shadow-lg shadow-emerald-950/20 min-[380px]:text-xs sm:px-3 sm:text-sm"
                 >
                   ${balance.toLocaleString()}
                 </span>
@@ -231,20 +252,43 @@ export default function Header() {
                 <div className="relative" ref={profileRef}>
                   <button
                     onClick={() => setShowProfileMenu((v) => !v)}
-                    className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-neutral-300 shadow-lg shadow-black/20 transition hover:border-white/20 hover:bg-white/[0.1] hover:text-white min-[380px]:h-9 min-[380px]:w-9"
+                    aria-label="Abrir menu de perfil"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       fill="currentColor"
                       viewBox="0 0 22 22"
-                      className="w-5 h-5 text-zinc-700 dark:text-zinc-300"
+                      className="h-5 w-5"
                     >
                       <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/>
                     </svg>
                   </button>
 
                   {showProfileMenu && (
-                    <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-lg z-50">
+                    <div className="absolute right-0 z-50 mt-3 w-52 overflow-hidden rounded-lg border border-white/10 bg-[#101012] p-1 text-white shadow-2xl shadow-black/40">
+                      {isOwner && (
+                        <Link
+                          href="/admin/verificaciones"
+                          onClick={() => setShowProfileMenu(false)}
+                          className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-amber-100 transition hover:bg-amber-400/10 hover:text-amber-50"
+                        >
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/10 text-amber-200">
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M12 3 4 6v6c0 5 3.4 8.7 8 9 4.6-.3 8-4 8-9V6l-8-3Z" />
+                              <path d="M9 12l2 2 4-5" />
+                            </svg>
+                          </span>
+                          Panel admin
+                        </Link>
+                      )}
+
                       <Link
                         href={
                           role === "prestador"
@@ -252,8 +296,20 @@ export default function Header() {
                             : "/usuario/perfil"
                         }
                         onClick={() => setShowProfileMenu(false)}
-                        className="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                        className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-neutral-200 transition hover:bg-white/[0.07] hover:text-white"
                       >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] text-neutral-300">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M20 21a8 8 0 0 0-16 0" />
+                            <circle cx="12" cy="7" r="4" />
+                          </svg>
+                        </span>
                         Mi perfil
                       </Link>
 
@@ -262,8 +318,21 @@ export default function Header() {
                           setShowProfileMenu(false);
                           handleLogout();
                         }}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                        className="mt-1 flex w-full items-center gap-3 rounded-md border-t border-white/[0.06] px-3 py-2.5 text-left text-sm font-medium text-neutral-300 transition hover:bg-rose-500/10 hover:text-rose-100"
                       >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] text-neutral-300">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <path d="M16 17l5-5-5-5" />
+                            <path d="M21 12H9" />
+                          </svg>
+                        </span>
                         Salir
                       </button>
                     </div>
@@ -277,39 +346,80 @@ export default function Header() {
 
       {modalOpen && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-          onClick={() => setModalOpen(false)}
+          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          onClick={() => {
+            setSelectedRechargeAmount(null);
+            setModalOpen(false);
+          }}
         >
           <div
-            className="bg-white dark:bg-zinc-900 p-6 rounded-lg w-full max-w-sm"
+            className="w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-zinc-950 text-white shadow-2xl shadow-black/50"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold mb-4">Tu saldo</h2>
+            <div className="border-b border-white/10 p-5 sm:p-6">
+              <p className="text-sm font-medium text-zinc-400">Tu saldo actual</p>
 
-            <p className="text-2xl font-bold text-green-600 mb-6">
-              ${balance.toLocaleString()}
-            </p>
+              <div className="mt-2 flex items-end justify-between gap-4">
+                <p className="text-2xl font-semibold sm:text-3xl">
+                  ${balance.toLocaleString("es-CO")}
+                </p>
+                <p className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
+                  COP
+                </p>
+              </div>
 
-            <input
-              id="rechargeAmount"
-              type="number"
-              placeholder="Monto a recargar"
-              className="w-full p-2 border rounded mb-4 text-black"
-            />
+              <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs text-zinc-500">Monto a recargar</p>
+                <p className="mt-1 text-xl font-semibold text-emerald-300 sm:text-2xl">
+                  {selectedRechargeAmount
+                    ? `$${selectedRechargeAmount.toLocaleString("es-CO")}`
+                    : "Selecciona una opción"}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              <p className="mb-3 text-sm font-medium text-zinc-300">
+                Elige un paquete
+              </p>
+
+              <div className="mb-5 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+              {rechargeOptions.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  onClick={() => setSelectedRechargeAmount(amount)}
+                    className={`rounded-lg border px-3 py-4 text-center transition ${
+                    selectedRechargeAmount === amount
+                        ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200 shadow-lg shadow-emerald-950/20"
+                        : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
+                  }`}
+                >
+                    <span className="block text-sm font-semibold">
+                      ${amount.toLocaleString("es-CO")}
+                    </span>
+                </button>
+              ))}
+              </div>
 
             <button
               onClick={handleRecharge}
-              className="w-full py-2 bg-green-500 text-white rounded-lg font-semibold"
+              disabled={!selectedRechargeAmount}
+                className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Recargar saldo
             </button>
 
             <button
-              onClick={() => setModalOpen(false)}
-              className="w-full mt-3 py-2 bg-zinc-700 text-white rounded-lg"
+              onClick={() => {
+                setSelectedRechargeAmount(null);
+                setModalOpen(false);
+              }}
+                className="w-full mt-3 rounded-lg border border-white/10 bg-white/[0.03] py-3 text-sm font-semibold text-zinc-300 transition hover:bg-white/[0.07]"
             >
               Cerrar
             </button>
+            </div>
           </div>
         </div>
       )}

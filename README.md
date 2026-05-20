@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BelaClub
 
-## Getting Started
+Aplicacion Next.js para conectar clientes con prestadores, gestionar perfiles,
+verificaciones, saldo, contenido privado y reportes de seguridad.
 
-First, run the development server:
+## Desarrollo
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm.cmd run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre `http://localhost:3000/prestadores`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Validacion
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+node_modules\.bin\eslint.cmd app lib components
+node_modules\.bin\tsc.cmd --noEmit
+npm.cmd run build
+```
 
-## Learn More
+## Variables de entorno
 
-To learn more about Next.js, take a look at the following resources:
+Configura estas variables en `.env.local` y tambien en produccion:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```txt
+NEXT_PUBLIC_APP_URL=https://tu-dominio.com
+NEXT_PUBLIC_OWNER_EMAIL=correo-del-dueno@dominio.com
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+OWNER_EMAIL=correo-del-dueno@dominio.com
+# o OWNER_UID=uid-del-dueno
 
-## Deploy on Vercel
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+BUNNY_API_KEY=
+BUNNY_STORAGE_ZONE=
+BUNNY_STORAGE_HOST=
+BUNNY_CDN_HOST=
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+PRIVATE_MEDIA_SECRET=clave-larga-random
+
+WOMPI_PUBLIC_KEY=
+WOMPI_INTEGRITY_SECRET=
+WOMPI_EVENTS_SECRET=
+```
+
+## Produccion
+
+Antes de publicar:
+
+1. Valida variables criticas:
+
+```bash
+npm.cmd run preflight
+```
+
+2. Despliega reglas de Firestore:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+3. En Wompi configura la URL de eventos:
+
+```txt
+https://tu-dominio.com/api/wompi/webhook
+```
+
+4. Haz una recarga real pequena y valida que el saldo se acredite.
+
+5. Prueba el flujo completo con dos cuentas:
+
+- prestador crea perfil y sube contenido privado;
+- dueno aprueba perfil;
+- cliente recarga saldo;
+- cliente compra contenido;
+- cliente vuelve a abrir el perfil y el contenido sigue desbloqueado;
+- cliente reporta perfil y el reporte aparece en el panel admin.
+
+## Seguridad
+
+- Las compras y abonos usan el usuario autenticado desde Firebase Admin.
+- El contenido privado se entrega con links temporales firmados.
+- El webhook de Wompi valida checksum antes de acreditar saldo.
+- Las reglas de Firestore bloquean lectura publica directa de documentos sensibles.
+- Los reportes se guardan en Firestore y se revisan desde el panel admin.
+- Next envia headers base de seguridad para bloquear iframes, sniffing y
+  rastreo de rutas privadas/API.

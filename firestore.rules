@@ -1,0 +1,147 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validInitialUser(uid) {
+      return isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role in ["cliente", "prestador"]
+        && request.resource.data.balance == 0
+        && request.resource.data.blocked == false
+        && request.resource.data.rating == 0
+        && request.resource.data.visitVerified == false
+        && request.resource.data.visitVerificationStatus == "none"
+        && request.resource.data.verificationBadge == null
+        && request.resource.data.badgeVerificationStatus == "none"
+        && request.resource.data.badgeVerificationLevel == null
+        && request.resource.data.createdAt == request.time
+        && (
+          (
+            request.resource.data.role == "cliente"
+            && request.resource.data.isVerified == true
+            && request.resource.data.profileVisible == true
+            && request.resource.data.verificationStatus == "approved"
+            && request.resource.data.verificationPhotoUrl == null
+          )
+          ||
+          (
+            request.resource.data.role == "prestador"
+            && request.resource.data.isVerified == false
+            && request.resource.data.profileVisible == false
+            && request.resource.data.verificationStatus == "pending"
+          )
+        );
+    }
+
+    function safeUserUpdateKeys() {
+      return [
+        "name",
+        "photoUrl",
+        "description",
+        "price",
+        "department",
+        "city",
+        "whatsapp",
+        "verificationPhotoUrl",
+        "media",
+        "badgeVerificationStatus",
+        "badgeVerificationLevel",
+        "badgeVerificationVideoUrl",
+        "badgeVerificationRequestedAt"
+      ];
+    }
+
+    function onlySafeUserFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(safeUserUpdateKeys());
+    }
+
+    function validBadgeRequestUpdate() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny([
+          "badgeVerificationStatus",
+          "badgeVerificationLevel",
+          "badgeVerificationVideoUrl",
+          "badgeVerificationRequestedAt"
+        ])
+        ||
+        (
+          resource.data.role == "prestador"
+          && resource.data.verificationStatus == "approved"
+          && resource.data.verificationBadge == null
+          && request.resource.data.badgeVerificationStatus == "pending"
+          && request.resource.data.badgeVerificationLevel in [1, 2]
+        );
+    }
+
+    function validVerificationPhotoUpdate() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(["verificationPhotoUrl"])
+        ||
+        (
+          resource.data.role == "prestador"
+          && resource.data.verificationStatus == "pending"
+          && request.resource.data.verificationPhotoUrl is string
+          && request.resource.data.verificationPhotoUrl.matches("^https://")
+        );
+    }
+
+    match /users/{uid} {
+      allow create: if validInitialUser(uid);
+
+      allow get: if isOwner(uid);
+
+      allow list: if false;
+
+      allow update: if isOwner(uid)
+        && onlySafeUserFieldsChanged()
+        && validBadgeRequestUpdate()
+        && validVerificationPhotoUpdate()
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.balance == resource.data.balance
+        && request.resource.data.blocked == resource.data.blocked
+        && request.resource.data.isVerified == resource.data.isVerified
+        && request.resource.data.profileVisible == resource.data.profileVisible
+        && request.resource.data.verificationStatus == resource.data.verificationStatus
+        && request.resource.data.verificationBadge == resource.data.verificationBadge
+        && request.resource.data.rating == resource.data.rating
+        && request.resource.data.purchasedContent == resource.data.purchasedContent;
+
+      allow delete: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
+    match /recharges/{rechargeId} {
+      allow read, write: if false;
+    }
+
+    match /serviceDeposits/{depositId} {
+      allow read, write: if false;
+    }
+
+    match /contentPurchases/{purchaseId} {
+      allow read, write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

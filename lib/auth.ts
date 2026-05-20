@@ -17,11 +17,13 @@ import {
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// REGISTRO DE USUARIO + CREAR DOCUMENTO EN FIRESTORE CON ROLE
+export type UserRole = "cliente" | "prestador";
+
 export const registerUser = async (
   email: string,
   password: string,
-  role: string
+  role: UserRole,
+  verificationPhotoUrl?: string
 ) => {
   const credential: UserCredential = await createUserWithEmailAndPassword(
     auth,
@@ -30,23 +32,34 @@ export const registerUser = async (
   );
 
   const user = credential.user;
-await setDoc(doc(db, "users", user.uid), {
-  uid: user.uid,
-  email: user.email,
-  role: role,
-  balance: 0,              // 👈 AQUI SE CREA EL BALANCE
-  createdAt: serverTimestamp(),
-});
+  const isProvider = role === "prestador";
+
+  await setDoc(doc(db, "users", user.uid), {
+    uid: user.uid,
+    email: user.email,
+    role,
+    balance: 0,
+    blocked: false,
+    rating: 0,
+    visitVerified: false,
+    visitVerificationStatus: "none",
+    verificationBadge: null,
+    badgeVerificationStatus: "none",
+    badgeVerificationLevel: null,
+    isVerified: !isProvider,
+    profileVisible: !isProvider,
+    verificationStatus: isProvider ? "pending" : "approved",
+    verificationPhotoUrl: isProvider ? verificationPhotoUrl ?? null : null,
+    createdAt: serverTimestamp(),
+  });
 
   return user;
 };
 
-// LOGIN
 export const loginUser = async (email: string, password: string) => {
   return await signInWithEmailAndPassword(auth, email, password);
 };
 
-// LOGOUT
 export const logoutUser = async () => {
   return await signOut(auth);
 };

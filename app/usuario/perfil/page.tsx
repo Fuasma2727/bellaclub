@@ -55,6 +55,9 @@ export default function PerfilUsuario() {
 
     const res = await fetch("/api/upload-profile-photo", {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${await user.getIdToken()}`,
+      },
       body: formData,
     });
 
@@ -90,7 +93,7 @@ export default function PerfilUsuario() {
   if (loading) return <p className="p-6">Cargando...</p>;
 
   return (
-    <div>
+    <div className="min-h-screen bg-[#050505] pt-14 text-white sm:pt-16">
       <Header />
 
       <div className="max-w-md mx-auto mt-12 p-8 bg-neutral-950 rounded-2xl shadow-lg">
