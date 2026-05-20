@@ -44,6 +44,9 @@ PRIVATE_MEDIA_SECRET=clave-larga-random
 WOMPI_PUBLIC_KEY=
 WOMPI_INTEGRITY_SECRET=
 WOMPI_EVENTS_SECRET=
+
+# Opcional para ejecutar manualmente el cobro de mensualidades
+CRON_SECRET=
 ```
 
 ## Produccion
@@ -78,6 +81,8 @@ https://tu-dominio.com/api/wompi/webhook
 - cliente compra contenido;
 - cliente vuelve a abrir el perfil y el contenido sigue desbloqueado;
 - cliente reporta perfil y el reporte aparece en el panel admin.
+- prestador recarga saldo y el sistema descuenta automaticamente la mensualidad
+  cuando este vencida.
 
 ## Seguridad
 
@@ -88,3 +93,5 @@ https://tu-dominio.com/api/wompi/webhook
 - Los reportes se guardan en Firestore y se revisan desde el panel admin.
 - Next envia headers base de seguridad para bloquear iframes, sniffing y
   rastreo de rutas privadas/API.
+- Las mensualidades de prestadores se procesan con un cron diario de Vercel en
+  `/api/provider-subscriptions/process`.

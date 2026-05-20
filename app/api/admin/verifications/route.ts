@@ -6,6 +6,14 @@ type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
 type VerificationBadge = "gold" | "diamond";
 
+type AdminMediaItem = {
+  id: string;
+  type: "photo" | "video";
+  url: string;
+  private: boolean;
+  description?: string;
+};
+
 type ProviderVerification = {
   id: string;
   email?: string;
@@ -15,6 +23,8 @@ type ProviderVerification = {
   department?: string;
   photoUrl?: string;
   blocked?: boolean;
+  blockedReason?: string | null;
+  balance?: number;
   verificationPhotoUrl?: string;
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
@@ -23,11 +33,40 @@ type ProviderVerification = {
   badgeVerificationVideoUrl?: string | null;
   badgeVerificationRequestedAt?: string | null;
   blockedAt?: string | null;
+  subscriptionStatus?: string | null;
+  subscriptionNextChargeAt?: string | null;
+  subscriptionLastPaidAt?: string | null;
+  subscriptionAmount?: number | null;
+  media?: AdminMediaItem[];
   createdAt?: string | null;
 };
 
 const toDateString = (value: FirebaseFirestore.Timestamp | undefined) => {
   return value?.toDate?.().toISOString() ?? null;
+};
+
+const sanitizeMediaForAdmin = (value: unknown): AdminMediaItem[] => {
+  if (!Array.isArray(value)) return [];
+
+  const items: Array<AdminMediaItem | null> = value.map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+
+      const media = item as Record<string, unknown>;
+      const url = typeof media.url === "string" ? media.url : "";
+
+      if (!url) return null;
+
+      return {
+        id: typeof media.id === "string" ? media.id : `legacy-${index}`,
+        type: media.type === "video" ? "video" : "photo",
+        url,
+        private: Boolean(media.private),
+        description:
+          typeof media.description === "string" ? media.description : "",
+      };
+    });
+
+  return items.filter((item): item is AdminMediaItem => Boolean(item));
 };
 
 export async function GET(request: Request) {
@@ -56,6 +95,8 @@ export async function GET(request: Request) {
           department: data.department,
           photoUrl: data.photoUrl,
           blocked: Boolean(data.blocked),
+          blockedReason: data.blockedReason || null,
+          balance: Number(data.balance || 0),
           verificationPhotoUrl: data.verificationPhotoUrl,
           verificationStatus: data.verificationStatus,
           verificationBadge: data.verificationBadge || null,
@@ -66,6 +107,11 @@ export async function GET(request: Request) {
             data.badgeVerificationRequestedAt
           ),
           blockedAt: toDateString(data.blockedAt),
+          subscriptionStatus: data.subscriptionStatus || null,
+          subscriptionNextChargeAt: toDateString(data.subscriptionNextChargeAt),
+          subscriptionLastPaidAt: toDateString(data.subscriptionLastPaidAt),
+          subscriptionAmount: data.subscriptionAmount || null,
+          media: Boolean(data.blocked) ? sanitizeMediaForAdmin(data.media) : [],
           createdAt: toDateString(data.createdAt),
         };
       })

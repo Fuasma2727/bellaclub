@@ -2,6 +2,7 @@ import { app } from "./firebase";
 import {
   getAuth,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   UserCredential,
@@ -58,6 +59,10 @@ export const registerUser = async (
 
 export const loginUser = async (email: string, password: string) => {
   return await signInWithEmailAndPassword(auth, email, password);
+};
+
+export const sendPasswordReset = async (email: string) => {
+  return await sendPasswordResetEmail(auth, email);
 };
 
 export const logoutUser = async () => {

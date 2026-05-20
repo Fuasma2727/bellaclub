@@ -1,4 +1,5 @@
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { processProviderSubscription } from "@/lib/providerSubscription";
 
 type WompiTransactionStatus =
   | "APPROVED"
@@ -60,6 +61,8 @@ export async function creditApprovedRecharge(transaction: WompiTransaction) {
       updatedAt: adminFieldValue.serverTimestamp(),
     });
   });
+
+  await processProviderSubscription(recharge.userId);
 
   return { credited: true };
 }

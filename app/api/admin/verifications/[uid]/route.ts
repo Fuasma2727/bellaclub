@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
+import {
+  processProviderSubscription,
+  PROVIDER_MONTHLY_FEE,
+} from "@/lib/providerSubscription";
 
 type VerificationAction =
   | "approve"
@@ -8,7 +12,14 @@ type VerificationAction =
   | "verifyVisit"
   | "removeVisit"
   | "block"
-  | "unblock";
+  | "unblock"
+  | "deleteMedia";
+
+type MediaItem = {
+  id?: string;
+  url?: string;
+  type?: "photo" | "video";
+};
 
 type Params = {
   params: Promise<{
@@ -20,8 +31,9 @@ export async function PATCH(request: Request, { params }: Params) {
   try {
     const owner = await requireOwner(request);
     const { uid } = await params;
-    const { action } = (await request.json()) as {
+    const { action, mediaId } = (await request.json()) as {
       action?: VerificationAction;
+      mediaId?: string;
     };
 
     if (!uid) {
@@ -38,6 +50,7 @@ export async function PATCH(request: Request, { params }: Params) {
       "removeVisit",
       "block",
       "unblock",
+      "deleteMedia",
     ];
 
     if (!action || !validActions.includes(action)) {
@@ -72,12 +85,24 @@ export async function PATCH(request: Request, { params }: Params) {
         profileVisible: true,
         verificationStatus: "approved",
         blocked: false,
+        blockedReason: adminFieldValue.delete(),
         visitVerified: Boolean(userData.visitVerified),
+        subscriptionStatus: "pending_payment",
+        subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionManualOverride: false,
+        subscriptionNextChargeAt: adminFieldValue.serverTimestamp(),
+        subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
         verifiedAt: adminFieldValue.serverTimestamp(),
         verifiedBy: owner.uid,
       });
 
-      return NextResponse.json({ success: true, status: "approved" });
+      const subscriptionResult = await processProviderSubscription(uid);
+
+      return NextResponse.json({
+        success: true,
+        status: "approved",
+        subscriptionResult,
+      });
     }
 
     if (action === "verifyVisit") {
@@ -128,6 +153,8 @@ export async function PATCH(request: Request, { params }: Params) {
     if (action === "block") {
       await userRef.update({
         blocked: true,
+        blockedReason: "admin_block",
+        subscriptionManualOverride: false,
         profileVisible: false,
         blockedAt: adminFieldValue.serverTimestamp(),
         blockedBy: owner.uid,
@@ -136,12 +163,92 @@ export async function PATCH(request: Request, { params }: Params) {
       return NextResponse.json({ success: true, blocked: true });
     }
 
+    if (action === "deleteMedia") {
+      if (!userData.blocked) {
+        return NextResponse.json(
+          { error: "Primero debes bloquear el perfil para eliminar fotos" },
+          { status: 400 }
+        );
+      }
+
+      if (!mediaId) {
+        return NextResponse.json(
+          { error: "Foto requerida" },
+          { status: 400 }
+        );
+      }
+
+      if (mediaId === "profile-photo") {
+        await userRef.update({
+          photoUrl: "",
+          mediaModeratedAt: adminFieldValue.serverTimestamp(),
+          mediaModeratedBy: owner.uid,
+        });
+
+        return NextResponse.json({ success: true, deletedMediaId: mediaId });
+      }
+
+      const media = Array.isArray(userData.media)
+        ? (userData.media as MediaItem[])
+        : [];
+      const nextMedia = media.filter(
+        (item, index) => (item.id || `legacy-${index}`) !== mediaId
+      );
+
+      if (nextMedia.length === media.length) {
+        return NextResponse.json(
+          { error: "Foto no encontrada" },
+          { status: 404 }
+        );
+      }
+
+      await userRef.update({
+        media: nextMedia,
+        mediaModeratedAt: adminFieldValue.serverTimestamp(),
+        mediaModeratedBy: owner.uid,
+      });
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "provider_media_removed",
+        title: "Contenido retirado",
+        message:
+          "El administrador retiro una foto de tu perfil por revision de seguridad.",
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return NextResponse.json({ success: true, deletedMediaId: mediaId });
+    }
+
     if (action === "unblock") {
       await userRef.update({
         blocked: false,
+        blockedReason: adminFieldValue.delete(),
         profileVisible: userData.verificationStatus === "approved",
+        subscriptionStatus:
+          userData.blockedReason === "subscription_unpaid"
+            ? "admin_override"
+            : userData.subscriptionStatus || "active",
+        subscriptionManualOverride:
+          userData.blockedReason === "subscription_unpaid"
+            ? true
+            : Boolean(userData.subscriptionManualOverride),
+        subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
         unblockedAt: adminFieldValue.serverTimestamp(),
         unblockedBy: owner.uid,
+      });
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "provider_unblocked",
+        title: "Perfil activado",
+        message:
+          userData.blockedReason === "subscription_unpaid"
+            ? "Tu perfil fue activado manualmente por el administrador aunque la mensualidad sigue pendiente."
+            : "Tu perfil fue activado nuevamente por el administrador.",
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
       });
 
       return NextResponse.json({ success: true, blocked: false });

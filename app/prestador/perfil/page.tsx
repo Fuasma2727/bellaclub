@@ -14,6 +14,10 @@ import Header from "@/components/header";
 import { useAuth } from "@/context/AuthContext";
 import { app } from "@/lib/firebase";
 import { colombia } from "@/lib/colombia";
+import {
+  EXTRA_VIDEO_SLOT_PRICE,
+  getProviderVideoLimit,
+} from "@/lib/providerMediaLimits";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
@@ -46,12 +50,23 @@ type ProviderProfile = {
   badgeVerificationStatus?: BadgeVerificationStatus;
   badgeVerificationLevel?: BadgeVerificationLevel;
   profileVisible?: boolean;
+  videoSlotsExtra?: number;
 };
 
 type UploadResponse = {
   url?: string;
   error?: string;
   details?: string;
+};
+
+type ProviderMediaResponse = {
+  media?: MediaItem[];
+  error?: string;
+};
+
+type VideoSlotResponse = {
+  videoSlotsExtra?: number;
+  error?: string;
 };
 
 const statusCopy: Record<
@@ -149,12 +164,14 @@ export default function PerfilPrestador() {
   const [whatsapp, setWhatsapp] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [videoSlotsExtra, setVideoSlotsExtra] = useState(0);
 
   const [saving, setSaving] = useState(false);
   const [requestingBadgeVerification, setRequestingBadgeVerification] =
     useState(false);
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [buyingVideoSlot, setBuyingVideoSlot] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -178,6 +195,13 @@ export default function PerfilPrestador() {
       ...media,
     ];
   }, [photoUrl, media]);
+
+  const videoCount = useMemo(
+    () => media.filter((item) => item.type === "video").length,
+    [media]
+  );
+  const videoLimit = getProviderVideoLimit(videoSlotsExtra);
+  const hasReachedVideoLimit = videoCount >= videoLimit;
 
   const cities = useMemo(() => {
     return (
@@ -234,6 +258,7 @@ export default function PerfilPrestador() {
         setBadgeVerificationStatus(data.badgeVerificationStatus || "none");
         setBadgeVerificationLevel(data.badgeVerificationLevel || null);
         setProfileVisible(Boolean(data.profileVisible));
+        setVideoSlotsExtra(Number(data.videoSlotsExtra || 0));
       } catch (loadError) {
         const text =
           loadError instanceof Error
@@ -358,6 +383,16 @@ export default function PerfilPrestador() {
 
       try {
         const type = file.type.startsWith("video") ? "video" : "photo";
+
+        if (type === "video" && hasReachedVideoLimit) {
+          setError(
+            `Llegaste al limite de ${videoLimit} videos. Compra un cupo extra por $${EXTRA_VIDEO_SLOT_PRICE.toLocaleString(
+              "es-CO"
+            )}.`
+          );
+          return;
+        }
+
         const url = await uploadFile(file, await user.getIdToken());
         const newItem: MediaItem = {
           id: createMediaId(),
@@ -367,14 +402,24 @@ export default function PerfilPrestador() {
           price: isPrivate ? forcedPrice || 0 : null,
           description: isPrivate ? privateDescription?.trim() || "" : "",
         };
-        const updated = [...media, newItem];
+        const res = await fetch("/api/provider-media", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${await user.getIdToken()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "add",
+            item: newItem,
+          }),
+        });
+        const data = (await res.json()) as ProviderMediaResponse;
 
-        setMedia(updated);
-        await setDoc(
-          doc(db, "users", user.uid),
-          { media: updated },
-          { merge: true }
-        );
+        if (!res.ok || !data.media) {
+          throw new Error(data.error || "No pudimos guardar el contenido");
+        }
+
+        setMedia(data.media);
 
         showSuccess(isPrivate ? "Contenido privado subido" : "Foto pública subida");
       } catch (uploadError) {
@@ -387,7 +432,7 @@ export default function PerfilPrestador() {
         setUploadingMedia(false);
       }
     },
-    [db, media, user]
+    [hasReachedVideoLimit, user, videoLimit]
   );
 
   const deleteMedia = async (index: number) => {
@@ -397,13 +442,25 @@ export default function PerfilPrestador() {
     setError("");
 
     try {
-      const updated = media.filter((_, i) => i !== index);
-      setMedia(updated);
-      await setDoc(
-        doc(db, "users", user.uid),
-        { media: updated },
-        { merge: true }
-      );
+      const target = media[index];
+      const res = await fetch("/api/provider-media", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await user.getIdToken()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "delete",
+          mediaId: target?.id || `legacy-${index}`,
+        }),
+      });
+      const data = (await res.json()) as ProviderMediaResponse;
+
+      if (!res.ok || !data.media) {
+        throw new Error(data.error || "No pudimos eliminar el contenido");
+      }
+
+      setMedia(data.media);
       showSuccess("Contenido eliminado");
     } catch (deleteError) {
       const text =
@@ -443,6 +500,38 @@ export default function PerfilPrestador() {
     setPendingFile(null);
     setContentPrice("");
     setContentDescription("");
+  };
+
+  const buyExtraVideoSlot = async () => {
+    if (!user) return;
+
+    setBuyingVideoSlot(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/provider-video-slots", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await user.getIdToken()}`,
+        },
+      });
+      const data = (await res.json()) as VideoSlotResponse;
+
+      if (!res.ok || typeof data.videoSlotsExtra !== "number") {
+        throw new Error(data.error || "No pudimos comprar el cupo extra");
+      }
+
+      setVideoSlotsExtra(data.videoSlotsExtra);
+      showSuccess("Cupo extra de video activado");
+    } catch (slotError) {
+      const text =
+        slotError instanceof Error
+          ? slotError.message
+          : "No pudimos comprar el cupo extra";
+      setError(text);
+    } finally {
+      setBuyingVideoSlot(false);
+    }
   };
 
   const requestBadgeVerification = async () => {
@@ -821,9 +910,23 @@ export default function PerfilPrestador() {
           <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-neutral-50">Galería</h2>
+              <p className="mt-1 text-sm text-neutral-500">
+                Videos: {videoCount}/{videoLimit} incluidos. Cupos extra:{" "}
+                {videoSlotsExtra}. Cada cupo adicional cuesta $
+                {EXTRA_VIDEO_SLOT_PRICE.toLocaleString("es-CO")}.
+              </p>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                disabled={buyingVideoSlot}
+                onClick={() => void buyExtraVideoSlot()}
+                className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-6 py-3 text-center text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {buyingVideoSlot ? "Comprando..." : "Comprar cupo video"}
+              </button>
+
               <label className="cursor-pointer rounded-md border border-white/[0.08] bg-white/[0.03] px-6 py-3 text-center text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]">
                 Subir público
                 <input

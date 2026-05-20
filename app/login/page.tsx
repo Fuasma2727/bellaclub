@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { loginUser } from "@/lib/auth";
+import { loginUser, sendPasswordReset } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 
 const trustSignals = [
-  "Perfiles con verificación",
+  "Perfiles con verificacion",
   "Pagos protegidos",
   "Contenido privado seguro",
 ];
@@ -18,7 +18,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"error" | "success">("error");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +31,38 @@ export default function LoginPage() {
       await loginUser(email, password);
       router.push("/prestadores");
     } catch {
-      setMessage("Correo o contraseña incorrectos");
+      setMessageType("error");
+      setMessage("Correo o contrasena incorrectos");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail) {
+      setMessageType("error");
+      setMessage("Escribe tu correo para enviarte el enlace de recuperacion.");
+      return;
+    }
+
+    setResetLoading(true);
+    setMessage("");
+
+    try {
+      await sendPasswordReset(cleanEmail);
+      setMessageType("success");
+      setMessage(
+        "Te enviamos un correo para restablecer tu contrasena. Revisa tambien spam o promociones."
+      );
+    } catch {
+      setMessageType("error");
+      setMessage(
+        "No pudimos enviar el correo. Revisa que el email este bien escrito."
+      );
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -101,7 +132,7 @@ export default function LoginPage() {
                   Bienvenido de nuevo
                 </p>
                 <h2 className="text-2xl font-semibold text-white sm:text-3xl">
-                  Iniciar sesión
+                  Iniciar sesion
                 </h2>
                 <p className="mt-2 text-sm text-neutral-400">
                   Accede con tu cuenta para continuar explorando BelaClub.
@@ -130,19 +161,29 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="password"
-                    className="mb-1.5 block text-sm font-medium text-neutral-300"
-                  >
-                    Contraseña
-                  </label>
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <label
+                      htmlFor="password"
+                      className="block text-sm font-medium text-neutral-300"
+                    >
+                      Contrasena
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void handlePasswordReset()}
+                      disabled={resetLoading}
+                      className="text-xs font-medium text-blue-300 transition hover:text-blue-200 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {resetLoading ? "Enviando..." : "Olvide mi contrasena"}
+                    </button>
+                  </div>
                   <input
                     id="password"
                     name="password"
                     type="password"
                     autoComplete="current-password"
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-white outline-none transition placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-                    placeholder="Ingresa tu contraseña"
+                    placeholder="Ingresa tu contrasena"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -150,7 +191,13 @@ export default function LoginPage() {
                 </div>
 
                 {message && (
-                  <div className="rounded-lg border border-red-700 bg-red-950/40 p-3 text-sm text-red-200">
+                  <div
+                    className={`rounded-lg border p-3 text-sm ${
+                      messageType === "success"
+                        ? "border-emerald-700 bg-emerald-950/40 text-emerald-200"
+                        : "border-red-700 bg-red-950/40 text-red-200"
+                    }`}
+                  >
                     {message}
                   </div>
                 )}
@@ -166,7 +213,7 @@ export default function LoginPage() {
 
               <div className="mt-6 flex flex-col gap-3 text-center text-sm text-neutral-400">
                 <p>
-                  ¿No tienes cuenta?{" "}
+                  No tienes cuenta?{" "}
                   <Link
                     href="/register"
                     className="font-medium text-blue-300 hover:text-blue-200 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -179,14 +226,14 @@ export default function LoginPage() {
                   href="/prestadores"
                   className="text-neutral-500 hover:text-neutral-300 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
-                  Explorar prestadores sin iniciar sesión
+                  Explorar prestadores sin iniciar sesion
                 </Link>
               </div>
             </div>
 
             <p className="mt-5 text-center text-xs leading-5 text-neutral-500">
-              Tu acceso está protegido. Nunca compartiremos tu información de
-              inicio de sesión.
+              Tu acceso esta protegido. Nadie en BelaClub puede ver tu
+              contrasena; solo puedes restablecerla desde tu correo.
             </p>
           </section>
         </div>

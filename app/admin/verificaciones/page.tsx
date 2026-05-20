@@ -10,6 +10,14 @@ type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
 type VerificationBadge = "gold" | "diamond";
 
+type AdminMediaItem = {
+  id: string;
+  type: "photo" | "video";
+  url?: string;
+  private: boolean;
+  description?: string;
+};
+
 type ProviderVerification = {
   id: string;
   email?: string;
@@ -19,6 +27,8 @@ type ProviderVerification = {
   department?: string;
   photoUrl?: string;
   blocked?: boolean;
+  blockedReason?: string | null;
+  balance?: number;
   verificationPhotoUrl?: string;
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
@@ -27,6 +37,11 @@ type ProviderVerification = {
   badgeVerificationVideoUrl?: string | null;
   badgeVerificationRequestedAt?: string | null;
   blockedAt?: string | null;
+  subscriptionStatus?: string | null;
+  subscriptionNextChargeAt?: string | null;
+  subscriptionLastPaidAt?: string | null;
+  subscriptionAmount?: number | null;
+  media?: AdminMediaItem[];
   createdAt?: string | null;
 };
 
@@ -61,7 +76,8 @@ type VerificationAction =
   | "verifyVisit"
   | "removeVisit"
   | "block"
-  | "unblock";
+  | "unblock"
+  | "deleteMedia";
 
 const statusClass: Record<VerificationStatus, string> = {
   pending: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200",
@@ -154,7 +170,8 @@ export default function AdminVerificationsPage() {
 
   const handleAction = async (
     provider: ProviderVerification,
-    action: VerificationAction
+    action: VerificationAction,
+    mediaId?: string
   ) => {
     if (!user) return;
 
@@ -168,7 +185,20 @@ export default function AdminVerificationsPage() {
       if (!confirmed) return;
     }
 
-    setActionId(provider.id);
+    if (action === "deleteMedia") {
+      const confirmed = window.confirm(
+        "Seguro que quieres eliminar esta foto del prestador?"
+      );
+
+      if (!confirmed) return;
+    }
+
+    const currentActionId =
+      action === "deleteMedia" && mediaId
+        ? `${provider.id}:${mediaId}`
+        : provider.id;
+
+    setActionId(currentActionId);
     setMessage("");
 
     try {
@@ -179,7 +209,7 @@ export default function AdminVerificationsPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, mediaId }),
       });
       const data = (await res.json()) as { error?: string };
 
@@ -188,6 +218,21 @@ export default function AdminVerificationsPage() {
       }
 
       setProviders((current) => {
+        if (action === "deleteMedia" && mediaId) {
+          return current.map((item) => {
+            if (item.id !== provider.id) return item;
+
+            if (mediaId === "profile-photo") {
+              return { ...item, photoUrl: "" };
+            }
+
+            return {
+              ...item,
+              media: (item.media || []).filter((media) => media.id !== mediaId),
+            };
+          });
+        }
+
         if (action === "unblock" && activeView === "blocked") {
           return current.filter((item) => item.id !== provider.id);
         }
@@ -625,6 +670,24 @@ export default function AdminVerificationsPage() {
                             WhatsApp: {provider.whatsapp}
                           </p>
                         )}
+                        {typeof provider.balance === "number" && (
+                          <p className="mt-1 text-xs text-neutral-500">
+                            Saldo: ${provider.balance.toLocaleString("es-CO")}
+                          </p>
+                        )}
+                        {provider.subscriptionStatus && (
+                          <p className="mt-1 text-xs text-neutral-500">
+                            Mensualidad:{" "}
+                            {provider.subscriptionStatus === "active"
+                              ? "Activa"
+                              : provider.subscriptionStatus === "past_due"
+                                ? "Pendiente"
+                                : provider.subscriptionStatus ===
+                                    "admin_override"
+                                  ? "Activada por admin"
+                                  : "Por cobrar"}
+                          </p>
+                        )}
                         {provider.createdAt && (
                           <p className="mt-1 text-xs text-neutral-500">
                             {new Date(
@@ -656,7 +719,9 @@ export default function AdminVerificationsPage() {
                         )}
                         {provider.blocked && (
                           <span className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-200">
-                            Bloqueado
+                            {provider.blockedReason === "subscription_unpaid"
+                              ? "Mensualidad pendiente"
+                              : "Bloqueado"}
                           </span>
                         )}
                       </div>
@@ -696,9 +761,132 @@ export default function AdminVerificationsPage() {
                     </button>
 
                     {isBlockedView ? (
-                      <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">
-                        Perfil bloqueado. Puedes desbloquearlo cuando quieras
-                        que vuelva a funcionar en la pagina publica.
+                      <div className="space-y-3">
+                        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">
+                          {provider.blockedReason === "subscription_unpaid"
+                            ? "Perfil bloqueado por mensualidad pendiente. Puedes activarlo manualmente desde aqui aunque no pague."
+                            : "Perfil bloqueado. Puedes eliminar fotos antes de volver a activarlo."}
+                        </div>
+
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                              Fotos del perfil
+                            </p>
+                            <span className="text-xs text-neutral-600">
+                              {(provider.media || []).length +
+                                (provider.photoUrl ? 1 : 0)}
+                            </span>
+                          </div>
+
+                          {!provider.photoUrl &&
+                          (!provider.media || provider.media.length === 0) ? (
+                            <p className="text-sm text-neutral-500">
+                              Este prestador no tiene fotos para moderar.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                              {provider.photoUrl && (
+                                <div className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
+                                  <div className="relative aspect-square">
+                                    <Image
+                                      src={provider.photoUrl}
+                                      alt="Foto principal"
+                                      fill
+                                      className="object-cover"
+                                      sizes="180px"
+                                    />
+                                  </div>
+                                  <div className="p-2">
+                                    <p className="mb-2 truncate text-xs text-neutral-400">
+                                      Foto principal
+                                    </p>
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        actionId ===
+                                        `${provider.id}:profile-photo`
+                                      }
+                                      onClick={() =>
+                                        handleAction(
+                                          provider,
+                                          "deleteMedia",
+                                          "profile-photo"
+                                        )
+                                      }
+                                      className="w-full rounded-md border border-red-500/35 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {actionId ===
+                                      `${provider.id}:profile-photo`
+                                        ? "Eliminando..."
+                                        : "Eliminar"}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {(provider.media || []).map((media) => (
+                                <div
+                                  key={media.id}
+                                  className="overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                                >
+                                  <div className="relative aspect-square">
+                                    {media.type === "video" ? (
+                                      <video
+                                        src={media.url}
+                                        className="h-full w-full object-cover"
+                                        muted
+                                      />
+                                    ) : (
+                                      <Image
+                                        src={media.url || "/default-avatar.png"}
+                                        alt={
+                                          media.description || "Foto de perfil"
+                                        }
+                                        fill
+                                        className="object-cover"
+                                        sizes="180px"
+                                      />
+                                    )}
+                                    {media.private && (
+                                      <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
+                                        Privada
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="p-2">
+                                    <p className="mb-2 truncate text-xs text-neutral-400">
+                                      {media.description ||
+                                        (media.private
+                                          ? "Contenido privado"
+                                          : "Contenido publico")}
+                                    </p>
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        actionId ===
+                                        `${provider.id}:${media.id}`
+                                      }
+                                      onClick={() =>
+                                        handleAction(
+                                          provider,
+                                          "deleteMedia",
+                                          media.id
+                                        )
+                                      }
+                                      className="w-full rounded-md border border-red-500/35 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {actionId ===
+                                      `${provider.id}:${media.id}`
+                                        ? "Eliminando..."
+                                        : "Eliminar"}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : isInitialRequest ? (
                       <div className="grid grid-cols-2 gap-3">
