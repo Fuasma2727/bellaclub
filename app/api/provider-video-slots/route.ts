@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import admin from "firebase-admin";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
-import { EXTRA_VIDEO_SLOT_PRICE } from "@/lib/providerMediaLimits";
+import {
+  EXTRA_VIDEO_SECONDS,
+  EXTRA_VIDEO_TIME_PRICE,
+} from "@/lib/providerMediaLimits";
 
 export const runtime = "nodejs";
 
@@ -22,47 +25,50 @@ export async function POST(request: Request) {
 
       const balance = Number(user.balance || 0);
 
-      if (balance < EXTRA_VIDEO_SLOT_PRICE) {
+      if (balance < EXTRA_VIDEO_TIME_PRICE) {
         throw new Error("INSUFFICIENT_BALANCE");
       }
 
-      const currentSlots = Number(user.videoSlotsExtra || 0);
-      const nextSlots = currentSlots + 1;
+      const currentSeconds = Number(user.videoSecondsExtra || 0);
+      const nextSeconds = currentSeconds + EXTRA_VIDEO_SECONDS;
+      const nextMinutes = Math.floor(nextSeconds / 60);
 
       tx.update(userRef, {
-        balance: admin.firestore.FieldValue.increment(-EXTRA_VIDEO_SLOT_PRICE),
-        videoSlotsExtra: admin.firestore.FieldValue.increment(1),
-        videoSlotsUpdatedAt: adminFieldValue.serverTimestamp(),
+        balance: admin.firestore.FieldValue.increment(-EXTRA_VIDEO_TIME_PRICE),
+        videoSecondsExtra: admin.firestore.FieldValue.increment(
+          EXTRA_VIDEO_SECONDS
+        ),
+        videoTimeUpdatedAt: adminFieldValue.serverTimestamp(),
       });
 
-      tx.set(adminDb.collection("providerVideoSlotPurchases").doc(), {
+      tx.set(adminDb.collection("providerVideoTimePurchases").doc(), {
         providerId: decoded.uid,
-        amount: EXTRA_VIDEO_SLOT_PRICE,
-        slots: 1,
+        amount: EXTRA_VIDEO_TIME_PRICE,
+        seconds: EXTRA_VIDEO_SECONDS,
         status: "completed",
         createdAt: adminFieldValue.serverTimestamp(),
       });
 
       tx.set(adminDb.collection("notifications").doc(), {
         userId: decoded.uid,
-        type: "provider_video_slot_purchase",
-        title: "Cupo extra de video activado",
-        message: `Compraste 1 cupo extra de video por $${EXTRA_VIDEO_SLOT_PRICE.toLocaleString(
+        type: "provider_video_time_purchase",
+        title: "Tiempo extra de video activado",
+        message: `Compraste 1 minuto extra de video por $${EXTRA_VIDEO_TIME_PRICE.toLocaleString(
           "es-CO"
-        )}. Ahora tienes ${nextSlots} cupo${
-          nextSlots === 1 ? "" : "s"
+        )}. Ahora tienes ${nextMinutes} minuto${
+          nextMinutes === 1 ? "" : "s"
         } extra.`,
-        amount: EXTRA_VIDEO_SLOT_PRICE,
+        amount: EXTRA_VIDEO_TIME_PRICE,
         read: false,
         createdAt: adminFieldValue.serverTimestamp(),
       });
 
-      return { videoSlotsExtra: nextSlots };
+      return { videoSecondsExtra: nextSeconds };
     });
 
     return NextResponse.json({
       success: true,
-      price: EXTRA_VIDEO_SLOT_PRICE,
+      price: EXTRA_VIDEO_TIME_PRICE,
       ...result,
     });
   } catch (error) {
@@ -71,7 +77,7 @@ export async function POST(request: Request) {
         USER_NOT_FOUND: { message: "Usuario no encontrado", status: 404 },
         NOT_PROVIDER: { message: "Solo prestadores pueden comprar cupos", status: 403 },
         INSUFFICIENT_BALANCE: {
-          message: "Saldo insuficiente para comprar un cupo extra de video",
+          message: "Saldo insuficiente para comprar tiempo extra de video",
           status: 400,
         },
       };

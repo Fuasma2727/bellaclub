@@ -15,8 +15,9 @@ import { useAuth } from "@/context/AuthContext";
 import { app } from "@/lib/firebase";
 import { colombia } from "@/lib/colombia";
 import {
-  EXTRA_VIDEO_SLOT_PRICE,
-  getProviderVideoLimit,
+  EXTRA_VIDEO_TIME_PRICE,
+  getProviderVideoSecondsLimit,
+  getProviderVideoSecondsUsed,
 } from "@/lib/providerMediaLimits";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
@@ -31,6 +32,7 @@ type MediaItem = {
   private?: boolean;
   price?: number | null;
   description?: string;
+  duration?: number | null;
 };
 
 type StatusTone = "approved" | "pending" | "rejected";
@@ -50,7 +52,7 @@ type ProviderProfile = {
   badgeVerificationStatus?: BadgeVerificationStatus;
   badgeVerificationLevel?: BadgeVerificationLevel;
   profileVisible?: boolean;
-  videoSlotsExtra?: number;
+  videoSecondsExtra?: number;
 };
 
 type UploadResponse = {
@@ -65,7 +67,7 @@ type ProviderMediaResponse = {
 };
 
 type VideoSlotResponse = {
-  videoSlotsExtra?: number;
+  videoSecondsExtra?: number;
   error?: string;
 };
 
@@ -138,6 +140,32 @@ const uploadFile = async (file: File, token: string) => {
   return data.url;
 };
 
+const getVideoDuration = (file: File) => {
+  return new Promise<number>((resolve, reject) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(Math.ceil(video.duration || 0));
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("No pudimos leer la duracion del video"));
+    };
+    video.src = objectUrl;
+  });
+};
+
+const formatVideoTime = (seconds: number) => {
+  const safeSeconds = Math.max(0, Math.ceil(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+};
+
 export default function PerfilPrestador() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -164,14 +192,15 @@ export default function PerfilPrestador() {
   const [whatsapp, setWhatsapp] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
-  const [videoSlotsExtra, setVideoSlotsExtra] = useState(0);
+  const [videoSecondsExtra, setVideoSecondsExtra] = useState(0);
 
   const [saving, setSaving] = useState(false);
   const [requestingBadgeVerification, setRequestingBadgeVerification] =
     useState(false);
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
-  const [buyingVideoSlot, setBuyingVideoSlot] = useState(false);
+  const [buyingVideoTime, setBuyingVideoTime] = useState(false);
+  const [showVideoTimePurchase, setShowVideoTimePurchase] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -195,12 +224,12 @@ export default function PerfilPrestador() {
     ];
   }, [photoUrl, media]);
 
-  const videoCount = useMemo(
-    () => media.filter((item) => item.type === "video").length,
+  const videoSecondsUsed = useMemo(
+    () => getProviderVideoSecondsUsed(media),
     [media]
   );
-  const videoLimit = getProviderVideoLimit(videoSlotsExtra);
-  const hasReachedVideoLimit = videoCount >= videoLimit;
+  const videoSecondsLimit = getProviderVideoSecondsLimit(videoSecondsExtra);
+  const hasReachedVideoTimeLimit = videoSecondsUsed >= videoSecondsLimit;
 
   const cities = useMemo(() => {
     return (
@@ -219,6 +248,14 @@ export default function PerfilPrestador() {
         : effectiveVerificationBadge === "gold"
           ? "Oro"
           : "Platino";
+  const locationSummary =
+    city && department
+      ? `${city}, ${department}`
+      : city || department || "Ubicacion pendiente";
+  const priceSummary = price
+    ? `$${Number(price).toLocaleString("es-CO")}`
+    : "Precio por definir";
+  const whatsappSummary = whatsapp || "WhatsApp pendiente";
 
   const showSuccess = (text: string) => {
     setMessage(text);
@@ -264,7 +301,7 @@ export default function PerfilPrestador() {
         setBadgeVerificationStatus(data.badgeVerificationStatus || "none");
         setBadgeVerificationLevel(data.badgeVerificationLevel || null);
         setProfileVisible(Boolean(data.profileVisible));
-        setVideoSlotsExtra(Number(data.videoSlotsExtra || 0));
+        setVideoSecondsExtra(Number(data.videoSecondsExtra || 0));
       } catch (loadError) {
         const text =
           loadError instanceof Error
@@ -390,11 +427,20 @@ export default function PerfilPrestador() {
       try {
         const type = file.type.startsWith("video") ? "video" : "photo";
 
-        if (type === "video" && hasReachedVideoLimit) {
+        const duration = type === "video" ? await getVideoDuration(file) : null;
+
+        if (
+          type === "video" &&
+          duration &&
+          videoSecondsUsed + duration > videoSecondsLimit
+        ) {
+          setShowVideoTimePurchase(true);
           setError(
-            `Llegaste al limite de ${videoLimit} videos. Compra un cupo extra por $${EXTRA_VIDEO_SLOT_PRICE.toLocaleString(
-              "es-CO"
-            )}.`
+            `Este video dura ${formatVideoTime(
+              duration
+            )} y supera tus ${formatVideoTime(
+              videoSecondsLimit
+            )} incluidos. Para subirlo debes comprar tiempo extra.`
           );
           return;
         }
@@ -406,6 +452,7 @@ export default function PerfilPrestador() {
           url,
           private: isPrivate,
           price: isPrivate ? forcedPrice || 0 : null,
+          duration,
           description: isPrivate ? privateDescription?.trim() || "" : "",
         };
         const res = await fetch("/api/provider-media", {
@@ -438,7 +485,7 @@ export default function PerfilPrestador() {
         setUploadingMedia(false);
       }
     },
-    [hasReachedVideoLimit, user, videoLimit]
+    [user, videoSecondsLimit, videoSecondsUsed]
   );
 
   const deleteMedia = async (index: number) => {
@@ -508,10 +555,10 @@ export default function PerfilPrestador() {
     setContentDescription("");
   };
 
-  const buyExtraVideoSlot = async () => {
+  const buyExtraVideoTime = async () => {
     if (!user) return;
 
-    setBuyingVideoSlot(true);
+    setBuyingVideoTime(true);
     setError("");
 
     try {
@@ -523,20 +570,21 @@ export default function PerfilPrestador() {
       });
       const data = (await res.json()) as VideoSlotResponse;
 
-      if (!res.ok || typeof data.videoSlotsExtra !== "number") {
-        throw new Error(data.error || "No pudimos comprar el cupo extra");
+      if (!res.ok || typeof data.videoSecondsExtra !== "number") {
+        throw new Error(data.error || "No pudimos comprar tiempo extra");
       }
 
-      setVideoSlotsExtra(data.videoSlotsExtra);
-      showSuccess("Cupo extra de video activado");
+      setVideoSecondsExtra(data.videoSecondsExtra);
+      setShowVideoTimePurchase(false);
+      showSuccess("Minuto extra de video activado");
     } catch (slotError) {
       const text =
         slotError instanceof Error
           ? slotError.message
-          : "No pudimos comprar el cupo extra";
+          : "No pudimos comprar tiempo extra";
       setError(text);
     } finally {
-      setBuyingVideoSlot(false);
+      setBuyingVideoTime(false);
     }
   };
 
@@ -713,15 +761,25 @@ export default function PerfilPrestador() {
             </aside>
 
             <div className="flex-1">
-              <div className="flex justify-end">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                    Informacion publica
+                  </p>
+                  <p className="mt-1 text-sm text-neutral-400">
+                    {editMode
+                      ? "Actualiza solo lo que quieres cambiar."
+                      : "Tu vista resumida para clientes."}
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setEditMode((value) => !value)}
-                    className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                       editMode
                         ? "border border-white/[0.08] bg-white/[0.03] text-neutral-200 hover:bg-white/[0.07]"
-                        : "bg-blue-600 text-white shadow-lg shadow-blue-950/25 hover:bg-blue-500"
+                        : "bg-blue-600 text-white shadow-lg shadow-blue-950/25 hover:-translate-y-0.5 hover:bg-blue-500"
                     }`}
                   >
                     {editMode ? "Cancelar" : "Editar"}
@@ -731,7 +789,7 @@ export default function PerfilPrestador() {
                       type="button"
                       onClick={saveProfile}
                       disabled={saving}
-                      className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                     >
                       {saving ? "Guardando..." : "Guardar"}
                     </button>
@@ -739,6 +797,43 @@ export default function PerfilPrestador() {
                 </div>
               </div>
 
+              {!editMode ? (
+                <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/25 p-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
+                        Ubicacion
+                      </p>
+                      <p className="mt-1 truncate text-sm font-semibold text-neutral-100">
+                        {locationSummary}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-emerald-300/15 bg-emerald-300/[0.06] px-3 py-2.5">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-300/70">
+                        Precio
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-emerald-100">
+                        {priceSummary}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
+                        Contacto
+                      </p>
+                      <p className="mt-1 truncate text-sm font-semibold text-neutral-100">
+                        {whatsappSummary}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-md border border-white/[0.06] bg-[#0b0b0c] px-3 py-3">
+                    <p className="line-clamp-3 text-sm leading-6 text-neutral-300">
+                      {description ||
+                        "Agrega una descripcion breve para que los clientes entiendan mejor tus servicios."}
+                    </p>
+                  </div>
+                </div>
+              ) : (
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="sm:col-span-2">
                 <label
@@ -903,7 +998,8 @@ export default function PerfilPrestador() {
                   </p>
                 )}
               </div>
-            </div>
+              </div>
+              )}
             </div>
           </div>
         </section>
@@ -913,21 +1009,26 @@ export default function PerfilPrestador() {
             <div>
               <h2 className="text-2xl font-semibold text-neutral-50">Galería</h2>
               <p className="mt-1 text-sm text-neutral-500">
-                Videos: {videoCount}/{videoLimit} incluidos. Cupos extra:{" "}
-                {videoSlotsExtra}. Cada cupo adicional cuesta $
-                {EXTRA_VIDEO_SLOT_PRICE.toLocaleString("es-CO")}.
+                Tiempo de video: {formatVideoTime(videoSecondsUsed)} /{" "}
+                {formatVideoTime(videoSecondsLimit)} incluido.
               </p>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-3">
-              <button
-                type="button"
-                disabled={buyingVideoSlot}
-                onClick={() => void buyExtraVideoSlot()}
-                className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-6 py-3 text-center text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {buyingVideoSlot ? "Comprando..." : "Comprar cupo video"}
-              </button>
+              {(hasReachedVideoTimeLimit || showVideoTimePurchase) && (
+                <button
+                  type="button"
+                  disabled={buyingVideoTime}
+                  onClick={() => void buyExtraVideoTime()}
+                  className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-6 py-3 text-center text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {buyingVideoTime
+                    ? "Comprando..."
+                    : `Comprar 1 min $${EXTRA_VIDEO_TIME_PRICE.toLocaleString(
+                        "es-CO"
+                      )}`}
+                </button>
+              )}
 
               <label className="cursor-pointer rounded-md border border-white/[0.08] bg-white/[0.03] px-6 py-3 text-center text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]">
                 Subir público
@@ -1048,6 +1149,13 @@ export default function PerfilPrestador() {
               Define qué hay detrás y cuánto deberá pagar el cliente para
               desbloquearlo.
             </p>
+            {pendingFile?.type.startsWith("video") && (
+              <div className="mt-4 rounded-md border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
+                Los primeros 3 minutos de video estan incluidos. Si este video
+                supera tu tiempo disponible, deberas comprar tiempo extra para
+                poder subirlo.
+              </div>
+            )}
 
             <div className="mt-5">
               <label

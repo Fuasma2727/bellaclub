@@ -1,5 +1,6 @@
-export const INCLUDED_PROVIDER_VIDEOS = 3;
-export const EXTRA_VIDEO_SLOT_PRICE = 50000;
+export const INCLUDED_PROVIDER_VIDEO_SECONDS = 3 * 60;
+export const EXTRA_VIDEO_SECONDS = 60;
+export const EXTRA_VIDEO_TIME_PRICE = 50000;
 
 export type ProviderMediaItem = {
   id?: string;
@@ -8,12 +9,19 @@ export type ProviderMediaItem = {
   private?: boolean;
   price?: number | string | null;
   description?: string;
+  duration?: number | string | null;
 };
 
-export const countProviderVideos = (media: ProviderMediaItem[]) => {
-  return media.filter((item) => item.type === "video").length;
+export const getProviderVideoSecondsUsed = (media: ProviderMediaItem[]) => {
+  return media
+    .filter((item) => item.type === "video")
+    .reduce((total, item) => total + Math.max(0, Number(item.duration || 0)), 0);
 };
 
-export const getProviderVideoLimit = (extraSlots?: number | string | null) => {
-  return INCLUDED_PROVIDER_VIDEOS + Math.max(0, Number(extraSlots || 0));
+export const getProviderVideoSecondsLimit = (
+  extraSeconds?: number | string | null
+) => {
+  return (
+    INCLUDED_PROVIDER_VIDEO_SECONDS + Math.max(0, Number(extraSeconds || 0))
+  );
 };

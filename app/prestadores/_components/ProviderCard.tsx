@@ -43,14 +43,30 @@ export default function ProviderCard({
         : verificationBadge === "gold"
           ? "Este usuario fue verificado presencialmente"
           : "Este usuario fue verificado por servicio";
-  const badgeSymbol =
+  const badgeStyle =
     verificationBadge === "bronze"
-      ? "B"
+      ? {
+          shell:
+            "border-[#c0834b]/40 bg-[#c0834b]/15 shadow-[#5f3519]/25 hover:bg-[#c0834b]/22",
+          gem: "from-[#f0b06a] via-[#b87333] to-[#6f3f1d]",
+        }
       : verificationBadge === "silver"
-        ? "P"
+        ? {
+            shell:
+              "border-zinc-200/35 bg-zinc-200/12 shadow-zinc-950/20 hover:bg-zinc-200/18",
+            gem: "from-white via-zinc-300 to-zinc-500",
+          }
         : verificationBadge === "gold"
-          ? "O"
-          : "PT";
+          ? {
+              shell:
+                "border-yellow-300/40 bg-yellow-300/15 shadow-yellow-950/25 hover:bg-yellow-300/22",
+              gem: "from-yellow-100 via-yellow-400 to-amber-700",
+            }
+          : {
+              shell:
+                "border-cyan-200/45 bg-cyan-200/15 shadow-cyan-950/30 hover:bg-cyan-200/25",
+              gem: "from-white via-cyan-200 to-fuchsia-400",
+            };
   const privateCount = (provider.media || []).filter((item) => item.private)
     .length;
 
@@ -115,9 +131,12 @@ export default function ProviderCard({
                   event.stopPropagation();
                   setShowBadgeInfo((value) => !value);
                 }}
-                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-300/15 text-[10px] font-semibold text-emerald-100 shadow-lg shadow-emerald-950/20 transition hover:-translate-y-0.5 hover:bg-emerald-300/20 sm:h-7 sm:w-7"
+                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border shadow-lg transition hover:-translate-y-0.5 sm:h-7 sm:w-7 ${badgeStyle.shell}`}
               >
-                {badgeSymbol}
+                <span
+                  aria-hidden="true"
+                  className={`h-2.5 w-2.5 rotate-45 rounded-[2px] bg-gradient-to-br shadow-sm sm:h-3 sm:w-3 ${badgeStyle.gem}`}
+                />
               </button>
             )}
 

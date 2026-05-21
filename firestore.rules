@@ -113,7 +113,7 @@ service cloud.firestore {
         && request.resource.data.verificationBadge == resource.data.verificationBadge
         && request.resource.data.rating == resource.data.rating
         && request.resource.data.media == resource.data.media
-        && request.resource.data.videoSlotsExtra == resource.data.videoSlotsExtra
+        && request.resource.data.videoSecondsExtra == resource.data.videoSecondsExtra
         && request.resource.data.purchasedContent == resource.data.purchasedContent;
 
       allow delete: if false;

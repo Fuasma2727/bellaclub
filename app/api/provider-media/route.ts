@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
 import {
-  countProviderVideos,
-  getProviderVideoLimit,
+  getProviderVideoSecondsLimit,
+  getProviderVideoSecondsUsed,
   ProviderMediaItem,
 } from "@/lib/providerMediaLimits";
 
@@ -74,11 +74,20 @@ export async function POST(request: Request) {
         throw new Error("INVALID_MEDIA");
       }
 
-      const currentVideoCount = countProviderVideos(media);
-      const videoLimit = getProviderVideoLimit(user.videoSlotsExtra);
+      const videoSecondsUsed = getProviderVideoSecondsUsed(media);
+      const videoSecondsLimit = getProviderVideoSecondsLimit(
+        user.videoSecondsExtra
+      );
+      const incomingDuration = Math.ceil(Number(body.item.duration || 0));
 
-      if (body.item.type === "video" && currentVideoCount >= videoLimit) {
-        throw new Error("VIDEO_LIMIT_REACHED");
+      if (body.item.type === "video") {
+        if (!incomingDuration || incomingDuration <= 0) {
+          throw new Error("INVALID_VIDEO_DURATION");
+        }
+
+        if (videoSecondsUsed + incomingDuration > videoSecondsLimit) {
+          throw new Error("VIDEO_TIME_LIMIT_REACHED");
+        }
       }
 
       const updated = [
@@ -89,6 +98,7 @@ export async function POST(request: Request) {
           url: body.item.url,
           private: Boolean(body.item.private),
           price: body.item.private ? Number(body.item.price || 0) : null,
+          duration: body.item.type === "video" ? incomingDuration : null,
           description: body.item.private
             ? String(body.item.description || "").trim()
             : "",
@@ -100,7 +110,7 @@ export async function POST(request: Request) {
         mediaUpdatedAt: adminFieldValue.serverTimestamp(),
       });
 
-      return { media: updated, videoLimit };
+      return { media: updated, videoSecondsLimit };
     });
 
     return NextResponse.json({ success: true, ...result });
@@ -111,9 +121,13 @@ export async function POST(request: Request) {
         NOT_PROVIDER: { message: "Solo prestadores pueden subir contenido", status: 403 },
         MEDIA_REQUIRED: { message: "Contenido requerido", status: 400 },
         INVALID_MEDIA: { message: "Contenido invalido", status: 400 },
-        VIDEO_LIMIT_REACHED: {
+        INVALID_VIDEO_DURATION: {
+          message: "No pudimos leer la duracion del video",
+          status: 400,
+        },
+        VIDEO_TIME_LIMIT_REACHED: {
           message:
-            "Llegaste al limite de videos incluidos. Compra un cupo extra para subir mas videos.",
+            "Este video supera el tiempo incluido. Compra tiempo extra para subirlo.",
           status: 402,
         },
       };
