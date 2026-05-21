@@ -21,6 +21,14 @@ type MediaItem = {
   type?: "photo" | "video";
 };
 
+const badgeByLevel = (level: number) => {
+  if (level === 1) return "bronze";
+  if (level === 2) return "silver";
+  if (level === 3) return "gold";
+  if (level === 4) return "platinum";
+  return null;
+};
+
 type Params = {
   params: Promise<{
     uid: string;
@@ -106,16 +114,10 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     if (action === "verifyVisit") {
-      if (userData.verificationStatus !== "approved") {
-        return NextResponse.json(
-          { error: "Primero debes aprobar el perfil inicial" },
-          { status: 400 }
-        );
-      }
-
       const level = Number(userData.badgeVerificationLevel || 0);
+      const badge = badgeByLevel(level);
 
-      if (level !== 1 && level !== 2) {
+      if (!badge || userData.badgeVerificationStatus !== "pending") {
         return NextResponse.json(
           { error: "El prestador no tiene una solicitud de insignia valida" },
           { status: 400 }
@@ -123,17 +125,33 @@ export async function PATCH(request: Request, { params }: Params) {
       }
 
       await userRef.update({
-        visitVerified: level === 2,
-        visitVerificationStatus: level === 2 ? "approved" : "none",
-        verificationBadge: level === 2 ? "diamond" : "gold",
+        isVerified: true,
+        profileVisible: true,
+        verificationStatus: "approved",
+        blocked: false,
+        blockedReason: adminFieldValue.delete(),
+        visitVerified: level >= 3,
+        visitVerificationStatus: level >= 3 ? "approved" : "none",
+        verificationBadge: badge,
         badgeVerificationStatus: "approved",
         badgeVerifiedAt: adminFieldValue.serverTimestamp(),
         badgeVerifiedBy: owner.uid,
+        subscriptionStatus:
+          userData.subscriptionStatus || "pending_payment",
+        subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionManualOverride: false,
+        subscriptionNextChargeAt:
+          userData.subscriptionNextChargeAt ||
+          adminFieldValue.serverTimestamp(),
+        subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
       });
+
+      const subscriptionResult = await processProviderSubscription(uid);
 
       return NextResponse.json({
         success: true,
-        verificationBadge: level === 2 ? "diamond" : "gold",
+        verificationBadge: badge,
+        subscriptionResult,
       });
     }
 

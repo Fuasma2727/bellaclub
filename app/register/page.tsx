@@ -5,49 +5,19 @@ import { registerUser, UserRole } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { doc, getFirestore, setDoc } from "firebase/firestore";
-import { app } from "@/lib/firebase";
-
-type UploadResponse = {
-  url?: string;
-  error?: string;
-};
 
 const providerSteps = [
-  "Sube una foto sosteniendo un papel que diga BelaClub.",
-  "Revisaremos que la solicitud sea real y segura.",
-  "Tu perfil aparecerá cuando sea aprobado.",
+  "Crea tu cuenta sin enviar documentos en el registro.",
+  "Completa tu perfil y solicita una verificacion desde tu panel.",
+  "Tu perfil aparecera cuando una verificacion sea aprobada.",
 ];
-
-const uploadVerificationPhoto = async (file: File, token: string) => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const res = await fetch("/api/upload-profile-photo", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  });
-
-  const data = (await res.json()) as UploadResponse;
-
-  if (!res.ok || !data.url) {
-    throw new Error(data.error || "No pudimos subir la foto de verificación");
-  }
-
-  return data.url;
-};
 
 export default function RegisterPage() {
   const router = useRouter();
-  const db = getFirestore(app);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("cliente");
-  const [verificationPhoto, setVerificationPhoto] = useState<File | null>(null);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,36 +26,18 @@ export default function RegisterPage() {
     e.preventDefault();
     setMessage("");
 
-    if (role === "prestador" && !verificationPhoto) {
-      setMessage("Para crear un perfil de prestador debes subir la foto de verificación.");
-      return;
-    }
-
     if (!acceptedLegal) {
-      setMessage("Debes confirmar que eres mayor de edad y aceptar las reglas de BelaClub.");
+      setMessage(
+        "Debes confirmar que eres mayor de edad y aceptar las reglas de BelaClub."
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const user = await registerUser(email, password, role);
-
-      if (role === "prestador" && verificationPhoto) {
-        const token = await user.getIdToken();
-        const verificationPhotoUrl = await uploadVerificationPhoto(
-          verificationPhoto,
-          token
-        );
-
-        await setDoc(
-          doc(db, "users", user.uid),
-          { verificationPhotoUrl },
-          { merge: true }
-        );
-      }
-
-      router.push("/prestadores");
+      await registerUser(email, password, role);
+      router.push(role === "prestador" ? "/prestador/perfil" : "/prestadores");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "No pudimos crear la cuenta";
@@ -118,16 +70,17 @@ export default function RegisterPage() {
               Crea tu acceso a la red
             </p>
             <h1 className="max-w-xl text-4xl font-semibold leading-tight xl:text-5xl">
-              Únete como cliente o solicita tu perfil como prestador.
+              Unete como cliente o crea tu cuenta de prestador.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-neutral-300">
-              Los clientes pueden explorar perfiles al instante. Los
-              prestadores pasan por revisión antes de aparecer públicamente.
+              Los clientes pueden explorar perfiles al instante. Los prestadores
+              completan su perfil y solicitan verificacion antes de aparecer
+              publicamente.
             </p>
 
             <div className="mt-10 max-w-xl rounded-lg border border-white/10 bg-white/[0.04] p-5">
               <p className="text-sm font-semibold text-white">
-                Verificación de prestadores
+                Verificacion de prestadores
               </p>
               <div className="mt-4 space-y-3">
                 {providerSteps.map((step) => (
@@ -166,7 +119,7 @@ export default function RegisterPage() {
                   Crear cuenta
                 </h2>
                 <p className="mt-2 text-sm text-neutral-400">
-                  Elige cómo quieres empezar dentro de BelaClub.
+                  Elige como quieres empezar dentro de BelaClub.
                 </p>
               </div>
 
@@ -206,7 +159,7 @@ export default function RegisterPage() {
                         Prestador
                       </span>
                       <span className="mt-1 block text-xs">
-                        Solicitar perfil
+                        Crear perfil
                       </span>
                     </button>
                   </div>
@@ -237,7 +190,7 @@ export default function RegisterPage() {
                     htmlFor="password"
                     className="mb-1.5 block text-sm font-medium text-neutral-300"
                   >
-                    Contraseña
+                    Contrasena
                   </label>
                   <input
                     id="password"
@@ -246,7 +199,7 @@ export default function RegisterPage() {
                     minLength={6}
                     autoComplete="new-password"
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-white outline-none transition placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Minimo 6 caracteres"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -255,32 +208,14 @@ export default function RegisterPage() {
 
                 {role === "prestador" && (
                   <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-                    <label
-                      htmlFor="verificationPhoto"
-                      className="block text-sm font-semibold text-white"
-                    >
-                      Foto de verificación
-                    </label>
-                    <p className="mt-1 text-xs leading-5 text-neutral-300">
-                      Debes sostener un papel visible que diga BelaClub. Tu
-                      perfil quedará pendiente hasta la aprobación.
+                    <p className="text-sm font-semibold text-white">
+                      Verificacion despues del registro
                     </p>
-                    <input
-                      id="verificationPhoto"
-                      name="verificationPhoto"
-                      type="file"
-                      accept="image/*"
-                      className="mt-3 block w-full text-sm text-neutral-300 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-blue-500"
-                      onChange={(e) =>
-                        setVerificationPhoto(e.target.files?.[0] ?? null)
-                      }
-                      required={role === "prestador"}
-                    />
-                    {verificationPhoto && (
-                      <p className="mt-2 truncate text-xs text-blue-200">
-                        {verificationPhoto.name}
-                      </p>
-                    )}
+                    <p className="mt-1 text-xs leading-5 text-neutral-300">
+                      Dentro de tu perfil podras solicitar verificacion bronce,
+                      plata, oro o platino. Tu perfil se publicara cuando sea
+                      aprobada.
+                    </p>
                   </div>
                 )}
 
@@ -333,12 +268,12 @@ export default function RegisterPage() {
               </form>
 
               <p className="mt-6 text-center text-sm text-neutral-400">
-                ¿Ya tienes cuenta?{" "}
+                Ya tienes cuenta?{" "}
                 <Link
                   href="/login"
                   className="font-medium text-blue-300 hover:text-blue-200 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
-                  Inicia sesión
+                  Inicia sesion
                 </Link>
               </p>
             </div>

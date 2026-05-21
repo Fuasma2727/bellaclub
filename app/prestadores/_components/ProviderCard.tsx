@@ -26,17 +26,37 @@ export default function ProviderCard({
   const rating = Number(provider.rating || 0);
   const badgeLevel = Number(provider.badgeVerificationLevel);
   const verificationBadge =
-    badgeLevel === 2 ? "diamond" : provider.verificationBadge;
+    badgeLevel === 1
+      ? "bronze"
+      : badgeLevel === 2
+        ? "silver"
+        : badgeLevel === 3
+          ? "gold"
+          : badgeLevel === 4
+            ? "platinum"
+            : provider.verificationBadge;
   const badgeText =
-    badgeLevel === 2
-      ? "Este usuario fue verificado presencialmente"
-      : "Este usuario fue verificado por video";
+    verificationBadge === "bronze"
+      ? "Este usuario fue verificado por foto"
+      : verificationBadge === "silver"
+        ? "Este usuario fue verificado por video"
+        : verificationBadge === "gold"
+          ? "Este usuario fue verificado presencialmente"
+          : "Este usuario fue verificado por servicio";
+  const badgeSymbol =
+    verificationBadge === "bronze"
+      ? "B"
+      : verificationBadge === "silver"
+        ? "P"
+        : verificationBadge === "gold"
+          ? "O"
+          : "PT";
   const privateCount = (provider.media || []).filter((item) => item.private)
     .length;
 
   return (
     <article
-      className="group cursor-pointer overflow-hidden rounded-md border border-white/[0.08] bg-[#101012] transition hover:border-white/20 hover:bg-[#141416]"
+      className="group cursor-pointer overflow-hidden rounded-md border border-white/[0.08] bg-[#101012] shadow-lg shadow-black/15 transition duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#141416] hover:shadow-black/35"
       onClick={() => onOpen(provider.id)}
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-zinc-900">
@@ -49,7 +69,7 @@ export default function ProviderCard({
         />
 
         {privateCount > 0 && (
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent p-2 sm:p-2.5">
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent p-2">
             <div className="flex items-center justify-end">
               <span className="rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[11px] font-medium text-white backdrop-blur">
                 {privateCount} privado{privateCount === 1 ? "" : "s"}
@@ -65,20 +85,22 @@ export default function ProviderCard({
         )}
       </div>
 
-      <div className="p-2 sm:p-2.5">
-        <h2 className="truncate text-[13px] font-semibold text-neutral-50 sm:text-sm">
-          {name}
-        </h2>
-        <p className="mt-1 truncate text-[11px] text-neutral-500 sm:text-xs">
-          {location || "Ubicación por confirmar"}
-        </p>
+      <div className="px-2.5 pb-2 pt-1.5 sm:px-3 sm:pb-2.5 sm:pt-2">
+        <div className="min-w-0">
+          <h2 className="truncate text-[13px] font-semibold leading-[15px] text-neutral-50 sm:text-sm">
+            {name}
+          </h2>
+          <p className="truncate text-[11px] leading-[15px] text-neutral-500 sm:text-xs">
+            {location || "Ubicacion por confirmar"}
+          </p>
+        </div>
 
-        <div className="mt-2 flex items-center justify-between gap-1.5 sm:mt-3 sm:gap-2">
-          <p className="min-w-0 truncate text-xs font-semibold text-blue-300 sm:text-sm">
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-xs font-semibold leading-4 text-blue-300 sm:text-sm">
             {provider.price ? formatMoney(provider.price) : "Sin precio"}
           </p>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             {rating > 0 && (
               <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-xs font-semibold text-amber-100">
                 {rating.toFixed(1)}
@@ -93,13 +115,9 @@ export default function ProviderCard({
                   event.stopPropagation();
                   setShowBadgeInfo((value) => !value);
                 }}
-                className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs shadow-lg transition hover:-translate-y-0.5 sm:h-8 sm:w-8 sm:text-sm ${
-                  verificationBadge === "diamond"
-                    ? "border-cyan-300/30 bg-cyan-300/15 text-cyan-100 shadow-cyan-950/20 hover:bg-cyan-300/20"
-                    : "border-yellow-300/30 bg-yellow-300/15 text-yellow-100 shadow-yellow-950/20 hover:bg-yellow-300/20"
-                }`}
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-300/15 text-[10px] font-semibold text-emerald-100 shadow-lg shadow-emerald-950/20 transition hover:-translate-y-0.5 hover:bg-emerald-300/20 sm:h-7 sm:w-7"
               >
-                {verificationBadge === "diamond" ? "💎" : "✦"}
+                {badgeSymbol}
               </button>
             )}
 
@@ -110,12 +128,12 @@ export default function ProviderCard({
                 rel="noopener noreferrer"
                 aria-label={`Contactar a ${name} por WhatsApp`}
                 onClick={(event) => event.stopPropagation()}
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500 text-white shadow-lg shadow-emerald-950/25 transition hover:bg-emerald-400 sm:h-8 sm:w-8"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500 text-white shadow-lg shadow-emerald-950/25 transition hover:bg-emerald-400 sm:h-7 sm:w-7"
               >
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
-                  className="h-4 w-4"
+                  className="h-3.5 w-3.5"
                   fill="none"
                 >
                   <path

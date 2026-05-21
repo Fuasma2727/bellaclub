@@ -8,7 +8,7 @@ import { getWhatsAppUrl } from "@/app/prestadores/_components/utils";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
-type VerificationBadge = "gold" | "diamond";
+type VerificationBadge = "bronze" | "silver" | "gold" | "platinum";
 
 type AdminMediaItem = {
   id: string;
@@ -33,7 +33,7 @@ type ProviderVerification = {
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
   badgeVerificationStatus?: BadgeVerificationStatus;
-  badgeVerificationLevel?: 1 | 2;
+  badgeVerificationLevel?: 1 | 2 | 3 | 4;
   badgeVerificationVideoUrl?: string | null;
   badgeVerificationRequestedAt?: string | null;
   blockedAt?: string | null;
@@ -89,6 +89,13 @@ const statusLabel: Record<VerificationStatus, string> = {
   pending: "Pendiente",
   approved: "Publicado",
   rejected: "Rechazado",
+};
+
+const badgeLabel: Record<VerificationBadge, string> = {
+  bronze: "Bronce",
+  silver: "Plata",
+  gold: "Oro",
+  platinum: "Platino",
 };
 
 export default function AdminVerificationsPage() {
@@ -616,10 +623,9 @@ export default function AdminVerificationsPage() {
           <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {providers.map((provider) => {
               const status = provider.verificationStatus || "pending";
-              const isInitialRequest = status === "pending";
               const isBadgeRequest =
-                status === "approved" &&
                 provider.badgeVerificationStatus === "pending";
+              const isInitialRequest = status === "pending" && !isBadgeRequest;
               const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
               const isBlockedView = activeView === "blocked";
 
@@ -629,11 +635,23 @@ export default function AdminVerificationsPage() {
                   className="overflow-hidden rounded-lg border border-white/10 bg-neutral-950"
                 >
                   <div className="relative h-[420px] bg-zinc-950">
-                    {isBadgeRequest && provider.badgeVerificationVideoUrl ? (
+                    {isBadgeRequest &&
+                    provider.badgeVerificationVideoUrl &&
+                    provider.badgeVerificationLevel === 2 ? (
                       <video
                         src={provider.badgeVerificationVideoUrl}
                         controls
                         className="h-full w-full object-contain"
+                      />
+                    ) : isBadgeRequest && provider.badgeVerificationVideoUrl ? (
+                      <Image
+                        src={provider.badgeVerificationVideoUrl}
+                        alt={`Evidencia de verificacion de ${
+                          provider.email || "prestador"
+                        }`}
+                        fill
+                        className="object-contain"
+                        sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
                       />
                     ) : provider.verificationPhotoUrl ? (
                       <Image
@@ -707,14 +725,12 @@ export default function AdminVerificationsPage() {
                         {provider.verificationBadge && (
                           <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
                             Aprobado:{" "}
-                            {provider.verificationBadge === "diamond"
-                              ? "💎"
-                              : "✦"}
+                            {badgeLabel[provider.verificationBadge] || provider.verificationBadge}
                           </span>
                         )}
                         {isBadgeRequest && (
                           <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
-                            Nivel {provider.badgeVerificationLevel}
+                            Solicita {provider.badgeVerificationLevel === 1 ? "Bronce" : provider.badgeVerificationLevel === 2 ? "Plata" : provider.badgeVerificationLevel === 3 ? "Oro" : "Platino"}
                           </span>
                         )}
                         {provider.blocked && (
@@ -918,9 +934,7 @@ export default function AdminVerificationsPage() {
                       >
                         {actionId === provider.id
                           ? "Procesando..."
-                          : provider.badgeVerificationLevel === 2
-                            ? "Aprobar insignia 💎"
-                            : "Aprobar insignia ✦"}
+                          : "Aprobar verificacion"}
                       </button>
                     ) : (
                       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm text-neutral-400">
@@ -937,3 +951,4 @@ export default function AdminVerificationsPage() {
     </main>
   );
 }
+

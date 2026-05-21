@@ -4,7 +4,7 @@ export type VisitVerificationStatus =
   | "pending"
   | "approved"
   | "rejected";
-export type VerificationBadge = "gold" | "diamond";
+export type VerificationBadge = "bronze" | "silver" | "gold" | "platinum";
 
 export type MediaItem = {
   id?: string;
@@ -31,7 +31,7 @@ export type Prestador = {
   visitVerified?: boolean;
   visitVerificationStatus?: VisitVerificationStatus;
   verificationBadge?: VerificationBadge | null;
-  badgeVerificationLevel?: 1 | 2 | number | string | null;
+  badgeVerificationLevel?: 1 | 2 | 3 | 4 | number | string | null;
 };
 
 export type PurchasedContentItem = {

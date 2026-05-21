@@ -21,8 +21,8 @@ import {
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
-type VerificationBadge = "gold" | "diamond";
-type BadgeVerificationLevel = 1 | 2;
+type VerificationBadge = "bronze" | "silver" | "gold" | "platinum";
+type BadgeVerificationLevel = 1 | 2 | 3 | 4;
 
 type MediaItem = {
   id?: string;
@@ -186,8 +186,7 @@ export default function PerfilPrestador() {
   const [contentDescription, setContentDescription] = useState("");
   const [selectedVerificationLevel, setSelectedVerificationLevel] =
     useState<BadgeVerificationLevel>(1);
-  const [verificationVideoFile, setVerificationVideoFile] =
-    useState<File | null>(null);
+  const [verificationFile, setVerificationFile] = useState<File | null>(null);
 
   const mediaList = useMemo<MediaItem[]>(() => {
     return [
@@ -211,8 +210,15 @@ export default function PerfilPrestador() {
   }, [department]);
 
   const status = statusCopy[verificationStatus];
-  const effectiveVerificationBadge =
-    badgeVerificationLevel === 2 ? "diamond" : verificationBadge;
+  const effectiveVerificationBadge = verificationBadge;
+  const effectiveBadgeLabel =
+    effectiveVerificationBadge === "bronze"
+      ? "Bronce"
+      : effectiveVerificationBadge === "silver"
+        ? "Plata"
+        : effectiveVerificationBadge === "gold"
+          ? "Oro"
+          : "Platino";
 
   const showSuccess = (text: string) => {
     setMessage(text);
@@ -537,13 +543,15 @@ export default function PerfilPrestador() {
   const requestBadgeVerification = async () => {
     if (!user) return;
 
-    if (verificationStatus !== "approved") {
-      setError("Primero tu perfil debe estar aprobado para aparecer publico");
-      return;
-    }
-
-    if (selectedVerificationLevel === 1 && !verificationVideoFile) {
-      setError("Sube un video diciendo: yo soy parte de BellaClub");
+    if (
+      (selectedVerificationLevel === 1 || selectedVerificationLevel === 2) &&
+      !verificationFile
+    ) {
+      setError(
+        selectedVerificationLevel === 1
+          ? "Sube una foto de verificacion para solicitar bronce"
+          : "Sube un video de verificacion para solicitar plata"
+      );
       return;
     }
 
@@ -551,9 +559,10 @@ export default function PerfilPrestador() {
     setError("");
 
     try {
-      const videoUrl =
-        selectedVerificationLevel === 1 && verificationVideoFile
-          ? await uploadFile(verificationVideoFile, await user.getIdToken())
+      const evidenceUrl =
+        (selectedVerificationLevel === 1 || selectedVerificationLevel === 2) &&
+        verificationFile
+          ? await uploadFile(verificationFile, await user.getIdToken())
           : null;
 
       await setDoc(
@@ -561,7 +570,7 @@ export default function PerfilPrestador() {
         {
           badgeVerificationStatus: "pending",
           badgeVerificationLevel: selectedVerificationLevel,
-          badgeVerificationVideoUrl: videoUrl,
+          badgeVerificationVideoUrl: evidenceUrl,
           badgeVerificationRequestedAt: serverTimestamp(),
         },
         { merge: true }
@@ -570,7 +579,7 @@ export default function PerfilPrestador() {
       setBadgeVerificationStatus("pending");
       setBadgeVerificationLevel(selectedVerificationLevel);
       setShowVerificationModal(false);
-      setVerificationVideoFile(null);
+      setVerificationFile(null);
       showSuccess("Solicitud de verificacion enviada");
     } catch (requestError) {
       const text =
@@ -667,18 +676,11 @@ export default function PerfilPrestador() {
                   {profileVisible ? "Visible públicamente" : "Oculto por verificación"}
                 </p>
 
-                {verificationStatus === "approved" && (
+                {(
                   <div className="mt-3">
                     {effectiveVerificationBadge ? (
-                      <span
-                        className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                          effectiveVerificationBadge === "diamond"
-                            ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
-                            : "border-yellow-300/30 bg-yellow-300/10 text-yellow-100"
-                        }`}
-                      >
-                        Aprobado:{" "}
-                        {effectiveVerificationBadge === "diamond" ? "💎" : "✦"}
+                      <span className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
+                        Aprobado: {effectiveBadgeLabel}
                       </span>
                     ) : badgeVerificationStatus === "pending" ? (
                       <span className="inline-flex rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
@@ -1122,7 +1124,7 @@ export default function PerfilPrestador() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
           onClick={() => {
             setShowVerificationModal(false);
-            setVerificationVideoFile(null);
+            setVerificationFile(null);
           }}
         >
           <div
@@ -1136,54 +1138,70 @@ export default function PerfilPrestador() {
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setSelectedVerificationLevel(1)}
-                className={`rounded-lg border p-4 text-left transition ${
-                  selectedVerificationLevel === 1
-                    ? "border-zinc-200/50 bg-zinc-200/10 text-white"
-                    : "border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
-                }`}
-              >
-                <span className="text-sm font-semibold">Nivel 1</span>
-                <span className="mt-1 block text-xl font-semibold">
-                  Insignia oro
-                </span>
-                <span className="mt-2 block text-xs leading-5 text-neutral-400">
-                  Requiere video diciendo: yo soy parte de BellaClub.
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedVerificationLevel(2)}
-                className={`rounded-lg border p-4 text-left transition ${
-                  selectedVerificationLevel === 2
-                    ? "border-yellow-300/50 bg-yellow-300/10 text-white"
-                    : "border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
-                }`}
-              >
-                <span className="text-sm font-semibold">Nivel 2</span>
-                <span className="mt-1 block text-xl font-semibold">
-                  Insignia diamante
-                </span>
-                <span className="mt-2 block text-xs leading-5 text-neutral-400">
-                  Requiere verificacion presencial por servicio.
-                </span>
-              </button>
+              {[
+                {
+                  level: 1 as BadgeVerificationLevel,
+                  title: "Bronce",
+                  text: "Requiere foto de verificacion.",
+                },
+                {
+                  level: 2 as BadgeVerificationLevel,
+                  title: "Plata",
+                  text: "Requiere video de verificacion.",
+                },
+                {
+                  level: 3 as BadgeVerificationLevel,
+                  title: "Oro",
+                  text: "Requiere visita presencial.",
+                },
+                {
+                  level: 4 as BadgeVerificationLevel,
+                  title: "Platino",
+                  text: "Requiere verificacion por servicio.",
+                },
+              ].map((option) => (
+                <button
+                  key={option.level}
+                  type="button"
+                  onClick={() => {
+                    setSelectedVerificationLevel(option.level);
+                    setVerificationFile(null);
+                  }}
+                  className={`rounded-lg border p-4 text-left transition ${
+                    selectedVerificationLevel === option.level
+                      ? "border-emerald-300/50 bg-emerald-300/10 text-white"
+                      : "border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
+                  }`}
+                >
+                  <span className="text-sm font-semibold">
+                    Nivel {option.level}
+                  </span>
+                  <span className="mt-1 block text-xl font-semibold">
+                    {option.title}
+                  </span>
+                  <span className="mt-2 block text-xs leading-5 text-neutral-400">
+                    {option.text}
+                  </span>
+                </button>
+              ))}
             </div>
 
-            {selectedVerificationLevel === 1 && (
+            {(selectedVerificationLevel === 1 ||
+              selectedVerificationLevel === 2) && (
               <label className="mt-5 block cursor-pointer rounded-lg border border-dashed border-white/15 bg-black/20 p-4 text-center text-sm text-neutral-300 transition hover:bg-white/[0.04]">
-                {verificationVideoFile
-                  ? verificationVideoFile.name
-                  : "Subir video de verificacion"}
+                {verificationFile
+                  ? verificationFile.name
+                  : selectedVerificationLevel === 1
+                    ? "Subir foto de verificacion"
+                    : "Subir video de verificacion"}
                 <input
                   type="file"
-                  accept="video/*"
+                  accept={
+                    selectedVerificationLevel === 1 ? "image/*" : "video/*"
+                  }
                   hidden
                   onChange={(e) => {
-                    setVerificationVideoFile(e.target.files?.[0] || null);
+                    setVerificationFile(e.target.files?.[0] || null);
                     e.target.value = "";
                   }}
                 />
@@ -1196,7 +1214,7 @@ export default function PerfilPrestador() {
                 className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]"
                 onClick={() => {
                   setShowVerificationModal(false);
-                  setVerificationVideoFile(null);
+                  setVerificationFile(null);
                 }}
               >
                 Cancelar
@@ -1251,3 +1269,4 @@ export default function PerfilPrestador() {
     </div>
   );
 }
+

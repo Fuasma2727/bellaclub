@@ -4,7 +4,7 @@ import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
-type VerificationBadge = "gold" | "diamond";
+type VerificationBadge = "bronze" | "silver" | "gold" | "platinum";
 
 type AdminMediaItem = {
   id: string;
@@ -29,7 +29,7 @@ type ProviderVerification = {
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
   badgeVerificationStatus?: BadgeVerificationStatus;
-  badgeVerificationLevel?: 1 | 2;
+  badgeVerificationLevel?: 1 | 2 | 3 | 4;
   badgeVerificationVideoUrl?: string | null;
   badgeVerificationRequestedAt?: string | null;
   blockedAt?: string | null;
@@ -116,10 +116,6 @@ export async function GET(request: Request) {
         };
       })
       .filter((provider) => {
-        const needsInitialApproval =
-          !provider.verificationStatus ||
-          provider.verificationStatus === "pending";
-
         if (filter === "blocked") {
           if (!provider.blocked) return false;
 
@@ -154,7 +150,7 @@ export async function GET(request: Request) {
           return haystack.includes(query);
         }
 
-        return needsInitialApproval || provider.badgeVerificationStatus === "pending";
+        return provider.badgeVerificationStatus === "pending";
       })
       .sort((a, b) => {
         if (filter === "blocked") {

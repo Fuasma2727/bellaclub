@@ -62,13 +62,28 @@ export default function ProviderProfileModal({
   const providerName = getDisplayName(provider);
   const providerLocation = getLocation(provider) || "Ubicacion por confirmar";
   const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
+  const badgeLevel = Number(provider.badgeVerificationLevel);
   const verificationBadge =
-    Number(provider.badgeVerificationLevel) === 2
-      ? "diamond"
-      : provider.verificationBadge;
+    badgeLevel === 1
+      ? "bronze"
+      : badgeLevel === 2
+        ? "silver"
+        : badgeLevel === 3
+          ? "gold"
+          : badgeLevel === 4
+            ? "platinum"
+            : provider.verificationBadge;
+  const badgeLabel =
+    verificationBadge === "bronze"
+      ? "Bronce"
+      : verificationBadge === "silver"
+        ? "Plata"
+        : verificationBadge === "gold"
+          ? "Oro"
+          : "Platino";
   const profileBadgeLabel = verificationBadge
-    ? `Aprobado: ${verificationBadge === "diamond" ? "💎" : "✦"}`
-    : "Perfil aprobado";
+    ? `Aprobado: ${badgeLabel}`
+    : "Aprobado";
   const isPrivateMediaUrl = (url?: string) =>
     Boolean(url?.includes("/api/private-media"));
 
@@ -106,24 +121,22 @@ export default function ProviderProfileModal({
               />
             </div>
 
-            <div className="mt-4 text-center sm:mt-5">
-              <div className="flex justify-center">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-100">
+            <div className="mt-4 sm:mt-5">
+              <div className="flex flex-wrap items-center justify-center gap-2 text-center">
+                <h2 className="min-w-0 max-w-[170px] truncate text-lg font-semibold sm:max-w-[190px] sm:text-xl">
+                  {providerName}
+                </h2>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-100">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
                   {profileBadgeLabel}
                 </span>
-              </div>
-              <div className="mt-3 flex items-center justify-center gap-2">
-                <h2 className="min-w-0 truncate text-xl font-semibold sm:text-2xl">
-                  {providerName}
-                </h2>
                 {whatsappUrl && (
                   <a
                     href={whatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`Contactar a ${providerName} por WhatsApp`}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500 text-white shadow-lg shadow-emerald-950/25 transition hover:bg-emerald-400"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500 text-white shadow-lg shadow-emerald-950/25 transition hover:bg-emerald-400"
                   >
                     <WhatsAppIcon />
                   </a>
@@ -131,15 +144,15 @@ export default function ProviderProfileModal({
               </div>
             </div>
 
-            <div className="mt-4 space-y-2 rounded-md border border-white/[0.08] bg-black/20 p-2.5 sm:mt-5 sm:space-y-3 sm:p-3">
-              <div className="flex items-center gap-3 rounded-md bg-white/[0.025] px-3 py-2.5">
+            <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-md border border-white/[0.08] bg-black/20 p-1.5 sm:mt-4">
+              <div className="min-w-0 rounded-md bg-white/[0.025] px-2 py-1.5">
                 <span
                   aria-hidden="true"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-200"
+                  className="mb-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-200"
                 >
                   <svg
                     viewBox="0 0 24 24"
-                    className="h-4 w-4"
+                    className="h-3 w-3"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
@@ -148,24 +161,22 @@ export default function ProviderProfileModal({
                     <circle cx="12" cy="10" r="2.5" />
                   </svg>
                 </span>
-                <div className="min-w-0 text-left">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-                    Ubicacion
-                  </p>
-                  <p className="truncate text-sm font-medium text-neutral-200">
-                    {providerLocation}
-                  </p>
-                </div>
+                <p className="text-[9px] font-medium uppercase tracking-wide text-neutral-500">
+                  Ubicacion
+                </p>
+                <p className="truncate text-[11px] font-medium leading-4 text-neutral-200">
+                  {providerLocation}
+                </p>
               </div>
 
-              <div className="flex items-center gap-3 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-3 py-3 shadow-lg shadow-emerald-950/20">
+              <div className="min-w-0 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-2 py-1.5 shadow-lg shadow-emerald-950/20">
                 <span
                   aria-hidden="true"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-[#07130d]"
+                  className="mb-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-[#07130d]"
                 >
                   <svg
                     viewBox="0 0 24 24"
-                    className="h-5 w-5"
+                    className="h-3 w-3"
                     fill="none"
                     stroke="currentColor"
                     strokeLinecap="round"
@@ -177,14 +188,12 @@ export default function ProviderProfileModal({
                     <path d="M9.5 12.5c.6.7 1.4 1 2.5 1s1.9-.3 2.5-1" />
                   </svg>
                 </span>
-                <div className="min-w-0 text-left">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-200/70">
-                    Desde
-                  </p>
-                  <p className="text-lg font-semibold text-emerald-50">
-                    {provider.price ? formatMoney(provider.price) : "Por acordar"}
-                  </p>
-                </div>
+                <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-200/70">
+                  Desde
+                </p>
+                <p className="truncate text-xs font-semibold leading-4 text-emerald-50">
+                  {provider.price ? formatMoney(provider.price) : "Por acordar"}
+                </p>
               </div>
             </div>
 

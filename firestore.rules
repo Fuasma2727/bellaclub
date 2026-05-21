@@ -75,10 +75,9 @@ service cloud.firestore {
         ||
         (
           resource.data.role == "prestador"
-          && resource.data.verificationStatus == "approved"
           && resource.data.verificationBadge == null
           && request.resource.data.badgeVerificationStatus == "pending"
-          && request.resource.data.badgeVerificationLevel in [1, 2]
+          && request.resource.data.badgeVerificationLevel in [1, 2, 3, 4]
         );
     }
 
