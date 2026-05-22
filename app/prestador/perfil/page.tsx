@@ -19,6 +19,10 @@ import {
   getProviderVideoSecondsLimit,
   getProviderVideoSecondsUsed,
 } from "@/lib/providerMediaLimits";
+import {
+  PROVIDER_PROMOTION_DAYS,
+  PROVIDER_PROMOTION_PRICE,
+} from "@/lib/providerPromotion";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
@@ -53,6 +57,9 @@ type ProviderProfile = {
   badgeVerificationLevel?: BadgeVerificationLevel;
   profileVisible?: boolean;
   videoSecondsExtra?: number;
+  promotedUntil?: {
+    toDate?: () => Date;
+  } | string | null;
 };
 
 type UploadResponse = {
@@ -68,6 +75,11 @@ type ProviderMediaResponse = {
 
 type VideoSlotResponse = {
   videoSecondsExtra?: number;
+  error?: string;
+};
+
+type ProviderPromotionResponse = {
+  promotedUntil?: string;
   error?: string;
 };
 
@@ -131,7 +143,7 @@ const verificationOptions = [
   {
     level: 4 as BadgeVerificationLevel,
     badge: "platinum" as VerificationBadge,
-    title: "Platino",
+    title: "Diamante",
     text: "Requiere verificacion por servicio.",
   },
 ];
@@ -200,6 +212,13 @@ const formatVideoTime = (seconds: number) => {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
+const getDateValue = (value: ProviderProfile["promotedUntil"]) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+
+  return value.toDate?.().toISOString() || null;
+};
+
 export default function PerfilPrestador() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -234,6 +253,7 @@ export default function PerfilPrestador() {
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [buyingVideoTime, setBuyingVideoTime] = useState(false);
+  const [buyingPromotion, setBuyingPromotion] = useState(false);
   const [showVideoTimePurchase, setShowVideoTimePurchase] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [message, setMessage] = useState("");
@@ -250,6 +270,7 @@ export default function PerfilPrestador() {
   const [selectedVerificationLevel, setSelectedVerificationLevel] =
     useState<BadgeVerificationLevel>(1);
   const [verificationFile, setVerificationFile] = useState<File | null>(null);
+  const [promotedUntil, setPromotedUntil] = useState<string | null>(null);
 
   const mediaList = useMemo<MediaItem[]>(() => {
     return [
@@ -264,6 +285,9 @@ export default function PerfilPrestador() {
   );
   const videoSecondsLimit = getProviderVideoSecondsLimit(videoSecondsExtra);
   const hasReachedVideoTimeLimit = videoSecondsUsed >= videoSecondsLimit;
+  const promotionActive = promotedUntil
+    ? new Date(promotedUntil).getTime() > Date.now()
+    : false;
 
   const cities = useMemo(() => {
     return (
@@ -290,7 +314,7 @@ export default function PerfilPrestador() {
         ? "Plata"
         : effectiveVerificationBadge === "gold"
           ? "Oro"
-          : "Platino";
+          : "Diamante";
   const showSuccess = (text: string) => {
     setMessage(text);
     setError("");
@@ -336,6 +360,7 @@ export default function PerfilPrestador() {
         setBadgeVerificationLevel(data.badgeVerificationLevel || null);
         setProfileVisible(Boolean(data.profileVisible));
         setVideoSecondsExtra(Number(data.videoSecondsExtra || 0));
+        setPromotedUntil(getDateValue(data.promotedUntil));
       } catch (loadError) {
         const text =
           loadError instanceof Error
@@ -619,6 +644,46 @@ export default function PerfilPrestador() {
       setError(text);
     } finally {
       setBuyingVideoTime(false);
+    }
+  };
+
+  const buyPromotion = async () => {
+    if (!user) return;
+
+    const confirmed = window.confirm(
+      `Promocionar tu perfil cuesta $${PROVIDER_PROMOTION_PRICE.toLocaleString(
+        "es-CO"
+      )} y dura ${PROVIDER_PROMOTION_DAYS} dias. El valor se descontara de tu saldo.`
+    );
+
+    if (!confirmed) return;
+
+    setBuyingPromotion(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/provider-promotion", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await user.getIdToken()}`,
+        },
+      });
+      const data = (await res.json()) as ProviderPromotionResponse;
+
+      if (!res.ok || !data.promotedUntil) {
+        throw new Error(data.error || "No pudimos promocionar el perfil");
+      }
+
+      setPromotedUntil(data.promotedUntil);
+      showSuccess("Perfil promocionado por 3 dias");
+    } catch (promotionError) {
+      const text =
+        promotionError instanceof Error
+          ? promotionError.message
+          : "No pudimos promocionar el perfil";
+      setError(text);
+    } finally {
+      setBuyingPromotion(false);
     }
   };
 
@@ -1029,6 +1094,44 @@ export default function PerfilPrestador() {
               </div>
               )}
             </div>
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-lg border border-white/[0.08] bg-[#101012] p-4 shadow-2xl shadow-black/20">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">
+                Visibilidad
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-neutral-50">
+                Promocionar mi perfil
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-400">
+                Por $${PROVIDER_PROMOTION_PRICE.toLocaleString("es-CO")} tu
+                perfil aparecera entre los primeros durante{" "}
+                {PROVIDER_PROMOTION_DAYS} dias. Primero se muestran los perfiles
+                promocionados y luego el orden va de Diamante a no verificados.
+              </p>
+              {promotionActive && promotedUntil && (
+                <p className="mt-2 text-xs font-semibold text-emerald-200">
+                  Promocion activa hasta{" "}
+                  {new Date(promotedUntil).toLocaleString("es-CO")}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={buyingPromotion || verificationStatus !== "approved"}
+              onClick={() => void buyPromotion()}
+              className="rounded-full border border-blue-300/30 bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-950/25 transition hover:-translate-y-0.5 hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            >
+              {buyingPromotion
+                ? "Procesando..."
+                : promotionActive
+                  ? "Extender promocion"
+                  : "Promocionar perfil"}
+            </button>
           </div>
         </section>
 

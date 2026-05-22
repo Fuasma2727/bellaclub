@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import { Prestador } from "./types";
 import {
@@ -10,14 +10,16 @@ import {
 
 type ProviderCardProps = {
   provider: Prestador;
-  isOpening: boolean;
-  onOpen: (id: string) => void;
+  isOpening?: boolean;
+  onOpen?: (id: string) => void;
+  afterContent?: ReactNode;
 };
 
 export default function ProviderCard({
   provider,
-  isOpening,
+  isOpening = false,
   onOpen,
+  afterContent,
 }: ProviderCardProps) {
   const [showBadgeInfo, setShowBadgeInfo] = useState(false);
   const name = getDisplayName(provider);
@@ -47,33 +49,35 @@ export default function ProviderCard({
     verificationBadge === "bronze"
       ? {
           shell:
-            "border-[#c0834b]/40 bg-[#c0834b]/15 shadow-[#5f3519]/25 hover:bg-[#c0834b]/22",
-          gem: "from-[#f0b06a] via-[#b87333] to-[#6f3f1d]",
+            "border-[#b7784d]/45 bg-[#b7784d]/12 shadow-[#4a2415]/20 hover:bg-[#b7784d]/18",
+          gem: "from-[#e7aa78] via-[#a9673f] to-[#5f3525]",
         }
       : verificationBadge === "silver"
         ? {
             shell:
-              "border-zinc-200/35 bg-zinc-200/12 shadow-zinc-950/20 hover:bg-zinc-200/18",
-            gem: "from-white via-zinc-300 to-zinc-500",
+              "border-slate-100/45 bg-slate-200/10 shadow-slate-950/20 hover:bg-slate-100/16",
+            gem: "from-white via-slate-300 to-slate-500",
           }
         : verificationBadge === "gold"
           ? {
               shell:
-                "border-yellow-300/40 bg-yellow-300/15 shadow-yellow-950/25 hover:bg-yellow-300/22",
-              gem: "from-yellow-100 via-yellow-400 to-amber-700",
+                "border-amber-300/45 bg-amber-300/12 shadow-amber-950/22 hover:bg-amber-300/18",
+              gem: "from-[#fff2b8] via-[#d9a328] to-[#8a5a12]",
             }
           : {
               shell:
-                "border-sky-100/70 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.42),rgba(125,211,252,0.18)_42%,rgba(168,85,247,0.14)_100%)] shadow-[0_0_18px_rgba(186,230,253,0.36)] ring-1 ring-white/15 hover:border-white/90 hover:bg-cyan-100/20 hover:shadow-[0_0_24px_rgba(186,230,253,0.55)]",
-              gem: "from-white via-sky-100 via-45% to-violet-300 shadow-[0_0_10px_rgba(255,255,255,0.8)]",
+                "border-white/85 bg-[radial-gradient(circle_at_30%_18%,rgba(255,255,255,0.72),rgba(219,234,254,0.26)_34%,rgba(125,211,252,0.18)_58%,rgba(167,139,250,0.16)_100%)] shadow-[0_0_24px_rgba(191,219,254,0.50)] ring-1 ring-white/30 hover:border-white hover:shadow-[0_0_34px_rgba(191,219,254,0.78)]",
+              gem: "text-sky-100 drop-shadow-[0_0_7px_rgba(255,255,255,0.95)]",
             };
   const privateCount = (provider.media || []).filter((item) => item.private)
     .length;
 
   return (
     <article
-      className="group cursor-pointer overflow-hidden rounded-md border border-white/[0.08] bg-[#101012] shadow-lg shadow-black/15 transition duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#141416] hover:shadow-black/35"
-      onClick={() => onOpen(provider.id)}
+      className={`group overflow-hidden rounded-md border border-white/[0.08] bg-[#101012] shadow-lg shadow-black/15 transition duration-300 hover:border-white/20 hover:bg-[#141416] hover:shadow-black/35 ${
+        onOpen ? "cursor-pointer hover:-translate-y-0.5" : ""
+      }`}
+      onClick={() => onOpen?.(provider.id)}
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-zinc-900">
         <Image
@@ -133,18 +137,50 @@ export default function ProviderCard({
                 }}
                 className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border shadow-lg transition hover:-translate-y-0.5 sm:h-7 sm:w-7 ${badgeStyle.shell}`}
               >
-                <span className="relative flex h-3.5 w-3.5 items-center justify-center sm:h-4 sm:w-4">
+                {verificationBadge === "platinum" ? (
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className={`h-4 w-4 sm:h-[18px] sm:w-[18px] ${badgeStyle.gem}`}
+                    fill="none"
+                  >
+                    <path
+                      d="M7.2 4.5h9.6l3.2 4.4L12 20 4 8.9l3.2-4.4Z"
+                      fill="url(#diamondFill)"
+                      stroke="currentColor"
+                      strokeWidth="1.15"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M4.2 8.9h15.6M7.2 4.5l2.2 4.4L12 4.5l2.6 4.4 2.2-4.4M9.4 8.9 12 20l2.6-11.1"
+                      stroke="white"
+                      strokeOpacity="0.82"
+                      strokeWidth="0.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <defs>
+                      <linearGradient
+                        id="diamondFill"
+                        x1="5"
+                        x2="18.5"
+                        y1="5"
+                        y2="18"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop stopColor="#FFFFFF" />
+                        <stop offset="0.36" stopColor="#DBEAFE" />
+                        <stop offset="0.72" stopColor="#7DD3FC" />
+                        <stop offset="1" stopColor="#A78BFA" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                ) : (
                   <span
                     aria-hidden="true"
                     className={`h-2.5 w-2.5 rotate-45 rounded-[2px] bg-gradient-to-br shadow-sm sm:h-3 sm:w-3 ${badgeStyle.gem}`}
                   />
-                  {verificationBadge === "platinum" && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute left-1 top-1 h-1 w-1 rounded-full bg-white/95 shadow-[0_0_8px_rgba(255,255,255,0.95)]"
-                    />
-                  )}
-                </span>
+                )}
               </button>
             )}
 
@@ -183,6 +219,8 @@ export default function ProviderCard({
             {badgeText}
           </div>
         )}
+
+        {afterContent}
       </div>
     </article>
   );

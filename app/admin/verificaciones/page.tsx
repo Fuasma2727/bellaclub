@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import ProviderCard from "@/app/prestadores/_components/ProviderCard";
+import type { Prestador } from "@/app/prestadores/_components/types";
 import { getWhatsAppUrl } from "@/app/prestadores/_components/utils";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
@@ -22,6 +24,8 @@ type ProviderVerification = {
   id: string;
   email?: string;
   name?: string;
+  price?: string | number;
+  description?: string;
   whatsapp?: string;
   city?: string;
   department?: string;
@@ -95,7 +99,7 @@ const badgeLabel: Record<VerificationBadge, string> = {
   bronze: "Bronce",
   silver: "Plata",
   gold: "Oro",
-  platinum: "Platino",
+  platinum: "Diamante",
 };
 
 export default function AdminVerificationsPage() {
@@ -109,6 +113,9 @@ export default function AdminVerificationsPage() {
   const [activeView, setActiveView] = useState<
     "requests" | "blocked" | "reports"
   >("requests");
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+    null
+  );
 
   const loadProviders = useCallback(async () => {
     if (!user) {
@@ -452,8 +459,194 @@ export default function AdminVerificationsPage() {
     );
   };
 
+  const toPublicProviderCard = (provider: ProviderVerification): Prestador => ({
+    id: provider.id,
+    name: provider.name || provider.email || "Prestador sin nombre",
+    price: provider.price,
+    photoUrl: provider.photoUrl,
+    department: provider.department,
+    city: provider.city,
+    whatsapp: provider.whatsapp,
+    description: provider.description,
+    media: provider.media,
+    verificationBadge: provider.verificationBadge || null,
+    badgeVerificationLevel: provider.badgeVerificationLevel || null,
+  });
+
+  const renderProviderAdminContent = (
+    provider: ProviderVerification,
+    options: {
+      status: VerificationStatus;
+      isBadgeRequest: boolean;
+      isInitialRequest: boolean;
+      isBlockedView: boolean;
+    }
+  ) => {
+    const { status, isBadgeRequest, isInitialRequest, isBlockedView } = options;
+
+    return (
+      <div className="mt-3 space-y-3 border-t border-white/[0.08] pt-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${statusClass[status]}`}
+          >
+            {statusLabel[status]}
+          </span>
+          {provider.verificationBadge && (
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-200">
+              {badgeLabel[provider.verificationBadge] ||
+                provider.verificationBadge}
+            </span>
+          )}
+          {isBadgeRequest && (
+            <span className="rounded-full border border-blue-400/30 bg-blue-400/10 px-2.5 py-1 text-[11px] font-medium text-blue-100">
+              Solicita{" "}
+              {provider.badgeVerificationLevel === 1
+                ? "Bronce"
+                : provider.badgeVerificationLevel === 2
+                  ? "Plata"
+                  : provider.badgeVerificationLevel === 3
+                    ? "Oro"
+                    : "Diamante"}
+            </span>
+          )}
+          {provider.blocked && (
+            <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-200">
+              {provider.blockedReason === "subscription_unpaid"
+                ? "Mensualidad pendiente"
+                : "Bloqueado"}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-1 text-xs text-neutral-500">
+          {provider.email && <p className="truncate">{provider.email}</p>}
+          {typeof provider.balance === "number" && (
+            <p>Saldo: ${provider.balance.toLocaleString("es-CO")}</p>
+          )}
+          {provider.createdAt && (
+            <p>
+              {new Date(
+                provider.badgeVerificationRequestedAt || provider.createdAt
+              ).toLocaleString("es-CO")}
+            </p>
+          )}
+        </div>
+
+        {isBadgeRequest && (
+          <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200/80">
+              Evidencia de verificacion
+            </p>
+            {provider.badgeVerificationVideoUrl &&
+            provider.badgeVerificationLevel === 2 ? (
+              <video
+                src={provider.badgeVerificationVideoUrl}
+                controls
+                className="mt-3 aspect-video w-full rounded-md bg-black object-contain"
+              />
+            ) : provider.badgeVerificationVideoUrl ? (
+              <div className="relative mt-3 aspect-video overflow-hidden rounded-md bg-black">
+                <Image
+                  src={provider.badgeVerificationVideoUrl}
+                  alt={`Evidencia de verificacion de ${
+                    provider.email || "prestador"
+                  }`}
+                  fill
+                  className="object-contain"
+                  sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+                />
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-neutral-400">
+                Esta solicitud no requiere archivo. Revisa el perfil completo
+                antes de aprobar.
+              </p>
+            )}
+          </div>
+        )}
+
+        {renderProviderGallery(provider, isBlockedView)}
+
+        <button
+          type="button"
+          disabled={actionId === provider.id}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleAction(provider, provider.blocked ? "unblock" : "block");
+          }}
+          className={`w-full rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+            provider.blocked
+              ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15"
+              : "border border-red-500/35 bg-red-500/10 text-red-100 hover:bg-red-500/15"
+          }`}
+        >
+          {actionId === provider.id
+            ? "Procesando..."
+            : provider.blocked
+              ? "Desbloquear perfil"
+              : "Bloquear perfil"}
+        </button>
+
+        {isBlockedView ? (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">
+            {provider.blockedReason === "subscription_unpaid"
+              ? "Perfil bloqueado por mensualidad pendiente. Puedes activarlo manualmente desde aqui aunque no pague."
+              : "Perfil bloqueado. Puedes eliminar fotos antes de volver a activarlo."}
+          </div>
+        ) : isInitialRequest ? (
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              disabled={actionId === provider.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleAction(provider, "approve");
+              }}
+              className="rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {actionId === provider.id ? "Procesando..." : "Aprobar"}
+            </button>
+            <button
+              type="button"
+              disabled={actionId === provider.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleAction(provider, "reject");
+              }}
+              className="rounded-lg border border-red-500/40 px-4 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Rechazar
+            </button>
+          </div>
+        ) : isBadgeRequest ? (
+          <button
+            type="button"
+            disabled={actionId === provider.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleAction(provider, "verifyVisit");
+            }}
+            className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {actionId === provider.id ? "Procesando..." : "Aprobar verificacion"}
+          </button>
+        ) : (
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm text-neutral-400">
+            Sin acciones pendientes
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const selectedProvider =
+    selectedProviderId && activeView !== "reports"
+      ? providers.find((provider) => provider.id === selectedProviderId) || null
+      : null;
   const isLoading = authLoading || loading;
-  const hasResults = activeView === "reports" ? reports.length > 0 : providers.length > 0;
+  const hasResults =
+    activeView === "reports" ? reports.length > 0 : providers.length > 0;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -730,239 +923,68 @@ export default function AdminVerificationsPage() {
         )}
 
         {user && !isLoading && activeView !== "reports" && providers.length > 0 && (
-          <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <section className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {providers.map((provider) => {
-              const status = provider.verificationStatus || "pending";
-              const isBadgeRequest =
-                provider.badgeVerificationStatus === "pending";
-              const isInitialRequest = status === "pending" && !isBadgeRequest;
-              const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
-              const isBlockedView = activeView === "blocked";
-
               return (
-                <article
+                <ProviderCard
                   key={provider.id}
-                  className="overflow-hidden rounded-lg border border-white/10 bg-neutral-950"
-                >
-                  <div className="relative h-72 bg-zinc-950">
-                    {provider.photoUrl ? (
-                      <Image
-                        src={provider.photoUrl}
-                        alt={provider.name || "Foto principal del prestador"}
-                        fill
-                        className="object-cover"
-                        sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-neutral-500">
-                        Sin foto principal
-                      </div>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/55 to-transparent p-4">
-                      <p className="truncate text-lg font-semibold">
-                        {provider.name || "Prestador sin nombre"}
-                      </p>
-                      <p className="mt-1 truncate text-xs text-neutral-300">
-                        {[provider.city, provider.department]
-                          .filter(Boolean)
-                          .join(", ") || "Ubicacion sin completar"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-4">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-neutral-200">
-                          {provider.name ||
-                            provider.email ||
-                            "Prestador sin nombre"}
-                        </p>
-                        {provider.email && (
-                          <p className="mt-1 truncate text-xs text-neutral-500">
-                            {provider.email}
-                          </p>
-                        )}
-                        {provider.whatsapp && (
-                          <p className="mt-1 truncate text-xs text-neutral-500">
-                            WhatsApp: {provider.whatsapp}
-                          </p>
-                        )}
-                        {typeof provider.balance === "number" && (
-                          <p className="mt-1 text-xs text-neutral-500">
-                            Saldo: ${provider.balance.toLocaleString("es-CO")}
-                          </p>
-                        )}
-                        {provider.subscriptionStatus && (
-                          <p className="mt-1 text-xs text-neutral-500">
-                            Mensualidad:{" "}
-                            {provider.subscriptionStatus === "active"
-                              ? "Activa"
-                              : provider.subscriptionStatus === "past_due"
-                                ? "Pendiente"
-                                : provider.subscriptionStatus ===
-                                    "admin_override"
-                                  ? "Activada por admin"
-                                  : "Por cobrar"}
-                          </p>
-                        )}
-                        {provider.createdAt && (
-                          <p className="mt-1 text-xs text-neutral-500">
-                            {new Date(
-                              provider.badgeVerificationRequestedAt ||
-                                provider.createdAt
-                            ).toLocaleString("es-CO")}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex shrink-0 flex-col items-end gap-2">
-                        <span
-                          className={`rounded-full border px-3 py-1 text-xs font-medium ${statusClass[status]}`}
-                        >
-                          {statusLabel[status]}
-                        </span>
-                        {provider.verificationBadge && (
-                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
-                            Aprobado:{" "}
-                            {badgeLabel[provider.verificationBadge] || provider.verificationBadge}
-                          </span>
-                        )}
-                        {isBadgeRequest && (
-                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
-                            Solicita {provider.badgeVerificationLevel === 1 ? "Bronce" : provider.badgeVerificationLevel === 2 ? "Plata" : provider.badgeVerificationLevel === 3 ? "Oro" : "Platino"}
-                          </span>
-                        )}
-                        {provider.blocked && (
-                          <span className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-200">
-                            {provider.blockedReason === "subscription_unpaid"
-                              ? "Mensualidad pendiente"
-                              : "Bloqueado"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {whatsappUrl && (
-                      <a
-                        href={whatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15"
-                      >
-                        Contactar por WhatsApp
-                      </a>
-                    )}
-
-                    {isBadgeRequest && (
-                      <div className="mb-3 rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200/80">
-                          Evidencia de verificacion
-                        </p>
-                        {provider.badgeVerificationVideoUrl &&
-                        provider.badgeVerificationLevel === 2 ? (
-                          <video
-                            src={provider.badgeVerificationVideoUrl}
-                            controls
-                            className="mt-3 aspect-video w-full rounded-md bg-black object-contain"
-                          />
-                        ) : provider.badgeVerificationVideoUrl ? (
-                          <div className="relative mt-3 aspect-video overflow-hidden rounded-md bg-black">
-                            <Image
-                              src={provider.badgeVerificationVideoUrl}
-                              alt={`Evidencia de verificacion de ${
-                                provider.email || "prestador"
-                              }`}
-                              fill
-                              className="object-contain"
-                              sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
-                            />
-                          </div>
-                        ) : (
-                          <p className="mt-2 text-sm text-neutral-400">
-                            Esta solicitud no requiere archivo. Revisa el
-                            perfil completo antes de aprobar.
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="mb-3">
-                      {renderProviderGallery(provider, isBlockedView)}
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={actionId === provider.id}
-                      onClick={() =>
-                        handleAction(
-                          provider,
-                          provider.blocked ? "unblock" : "block"
-                        )
-                      }
-                      className={`mb-3 w-full rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                        provider.blocked
-                          ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15"
-                          : "border border-red-500/35 bg-red-500/10 text-red-100 hover:bg-red-500/15"
-                      }`}
-                    >
-                      {actionId === provider.id
-                        ? "Procesando..."
-                        : provider.blocked
-                          ? "Desbloquear perfil"
-                          : "Bloquear perfil"}
-                    </button>
-
-                    {isBlockedView ? (
-                      <div className="space-y-3">
-                        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">
-                          {provider.blockedReason === "subscription_unpaid"
-                            ? "Perfil bloqueado por mensualidad pendiente. Puedes activarlo manualmente desde aqui aunque no pague."
-                            : "Perfil bloqueado. Puedes eliminar fotos antes de volver a activarlo."}
-                        </div>
-                      </div>
-                    ) : isInitialRequest ? (
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          disabled={actionId === provider.id}
-                          onClick={() => handleAction(provider, "approve")}
-                          className="rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {actionId === provider.id
-                            ? "Procesando..."
-                            : "Aprobar"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={actionId === provider.id}
-                          onClick={() => handleAction(provider, "reject")}
-                          className="rounded-lg border border-red-500/40 px-4 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Rechazar
-                        </button>
-                      </div>
-                    ) : isBadgeRequest ? (
-                      <button
-                        type="button"
-                        disabled={actionId === provider.id}
-                        onClick={() => handleAction(provider, "verifyVisit")}
-                        className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {actionId === provider.id
-                          ? "Procesando..."
-                          : "Aprobar verificacion"}
-                      </button>
-                    ) : (
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm text-neutral-400">
-                        Sin acciones pendientes
-                      </div>
-                    )}
-                  </div>
-                </article>
+                  provider={toPublicProviderCard(provider)}
+                  onOpen={() => setSelectedProviderId(provider.id)}
+                />
               );
             })}
           </section>
+        )}
+
+        {selectedProvider && (
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/85 px-3 py-4 backdrop-blur-sm sm:px-6 sm:py-8"
+            onClick={() => setSelectedProviderId(null)}
+          >
+            <div
+              className="w-full max-w-5xl overflow-hidden rounded-lg border border-white/10 bg-[#101012] shadow-2xl shadow-black/60"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                    Revision de prestador
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold text-white">
+                    {selectedProvider.name ||
+                      selectedProvider.email ||
+                      "Prestador sin nombre"}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Cerrar"
+                  onClick={() => setSelectedProviderId(null)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-lg text-white transition hover:bg-white/[0.08]"
+                >
+                  x
+                </button>
+              </div>
+
+              <div className="grid gap-0 lg:grid-cols-[300px_1fr]">
+                <div className="border-b border-white/10 p-4 lg:border-b-0 lg:border-r">
+                  <ProviderCard provider={toPublicProviderCard(selectedProvider)} />
+                </div>
+                <div className="max-h-[calc(100dvh-150px)] overflow-y-auto p-4">
+                  {renderProviderAdminContent(selectedProvider, {
+                    status: selectedProvider.verificationStatus || "pending",
+                    isBadgeRequest:
+                      selectedProvider.badgeVerificationStatus === "pending",
+                    isInitialRequest:
+                      (selectedProvider.verificationStatus || "pending") ===
+                        "pending" &&
+                      selectedProvider.badgeVerificationStatus !== "pending",
+                    isBlockedView: activeView === "blocked",
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </main>

@@ -213,7 +213,7 @@ export default function RegisterPage() {
                     </p>
                     <p className="mt-1 text-xs leading-5 text-neutral-300">
                       Dentro de tu perfil podras solicitar verificacion bronce,
-                      plata, oro o platino. Tu perfil se publicara cuando sea
+                      plata, oro o diamante. Tu perfil se publicara cuando sea
                       aprobada.
                     </p>
                   </div>

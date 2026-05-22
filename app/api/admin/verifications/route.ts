@@ -18,6 +18,8 @@ type ProviderVerification = {
   id: string;
   email?: string;
   name?: string;
+  price?: string | number;
+  description?: string;
   whatsapp?: string;
   city?: string;
   department?: string;
@@ -90,6 +92,8 @@ export async function GET(request: Request) {
           id: doc.id,
           email: data.email,
           name: data.name,
+          price: data.price,
+          description: data.description,
           whatsapp: data.whatsapp,
           city: data.city,
           department: data.department,

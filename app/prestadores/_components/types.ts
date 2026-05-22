@@ -32,6 +32,7 @@ export type Prestador = {
   visitVerificationStatus?: VisitVerificationStatus;
   verificationBadge?: VerificationBadge | null;
   badgeVerificationLevel?: 1 | 2 | 3 | 4 | number | string | null;
+  promotedUntil?: string | null;
 };
 
 export type PurchasedContentItem = {
