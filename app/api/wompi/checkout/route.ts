@@ -4,10 +4,16 @@ import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
 
-const PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY;
-const INTEGRITY_SECRET = process.env.WOMPI_INTEGRITY_SECRET;
+const PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY?.trim();
+const INTEGRITY_SECRET = process.env.WOMPI_INTEGRITY_SECRET?.trim();
 const WOMPI_URL = "https://checkout.wompi.co/p/";
 const allowedAmounts = [100000, 200000, 500000];
+
+const getWompiEnvironment = (value: string) => {
+  if (value.includes("_prod_")) return "prod";
+  if (value.includes("_test_")) return "test";
+  return "unknown";
+};
 
 const getBaseUrl = (request: Request) => {
   return (
@@ -22,6 +28,37 @@ export async function POST(request: Request) {
     if (!PUBLIC_KEY || !INTEGRITY_SECRET) {
       return NextResponse.json(
         { error: "Wompi no esta configurado" },
+        { status: 500 }
+      );
+    }
+
+    if (!PUBLIC_KEY.startsWith("pub_")) {
+      return NextResponse.json(
+        { error: "La llave publica de Wompi debe empezar por pub_" },
+        { status: 500 }
+      );
+    }
+
+    if (!INTEGRITY_SECRET.includes("_integrity_")) {
+      return NextResponse.json(
+        { error: "La llave de integridad de Wompi no es valida" },
+        { status: 500 }
+      );
+    }
+
+    const publicKeyEnvironment = getWompiEnvironment(PUBLIC_KEY);
+    const integrityEnvironment = getWompiEnvironment(INTEGRITY_SECRET);
+
+    if (
+      publicKeyEnvironment !== "unknown" &&
+      integrityEnvironment !== "unknown" &&
+      publicKeyEnvironment !== integrityEnvironment
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Las llaves de Wompi pertenecen a ambientes diferentes. Usa ambas test o ambas produccion.",
+        },
         { status: 500 }
       );
     }
@@ -52,7 +89,7 @@ export async function POST(request: Request) {
     }
 
     const currency = "COP";
-    const reference = `recarga_${decoded.uid}_${Date.now()}`;
+    const reference = `BC-${Date.now()}-${decoded.uid.slice(0, 10)}`;
     const signature = crypto
       .createHash("sha256")
       .update(`${reference}${amountInCents}${currency}${INTEGRITY_SECRET}`)
@@ -78,6 +115,14 @@ export async function POST(request: Request) {
       "signature:integrity": signature,
       "redirect-url": `${getBaseUrl(request)}/wompi/resultado`,
     });
+
+    if (decoded.email) {
+      params.set("customer-data:email", decoded.email);
+    }
+
+    if (decoded.name) {
+      params.set("customer-data:full-name", decoded.name);
+    }
 
     return NextResponse.json({ url: `${WOMPI_URL}?${params.toString()}` });
   } catch (error) {

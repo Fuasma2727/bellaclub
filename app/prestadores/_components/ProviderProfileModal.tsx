@@ -6,7 +6,6 @@ import { MediaItem, Prestador } from "./types";
 import {
   formatMoney,
   getDisplayName,
-  getLocation,
   getWhatsAppUrl,
 } from "./utils";
 
@@ -60,30 +59,7 @@ export default function ProviderProfileModal({
     "gallery"
   );
   const providerName = getDisplayName(provider);
-  const providerLocation = getLocation(provider) || "Ubicacion por confirmar";
   const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
-  const badgeLevel = Number(provider.badgeVerificationLevel);
-  const verificationBadge =
-    badgeLevel === 1
-      ? "bronze"
-      : badgeLevel === 2
-        ? "silver"
-        : badgeLevel === 3
-          ? "gold"
-          : badgeLevel === 4
-            ? "platinum"
-            : provider.verificationBadge;
-  const badgeLabel =
-    verificationBadge === "bronze"
-      ? "Bronce"
-      : verificationBadge === "silver"
-        ? "Plata"
-        : verificationBadge === "gold"
-          ? "Oro"
-          : "Platino";
-  const profileBadgeLabel = verificationBadge
-    ? `Aprobado: ${badgeLabel}`
-    : "Aprobado";
   const isPrivateMediaUrl = (url?: string) =>
     Boolean(url?.includes("/api/private-media"));
 
@@ -96,6 +72,11 @@ export default function ProviderProfileModal({
         className="relative max-h-[calc(100dvh-24px)] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-lg border border-white/[0.08] bg-[#101012] shadow-2xl shadow-black/50 sm:max-h-[calc(100dvh-48px)]"
         onClick={(e) => e.stopPropagation()}
       >
+        <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-emerald-100 backdrop-blur sm:left-4 sm:top-4">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+          Aprobado
+        </span>
+
         <button
           type="button"
           onClick={onClose}
@@ -122,14 +103,10 @@ export default function ProviderProfileModal({
             </div>
 
             <div className="mt-4 sm:mt-5">
-              <div className="flex flex-wrap items-center justify-center gap-2 text-center">
-                <h2 className="min-w-0 max-w-[170px] truncate text-lg font-semibold sm:max-w-[190px] sm:text-xl">
+              <div className="flex items-center justify-center gap-2 text-center">
+                <h2 className="min-w-0 max-w-[210px] truncate text-lg font-semibold sm:max-w-[230px] sm:text-xl">
                   {providerName}
                 </h2>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-100">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                  {profileBadgeLabel}
-                </span>
                 {whatsappUrl && (
                   <a
                     href={whatsappUrl}
@@ -141,59 +118,6 @@ export default function ProviderProfileModal({
                     <WhatsAppIcon />
                   </a>
                 )}
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-md border border-white/[0.08] bg-black/20 p-1.5 sm:mt-4">
-              <div className="min-w-0 rounded-md bg-white/[0.025] px-2 py-1.5">
-                <span
-                  aria-hidden="true"
-                  className="mb-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-200"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-3 w-3"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z" />
-                    <circle cx="12" cy="10" r="2.5" />
-                  </svg>
-                </span>
-                <p className="text-[9px] font-medium uppercase tracking-wide text-neutral-500">
-                  Ubicacion
-                </p>
-                <p className="truncate text-[11px] font-medium leading-4 text-neutral-200">
-                  {providerLocation}
-                </p>
-              </div>
-
-              <div className="min-w-0 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-2 py-1.5 shadow-lg shadow-emerald-950/20">
-                <span
-                  aria-hidden="true"
-                  className="mb-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-[#07130d]"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-3 w-3"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                  >
-                    <path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7" />
-                    <path d="M7 7h10l2 13H5L7 7Z" />
-                    <path d="M9.5 12.5c.6.7 1.4 1 2.5 1s1.9-.3 2.5-1" />
-                  </svg>
-                </span>
-                <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-200/70">
-                  Desde
-                </p>
-                <p className="truncate text-xs font-semibold leading-4 text-emerald-50">
-                  {provider.price ? formatMoney(provider.price) : "Por acordar"}
-                </p>
               </div>
             </div>
 

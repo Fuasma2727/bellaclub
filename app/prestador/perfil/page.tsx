@@ -102,12 +102,46 @@ const statusPillClass: Record<StatusTone, string> = {
 };
 
 const fieldBaseClass =
-  "w-full rounded-md border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-600 focus:border-blue-400/80 focus:ring-2 focus:ring-blue-500/20";
+  "w-full rounded-lg border border-white/10 bg-[#09090a] px-3 py-2 text-[13px] text-neutral-100 outline-none transition placeholder:text-neutral-600 focus:border-blue-400/70 focus:ring-2 focus:ring-blue-500/15";
 
 const readOnlyFieldClass =
   "rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-sm text-neutral-200";
 
 const privatePriceOptions = [10000, 50000, 100000, 200000];
+
+const verificationOptions = [
+  {
+    level: 1 as BadgeVerificationLevel,
+    badge: "bronze" as VerificationBadge,
+    title: "Bronce",
+    text: "Requiere foto de verificacion.",
+  },
+  {
+    level: 2 as BadgeVerificationLevel,
+    badge: "silver" as VerificationBadge,
+    title: "Plata",
+    text: "Requiere video de verificacion.",
+  },
+  {
+    level: 3 as BadgeVerificationLevel,
+    badge: "gold" as VerificationBadge,
+    title: "Oro",
+    text: "Requiere visita presencial.",
+  },
+  {
+    level: 4 as BadgeVerificationLevel,
+    badge: "platinum" as VerificationBadge,
+    title: "Platino",
+    text: "Requiere verificacion por servicio.",
+  },
+];
+
+const badgeLevelByType: Record<VerificationBadge, BadgeVerificationLevel> = {
+  bronze: 1,
+  silver: 2,
+  gold: 3,
+  platinum: 4,
+};
 
 const createMediaId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -240,6 +274,15 @@ export default function PerfilPrestador() {
 
   const status = statusCopy[verificationStatus];
   const effectiveVerificationBadge = verificationBadge;
+  const currentVerificationLevel = effectiveVerificationBadge
+    ? badgeLevelByType[effectiveVerificationBadge]
+    : 0;
+  const availableVerificationOptions = verificationOptions.filter(
+    (option) => option.level > currentVerificationLevel
+  );
+  const canUpgradeVerification = currentVerificationLevel > 0 &&
+    currentVerificationLevel < 4 &&
+    badgeVerificationStatus !== "pending";
   const effectiveBadgeLabel =
     effectiveVerificationBadge === "bronze"
       ? "Bronce"
@@ -248,15 +291,6 @@ export default function PerfilPrestador() {
         : effectiveVerificationBadge === "gold"
           ? "Oro"
           : "Platino";
-  const locationSummary =
-    city && department
-      ? `${city}, ${department}`
-      : city || department || "Ubicacion pendiente";
-  const priceSummary = price
-    ? `$${Number(price).toLocaleString("es-CO")}`
-    : "Precio por definir";
-  const whatsappSummary = whatsapp || "WhatsApp pendiente";
-
   const showSuccess = (text: string) => {
     setMessage(text);
     setError("");
@@ -588,8 +622,23 @@ export default function PerfilPrestador() {
     }
   };
 
+  const openVerificationRequest = () => {
+    const firstAvailableLevel = availableVerificationOptions[0]?.level;
+
+    if (!firstAvailableLevel) return;
+
+    setSelectedVerificationLevel(firstAvailableLevel);
+    setVerificationFile(null);
+    setShowVerificationModal(true);
+  };
+
   const requestBadgeVerification = async () => {
     if (!user) return;
+
+    if (selectedVerificationLevel <= currentVerificationLevel) {
+      setError("Selecciona un nivel superior al que ya tienes aprobado");
+      return;
+    }
 
     if (
       (selectedVerificationLevel === 1 || selectedVerificationLevel === 2) &&
@@ -710,14 +759,14 @@ export default function PerfilPrestador() {
 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-neutral-400">Perfil</p>
+                  <p className="text-xs font-medium text-neutral-500">Perfil</p>
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusPillClass[status.tone]}`}
                   >
                     {status.label}
                   </span>
                 </div>
-                <h1 className="mt-1 truncate text-2xl font-semibold">
+                <h1 className="mt-1 truncate text-xl font-semibold text-neutral-50">
                   {name || "Completa tu perfil"}
                 </h1>
                 <p className="mt-1 text-xs text-neutral-500">
@@ -727,9 +776,27 @@ export default function PerfilPrestador() {
                 {(
                   <div className="mt-3">
                     {effectiveVerificationBadge ? (
-                      <span className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
-                        Aprobado: {effectiveBadgeLabel}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
+                          Aprobado: {effectiveBadgeLabel}
+                        </span>
+                        {badgeVerificationStatus === "pending" && (
+                          <span className="inline-flex rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+                            Nivel {badgeVerificationLevel || ""} en revision
+                          </span>
+                        )}
+                        {canUpgradeVerification && (
+                          <button
+                            type="button"
+                            onClick={openVerificationRequest}
+                            disabled={requestingBadgeVerification}
+                            className="group inline-flex items-center gap-1.5 rounded-full border border-blue-400/30 bg-blue-400/10 px-3 py-1.5 text-xs font-semibold text-blue-100 transition duration-200 hover:-translate-y-0.5 hover:border-blue-300/60 hover:bg-blue-400/20 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-300 transition group-hover:scale-125" />
+                            Subir de nivel
+                          </button>
+                        )}
+                      </div>
                     ) : badgeVerificationStatus === "pending" ? (
                       <span className="inline-flex rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
                         Nivel {badgeVerificationLevel || ""} en revision
@@ -737,7 +804,7 @@ export default function PerfilPrestador() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setShowVerificationModal(true)}
+                        onClick={openVerificationRequest}
                         disabled={requestingBadgeVerification}
                         className="group inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 shadow-lg shadow-emerald-950/10 transition duration-200 hover:-translate-y-0.5 hover:border-emerald-300/60 hover:bg-emerald-400/20 hover:shadow-emerald-950/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                       >
@@ -748,7 +815,7 @@ export default function PerfilPrestador() {
                   </div>
                 )}
 
-                <label className="mt-3 inline-flex cursor-pointer rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:bg-white/[0.07]">
+                <label className="mt-3 inline-flex cursor-pointer rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-neutral-300 transition hover:border-white/15 hover:bg-white/[0.07] hover:text-white">
                   Editar foto
                   <input
                     type="file"
@@ -761,35 +828,30 @@ export default function PerfilPrestador() {
             </aside>
 
             <div className="flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-                    Informacion publica
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-400">
-                    {editMode
-                      ? "Actualiza solo lo que quieres cambiar."
-                      : "Tu vista resumida para clientes."}
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                    Perfil publico
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setEditMode((value) => !value)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                       editMode
                         ? "border border-white/[0.08] bg-white/[0.03] text-neutral-200 hover:bg-white/[0.07]"
                         : "bg-blue-600 text-white shadow-lg shadow-blue-950/25 hover:-translate-y-0.5 hover:bg-blue-500"
                     }`}
                   >
-                    {editMode ? "Cancelar" : "Editar"}
+                    {editMode ? "Cancelar" : "Editar perfil"}
                   </button>
                   {editMode && (
                     <button
                       type="button"
                       onClick={saveProfile}
                       disabled={saving}
-                      className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                      className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold transition hover:-translate-y-0.5 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                     >
                       {saving ? "Guardando..." : "Guardar"}
                     </button>
@@ -797,48 +859,13 @@ export default function PerfilPrestador() {
                 </div>
               </div>
 
-              {!editMode ? (
-                <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/25 p-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
-                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
-                        Ubicacion
-                      </p>
-                      <p className="mt-1 truncate text-sm font-semibold text-neutral-100">
-                        {locationSummary}
-                      </p>
-                    </div>
-                    <div className="rounded-md border border-emerald-300/15 bg-emerald-300/[0.06] px-3 py-2.5">
-                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-300/70">
-                        Precio
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-emerald-100">
-                        {priceSummary}
-                      </p>
-                    </div>
-                    <div className="rounded-md border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
-                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
-                        Contacto
-                      </p>
-                      <p className="mt-1 truncate text-sm font-semibold text-neutral-100">
-                        {whatsappSummary}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 rounded-md border border-white/[0.06] bg-[#0b0b0c] px-3 py-3">
-                    <p className="line-clamp-3 text-sm leading-6 text-neutral-300">
-                      {description ||
-                        "Agrega una descripcion breve para que los clientes entiendan mejor tus servicios."}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {editMode && (
+              <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/25 p-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="sm:col-span-2">
                 <label
                   htmlFor="name"
-                  className="mb-1.5 block text-sm font-medium text-neutral-300"
+                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
                 >
                   Nombre público
                 </label>
@@ -860,7 +887,7 @@ export default function PerfilPrestador() {
               <div>
                 <label
                   htmlFor="department"
-                  className="mb-1.5 block text-sm font-medium text-neutral-300"
+                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
                 >
                   Departamento
                 </label>
@@ -891,7 +918,7 @@ export default function PerfilPrestador() {
               <div>
                 <label
                   htmlFor="city"
-                  className="mb-1.5 block text-sm font-medium text-neutral-300"
+                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
                 >
                   Ciudad
                 </label>
@@ -920,12 +947,12 @@ export default function PerfilPrestador() {
               <div>
                 <label
                   htmlFor="price"
-                  className="mb-1.5 block text-sm font-medium text-neutral-300"
+                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
                 >
                   Precio base
                 </label>
                 {editMode ? (
-                  <div className="flex items-center rounded-md border border-white/10 bg-black/25 px-3 focus-within:border-blue-400/80 focus-within:ring-2 focus-within:ring-blue-500/20">
+                  <div className="flex items-center rounded-lg border border-white/10 bg-[#09090a] px-3 transition focus-within:border-blue-400/70 focus-within:ring-2 focus-within:ring-blue-500/15">
                     <span className="text-neutral-500">$</span>
                     <input
                       id="price"
@@ -934,7 +961,7 @@ export default function PerfilPrestador() {
                       step={10000}
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
-                      className="w-full bg-transparent px-2 py-2.5 text-sm outline-none"
+                      className="w-full bg-transparent px-2 py-2 text-[13px] outline-none"
                       placeholder="50000"
                     />
                     <span className="text-sm text-neutral-500">COP</span>
@@ -951,12 +978,12 @@ export default function PerfilPrestador() {
               <div>
                 <label
                   htmlFor="whatsapp"
-                  className="mb-1.5 block text-sm font-medium text-neutral-300"
+                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
                 >
                   WhatsApp
                 </label>
                 {editMode ? (
-                  <div className="flex items-center rounded-md border border-white/10 bg-black/25 px-3 focus-within:border-emerald-400/80 focus-within:ring-2 focus-within:ring-emerald-500/20">
+                  <div className="flex items-center rounded-lg border border-white/10 bg-[#09090a] px-3 transition focus-within:border-emerald-400/70 focus-within:ring-2 focus-within:ring-emerald-500/15">
                     <span className="text-sm font-semibold text-emerald-300">
                       WA
                     </span>
@@ -965,7 +992,7 @@ export default function PerfilPrestador() {
                       type="tel"
                       value={whatsapp}
                       onChange={(e) => setWhatsapp(e.target.value)}
-                      className="w-full bg-transparent px-2 py-2.5 text-sm outline-none placeholder:text-neutral-600"
+                      className="w-full bg-transparent px-2 py-2 text-[13px] outline-none placeholder:text-neutral-600"
                       placeholder="3001234567"
                     />
                   </div>
@@ -979,7 +1006,7 @@ export default function PerfilPrestador() {
               <div className="sm:col-span-2">
                 <label
                   htmlFor="description"
-                  className="mb-1.5 block text-sm font-medium text-neutral-300"
+                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
                 >
                   Descripción
                 </label>
@@ -988,7 +1015,7 @@ export default function PerfilPrestador() {
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    rows={5}
+                    rows={4}
                     className={`${fieldBaseClass} resize-none leading-6`}
                     placeholder="Cuenta qué servicios ofreces y qué pueden esperar los clientes."
                   />
@@ -997,6 +1024,7 @@ export default function PerfilPrestador() {
                     {description || "Sin descripción"}
                   </p>
                 )}
+              </div>
               </div>
               </div>
               )}
@@ -1239,35 +1267,19 @@ export default function PerfilPrestador() {
             className="w-full max-w-lg rounded-lg border border-white/[0.08] bg-[#101012] p-6 shadow-2xl shadow-black/40"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold">Solicitar verificacion</h3>
+            <h3 className="text-lg font-semibold">
+              {currentVerificationLevel > 0
+                ? "Subir nivel de verificacion"
+                : "Solicitar verificacion"}
+            </h3>
             <p className="mt-2 text-sm leading-6 text-neutral-400">
-              Elige el nivel de insignia que quieres solicitar. La solicitud
-              llegara al panel de control para revision.
+              {currentVerificationLevel > 0
+                ? `Tu nivel actual es ${effectiveBadgeLabel}. Elige un nivel superior para enviar una nueva solicitud.`
+                : "Elige el nivel de insignia que quieres solicitar. La solicitud llegara al panel de control para revision."}
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {[
-                {
-                  level: 1 as BadgeVerificationLevel,
-                  title: "Bronce",
-                  text: "Requiere foto de verificacion.",
-                },
-                {
-                  level: 2 as BadgeVerificationLevel,
-                  title: "Plata",
-                  text: "Requiere video de verificacion.",
-                },
-                {
-                  level: 3 as BadgeVerificationLevel,
-                  title: "Oro",
-                  text: "Requiere visita presencial.",
-                },
-                {
-                  level: 4 as BadgeVerificationLevel,
-                  title: "Platino",
-                  text: "Requiere verificacion por servicio.",
-                },
-              ].map((option) => (
+              {availableVerificationOptions.map((option) => (
                 <button
                   key={option.level}
                   type="button"

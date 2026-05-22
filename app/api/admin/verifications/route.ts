@@ -111,7 +111,7 @@ export async function GET(request: Request) {
           subscriptionNextChargeAt: toDateString(data.subscriptionNextChargeAt),
           subscriptionLastPaidAt: toDateString(data.subscriptionLastPaidAt),
           subscriptionAmount: data.subscriptionAmount || null,
-          media: Boolean(data.blocked) ? sanitizeMediaForAdmin(data.media) : [],
+          media: sanitizeMediaForAdmin(data.media),
           createdAt: toDateString(data.createdAt),
         };
       })

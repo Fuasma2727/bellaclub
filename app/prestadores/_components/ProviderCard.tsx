@@ -64,8 +64,8 @@ export default function ProviderCard({
             }
           : {
               shell:
-                "border-cyan-200/45 bg-cyan-200/15 shadow-cyan-950/30 hover:bg-cyan-200/25",
-              gem: "from-white via-cyan-200 to-fuchsia-400",
+                "border-sky-100/70 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.42),rgba(125,211,252,0.18)_42%,rgba(168,85,247,0.14)_100%)] shadow-[0_0_18px_rgba(186,230,253,0.36)] ring-1 ring-white/15 hover:border-white/90 hover:bg-cyan-100/20 hover:shadow-[0_0_24px_rgba(186,230,253,0.55)]",
+              gem: "from-white via-sky-100 via-45% to-violet-300 shadow-[0_0_10px_rgba(255,255,255,0.8)]",
             };
   const privateCount = (provider.media || []).filter((item) => item.private)
     .length;
@@ -133,10 +133,18 @@ export default function ProviderCard({
                 }}
                 className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border shadow-lg transition hover:-translate-y-0.5 sm:h-7 sm:w-7 ${badgeStyle.shell}`}
               >
-                <span
-                  aria-hidden="true"
-                  className={`h-2.5 w-2.5 rotate-45 rounded-[2px] bg-gradient-to-br shadow-sm sm:h-3 sm:w-3 ${badgeStyle.gem}`}
-                />
+                <span className="relative flex h-3.5 w-3.5 items-center justify-center sm:h-4 sm:w-4">
+                  <span
+                    aria-hidden="true"
+                    className={`h-2.5 w-2.5 rotate-45 rounded-[2px] bg-gradient-to-br shadow-sm sm:h-3 sm:w-3 ${badgeStyle.gem}`}
+                  />
+                  {verificationBadge === "platinum" && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-1 top-1 h-1 w-1 rounded-full bg-white/95 shadow-[0_0_8px_rgba(255,255,255,0.95)]"
+                    />
+                  )}
+                </span>
               </button>
             )}
 
