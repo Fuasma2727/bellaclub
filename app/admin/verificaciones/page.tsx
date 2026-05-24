@@ -45,6 +45,7 @@ type ProviderVerification = {
   subscriptionNextChargeAt?: string | null;
   subscriptionLastPaidAt?: string | null;
   subscriptionAmount?: number | null;
+  subscriptionManualOverride?: boolean;
   media?: AdminMediaItem[];
   createdAt?: string | null;
 };
@@ -81,7 +82,9 @@ type VerificationAction =
   | "removeVisit"
   | "block"
   | "unblock"
-  | "deleteMedia";
+  | "deleteMedia"
+  | "disableSubscription"
+  | "enableSubscription";
 
 const statusClass: Record<VerificationStatus, string> = {
   pending: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200",
@@ -207,6 +210,19 @@ export default function AdminVerificationsPage() {
       if (!confirmed) return;
     }
 
+    if (
+      action === "disableSubscription" ||
+      action === "enableSubscription"
+    ) {
+      const confirmed = window.confirm(
+        action === "disableSubscription"
+          ? "Seguro que quieres desactivar la mensualidad de este prestador?"
+          : "Seguro que quieres activar nuevamente la mensualidad de este prestador?"
+      );
+
+      if (!confirmed) return;
+    }
+
     const currentActionId =
       action === "deleteMedia" && mediaId
         ? `${provider.id}:${mediaId}`
@@ -261,6 +277,31 @@ export default function AdminVerificationsPage() {
           return current.map((item) => {
             if (item.id !== provider.id) return item;
             return { ...item, blocked: action === "block" };
+          });
+        }
+
+        if (
+          action === "disableSubscription" ||
+          action === "enableSubscription"
+        ) {
+          return current.map((item) => {
+            if (item.id !== provider.id) return item;
+
+            if (action === "disableSubscription") {
+              return {
+                ...item,
+                blocked: false,
+                blockedReason: null,
+                subscriptionStatus: "admin_override",
+                subscriptionManualOverride: true,
+              };
+            }
+
+            return {
+              ...item,
+              subscriptionStatus: "pending_payment",
+              subscriptionManualOverride: false,
+            };
           });
         }
 
@@ -517,12 +558,37 @@ export default function AdminVerificationsPage() {
                 : "Bloqueado"}
             </span>
           )}
+          <span
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+              provider.subscriptionManualOverride ||
+              provider.subscriptionStatus === "admin_override"
+                ? "border-sky-400/30 bg-sky-400/10 text-sky-100"
+                : "border-white/10 bg-white/[0.04] text-neutral-300"
+            }`}
+          >
+            {provider.subscriptionManualOverride ||
+            provider.subscriptionStatus === "admin_override"
+              ? "Mensualidad desactivada"
+              : "Mensualidad activa"}
+          </span>
         </div>
 
         <div className="space-y-1 text-xs text-neutral-500">
           {provider.email && <p className="truncate">{provider.email}</p>}
           {typeof provider.balance === "number" && (
             <p>Saldo: ${provider.balance.toLocaleString("es-CO")}</p>
+          )}
+          {provider.subscriptionStatus && (
+            <p>
+              Mensualidad:{" "}
+              {provider.subscriptionStatus === "active"
+                ? "Activa"
+                : provider.subscriptionStatus === "past_due"
+                  ? "Pendiente"
+                  : provider.subscriptionStatus === "admin_override"
+                    ? "Desactivada por admin"
+                    : "Por cobrar"}
+            </p>
           )}
           {provider.createdAt && (
             <p>
@@ -567,6 +633,34 @@ export default function AdminVerificationsPage() {
         )}
 
         {renderProviderGallery(provider, isBlockedView)}
+
+        <button
+          type="button"
+          disabled={actionId === provider.id}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleAction(
+              provider,
+              provider.subscriptionManualOverride ||
+                provider.subscriptionStatus === "admin_override"
+                ? "enableSubscription"
+                : "disableSubscription"
+            );
+          }}
+          className={`w-full rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+            provider.subscriptionManualOverride ||
+            provider.subscriptionStatus === "admin_override"
+              ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15"
+              : "border border-sky-400/30 bg-sky-400/10 text-sky-100 hover:bg-sky-400/15"
+          }`}
+        >
+          {actionId === provider.id
+            ? "Procesando..."
+            : provider.subscriptionManualOverride ||
+                provider.subscriptionStatus === "admin_override"
+              ? "Activar mensualidad"
+              : "Desactivar mensualidad"}
+        </button>
 
         <button
           type="button"

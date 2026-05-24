@@ -39,6 +39,7 @@ type ProviderVerification = {
   subscriptionNextChargeAt?: string | null;
   subscriptionLastPaidAt?: string | null;
   subscriptionAmount?: number | null;
+  subscriptionManualOverride?: boolean;
   media?: AdminMediaItem[];
   createdAt?: string | null;
 };
@@ -115,6 +116,7 @@ export async function GET(request: Request) {
           subscriptionNextChargeAt: toDateString(data.subscriptionNextChargeAt),
           subscriptionLastPaidAt: toDateString(data.subscriptionLastPaidAt),
           subscriptionAmount: data.subscriptionAmount || null,
+          subscriptionManualOverride: Boolean(data.subscriptionManualOverride),
           media: sanitizeMediaForAdmin(data.media),
           createdAt: toDateString(data.createdAt),
         };

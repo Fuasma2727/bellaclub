@@ -12,7 +12,22 @@ export const metadata: Metadata = {
     description:
       "Perfiles aprobados, galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
     url: "/prestadores",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "BelaClub",
+      },
+    ],
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Prestadores verificados | BelaClub",
+    description:
+      "Perfiles aprobados, galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
+    images: ["/og-image.png"],
   },
 };
 

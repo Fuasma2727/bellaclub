@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com"
   ),
   title: {
     default: "BelaClub",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/favicon.ico",
-    apple: "/logo.png",
+    apple: "/logo.jpg",
   },
   openGraph: {
     title: "BelaClub",
@@ -47,9 +47,9 @@ export const metadata: Metadata = {
     siteName: "BelaClub",
     images: [
       {
-        url: "/logo.png",
-        width: 512,
-        height: 512,
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
         alt: "BelaClub",
       },
     ],
@@ -57,11 +57,11 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "BelaClub",
     description:
       "Conecta con prestadores verificados y gestiona contenido privado de forma segura.",
-    images: ["/logo.png"],
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,

@@ -13,7 +13,9 @@ type VerificationAction =
   | "removeVisit"
   | "block"
   | "unblock"
-  | "deleteMedia";
+  | "deleteMedia"
+  | "disableSubscription"
+  | "enableSubscription";
 
 type MediaItem = {
   id?: string;
@@ -59,6 +61,8 @@ export async function PATCH(request: Request, { params }: Params) {
       "block",
       "unblock",
       "deleteMedia",
+      "disableSubscription",
+      "enableSubscription",
     ];
 
     if (!action || !validActions.includes(action)) {
@@ -179,6 +183,67 @@ export async function PATCH(request: Request, { params }: Params) {
       });
 
       return NextResponse.json({ success: true, blocked: true });
+    }
+
+    if (action === "disableSubscription") {
+      await userRef.update({
+        blocked: false,
+        blockedReason: adminFieldValue.delete(),
+        profileVisible: userData.verificationStatus === "approved",
+        subscriptionStatus: "admin_override",
+        subscriptionManualOverride: true,
+        subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
+        subscriptionOverrideAt: adminFieldValue.serverTimestamp(),
+        subscriptionOverrideBy: owner.uid,
+      });
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "provider_subscription_disabled",
+        title: "Mensualidad pausada",
+        message:
+          "El administrador pauso el cobro de tu mensualidad. Tu perfil seguira activo.",
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        subscriptionStatus: "admin_override",
+        subscriptionManualOverride: true,
+        blocked: false,
+      });
+    }
+
+    if (action === "enableSubscription") {
+      await userRef.update({
+        subscriptionStatus: "pending_payment",
+        subscriptionManualOverride: false,
+        subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionNextChargeAt: adminFieldValue.serverTimestamp(),
+        subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
+        subscriptionOverrideRemovedAt: adminFieldValue.serverTimestamp(),
+        subscriptionOverrideRemovedBy: owner.uid,
+      });
+
+      const subscriptionResult = await processProviderSubscription(uid);
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "provider_subscription_enabled",
+        title: "Mensualidad activada",
+        message:
+          "El administrador activo nuevamente el cobro mensual de tu perfil.",
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        subscriptionManualOverride: false,
+        subscriptionResult,
+      });
     }
 
     if (action === "deleteMedia") {
