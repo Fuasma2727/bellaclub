@@ -1,4 +1,5 @@
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { setLedgerEntry } from "@/lib/ledger";
 import { processProviderSubscription } from "@/lib/providerSubscription";
 
 type WompiTransactionStatus =
@@ -59,6 +60,20 @@ export async function creditApprovedRecharge(transaction: WompiTransaction) {
       wompiTransactionId: transaction.id,
       approvedAt: adminFieldValue.serverTimestamp(),
       updatedAt: adminFieldValue.serverTimestamp(),
+    });
+
+    setLedgerEntry(tx, {
+      userId: recharge.userId,
+      type: "recharge",
+      direction: "credit",
+      amount: transaction.amount_in_cents / 100,
+      status: "completed",
+      sourceCollection: "recharges",
+      sourceId: transaction.reference,
+      metadata: {
+        provider: "wompi",
+        wompiTransactionId: transaction.id,
+      },
     });
   });
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import admin from "firebase-admin";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import { setLedgerEntry } from "@/lib/ledger";
 import {
   PROVIDER_PROMOTION_DAYS,
   PROVIDER_PROMOTION_PRICE,
@@ -48,13 +49,26 @@ export async function POST(request: Request) {
         promotedUpdatedAt: adminFieldValue.serverTimestamp(),
       });
 
-      tx.set(adminDb.collection("providerPromotions").doc(), {
+      const promotionRef = adminDb.collection("providerPromotions").doc();
+
+      tx.set(promotionRef, {
         providerId: decoded.uid,
         amount: PROVIDER_PROMOTION_PRICE,
         days: PROVIDER_PROMOTION_DAYS,
         promotedUntil: admin.firestore.Timestamp.fromDate(promotedUntil),
         status: "completed",
         createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      setLedgerEntry(tx, {
+        userId: decoded.uid,
+        type: "provider_promotion",
+        direction: "debit",
+        amount: PROVIDER_PROMOTION_PRICE,
+        status: "completed",
+        sourceCollection: "providerPromotions",
+        sourceId: promotionRef.id,
+        metadata: { days: PROVIDER_PROMOTION_DAYS },
       });
 
       tx.set(adminDb.collection("notifications").doc(), {
@@ -124,4 +138,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

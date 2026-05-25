@@ -136,6 +136,30 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /withdrawals/{withdrawalId} {
+      allow read, write: if false;
+    }
+
+    match /ledger/{ledgerId} {
+      allow read, write: if false;
+    }
+
+    match /providerPromotions/{promotionId} {
+      allow read, write: if false;
+    }
+
+    match /providerSubscriptions/{subscriptionId} {
+      allow read, write: if false;
+    }
+
+    match /providerVideoTimePurchases/{purchaseId} {
+      allow read, write: if false;
+    }
+
+    match /wompiEvents/{eventId} {
+      allow read, write: if false;
+    }
+
     match /reports/{reportId} {
       allow read, write: if false;
     }

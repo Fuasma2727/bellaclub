@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import admin from "firebase-admin";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { calculateCommission } from "@/lib/commission";
+import { setLedgerEntry } from "@/lib/ledger";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
 
 const allowedAmounts = [50000, 100000, 300000, 500000];
@@ -13,6 +15,18 @@ const createDepositCode = () => {
 
 export async function POST(req: Request) {
   try {
+    const rateLimit = checkRateLimit(`deposit-service:${getClientIp(req)}`, {
+      limit: 30,
+      windowMs: 60 * 1000,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Intenta de nuevo en un momento." },
+        { status: 429 }
+      );
+    }
+
     const decoded = await requireAuthenticatedUser(req);
     const { sellerId, amount } = await req.json();
     const buyerId = decoded.uid;
@@ -105,7 +119,9 @@ export async function POST(req: Request) {
         balance: admin.firestore.FieldValue.increment(releasedAmount),
       });
 
-      tx.set(adminDb.collection("serviceDeposits").doc(), {
+      const depositRef = adminDb.collection("serviceDeposits").doc();
+
+      tx.set(depositRef, {
         code: depositCode,
         buyerId,
         sellerId,
@@ -115,6 +131,47 @@ export async function POST(req: Request) {
         releasedAmount,
         status: "pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      setLedgerEntry(tx, {
+        userId: buyerId,
+        counterpartyUserId: sellerId,
+        type: "service_deposit",
+        direction: "debit",
+        amount: totalAmount,
+        commissionAmount,
+        netAmount: releasedAmount,
+        status: "completed",
+        sourceCollection: "serviceDeposits",
+        sourceId: depositRef.id,
+        metadata: { code: depositCode },
+      });
+
+      setLedgerEntry(tx, {
+        userId: sellerId,
+        counterpartyUserId: buyerId,
+        type: "service_deposit_received",
+        direction: "credit",
+        amount: releasedAmount,
+        commissionAmount,
+        netAmount: releasedAmount,
+        status: "completed",
+        sourceCollection: "serviceDeposits",
+        sourceId: depositRef.id,
+        metadata: { code: depositCode },
+      });
+
+      setLedgerEntry(tx, {
+        userId: null,
+        counterpartyUserId: sellerId,
+        type: "service_deposit_commission",
+        direction: "commission",
+        amount: commissionAmount,
+        commissionAmount,
+        status: "completed",
+        sourceCollection: "serviceDeposits",
+        sourceId: depositRef.id,
+        metadata: { buyerId, sellerId, code: depositCode },
       });
 
       tx.set(adminDb.collection("notifications").doc(), {

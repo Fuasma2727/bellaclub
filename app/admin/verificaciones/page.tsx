@@ -75,6 +75,27 @@ type ReportsListResponse = {
   error?: string;
 };
 
+type WithdrawalItem = {
+  id: string;
+  providerId: string;
+  providerEmail?: string;
+  providerName?: string;
+  amount: number;
+  commissionAmount: number;
+  releasedAmount: number;
+  payoutProvider?: string;
+  payoutMethod?: string;
+  payoutAccount?: string;
+  accountHolder?: string;
+  status?: "pending_wompi" | "paid" | "rejected";
+  createdAt?: string | null;
+};
+
+type WithdrawalsListResponse = {
+  withdrawals?: WithdrawalItem[];
+  error?: string;
+};
+
 type VerificationAction =
   | "approve"
   | "reject"
@@ -109,12 +130,13 @@ export default function AdminVerificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const [providers, setProviders] = useState<ProviderVerification[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [activeView, setActiveView] = useState<
-    "requests" | "blocked" | "reports"
+    "requests" | "blocked" | "reports" | "withdrawals"
   >("requests");
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     null
@@ -151,6 +173,27 @@ export default function AdminVerificationsPage() {
 
         setReports(data.reports || []);
         setProviders([]);
+        setWithdrawals([]);
+        return;
+      }
+
+      if (activeView === "withdrawals") {
+        params.set("status", "pending_wompi");
+        const queryString = params.toString() ? `?${params.toString()}` : "";
+        const res = await fetch(`/api/admin/withdrawals${queryString}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = (await res.json()) as WithdrawalsListResponse;
+
+        if (!res.ok) {
+          throw new Error(data.error || "No pudimos cargar los retiros");
+        }
+
+        setWithdrawals(data.withdrawals || []);
+        setReports([]);
+        setProviders([]);
         return;
       }
 
@@ -170,6 +213,7 @@ export default function AdminVerificationsPage() {
 
       setProviders(data.providers || []);
       setReports([]);
+      setWithdrawals([]);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "No pudimos cargar el panel";
@@ -384,6 +428,53 @@ export default function AdminVerificationsPage() {
         error instanceof Error
           ? error.message
           : "No pudimos actualizar el reporte";
+      setMessage(errorMessage);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleWithdrawalAction = async (
+    withdrawal: WithdrawalItem,
+    action: "markPaid" | "reject"
+  ) => {
+    if (!user) return;
+
+    const confirmed = window.confirm(
+      action === "markPaid"
+        ? "Confirma que ya enviaste este dinero al prestador?"
+        : "Seguro que quieres rechazar este retiro y devolver el saldo?"
+    );
+
+    if (!confirmed) return;
+
+    setActionId(withdrawal.id);
+    setMessage("");
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/admin/withdrawals", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ withdrawalId: withdrawal.id, action }),
+      });
+      const data = (await res.json()) as { error?: string };
+
+      if (!res.ok) {
+        throw new Error(data.error || "No pudimos actualizar el retiro");
+      }
+
+      setWithdrawals((current) =>
+        current.filter((item) => item.id !== withdrawal.id)
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "No pudimos actualizar el retiro";
       setMessage(errorMessage);
     } finally {
       setActionId(null);
@@ -743,12 +834,18 @@ export default function AdminVerificationsPage() {
   };
 
   const selectedProvider =
-    selectedProviderId && activeView !== "reports"
+    selectedProviderId &&
+    activeView !== "reports" &&
+    activeView !== "withdrawals"
       ? providers.find((provider) => provider.id === selectedProviderId) || null
       : null;
   const isLoading = authLoading || loading;
   const hasResults =
-    activeView === "reports" ? reports.length > 0 : providers.length > 0;
+    activeView === "reports"
+      ? reports.length > 0
+      : activeView === "withdrawals"
+        ? withdrawals.length > 0
+        : providers.length > 0;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -845,6 +942,17 @@ export default function AdminVerificationsPage() {
               >
                 Reportes
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveView("withdrawals")}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  activeView === "withdrawals"
+                    ? "bg-blue-500 text-white"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Retiros
+              </button>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -857,6 +965,8 @@ export default function AdminVerificationsPage() {
                 placeholder={
                   activeView === "reports"
                     ? "Buscar reporte por prestador, correo, WhatsApp o motivo"
+                    : activeView === "withdrawals"
+                      ? "Buscar retiro por prestador, correo, titular, banco o cuenta"
                     : activeView === "blocked"
                     ? "Buscar bloqueado por nombre, correo o WhatsApp"
                     : "Buscar por nombre, correo o WhatsApp"
@@ -898,6 +1008,8 @@ export default function AdminVerificationsPage() {
                 ? "No hay resultados"
                 : activeView === "reports"
                   ? "No hay reportes"
+                : activeView === "withdrawals"
+                  ? "No hay retiros"
                 : activeView === "blocked"
                   ? "No hay bloqueados"
                   : "No hay solicitudes"}
@@ -907,12 +1019,129 @@ export default function AdminVerificationsPage() {
                 ? "Prueba con otro nombre, correo o telefono."
                 : activeView === "reports"
                   ? "Cuando un usuario reporte un perfil aparecera aqui."
+                : activeView === "withdrawals"
+                  ? "Cuando un prestador solicite retirar saldo aparecera aqui."
                 : activeView === "blocked"
                   ? "No tienes perfiles bloqueados en este momento."
-                : "Cuando un prestador solicite aprobacion o una insignia aparecera aqui."}
+                  : "Cuando un prestador solicite aprobacion o una insignia aparecera aqui."}
             </p>
           </section>
         )}
+
+        {user &&
+          !isLoading &&
+          activeView === "withdrawals" &&
+          withdrawals.length > 0 && (
+            <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {withdrawals.map((withdrawal) => (
+                <article
+                  key={withdrawal.id}
+                  className="overflow-hidden rounded-lg border border-white/10 bg-neutral-950"
+                >
+                  <div className="border-b border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {withdrawal.providerName || "Prestador sin nombre"}
+                        </p>
+                        {withdrawal.providerEmail && (
+                          <p className="mt-1 truncate text-xs text-neutral-500">
+                            {withdrawal.providerEmail}
+                          </p>
+                        )}
+                      </div>
+                      <span className="rounded-full border border-blue-400/30 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-100">
+                        Pendiente
+                      </span>
+                    </div>
+
+                    {withdrawal.createdAt && (
+                      <p className="mt-3 text-xs text-neutral-500">
+                        {new Date(withdrawal.createdAt).toLocaleString("es-CO")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-4 p-4">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-neutral-500">
+                          Retira
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          ${withdrawal.amount.toLocaleString("es-CO")}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-red-100/60">
+                          Comision
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-red-100">
+                          $
+                          {withdrawal.commissionAmount.toLocaleString(
+                            "es-CO"
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-emerald-100/60">
+                          Recibe
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-200">
+                          $
+                          {withdrawal.releasedAmount.toLocaleString("es-CO")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                        Datos de pago
+                      </p>
+                      <div className="mt-3 space-y-1 text-neutral-300">
+                        <p>Titular: {withdrawal.accountHolder || "Sin dato"}</p>
+                        <p>
+                          Metodo: {withdrawal.payoutMethod || "Sin dato"}
+                        </p>
+                        <p>
+                          Cuenta/celular:{" "}
+                          {withdrawal.payoutAccount || "Sin dato"}
+                        </p>
+                        <p className="text-neutral-500">
+                          Proveedor: {withdrawal.payoutProvider || "wompi"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        disabled={actionId === withdrawal.id}
+                        onClick={() =>
+                          void handleWithdrawalAction(withdrawal, "markPaid")
+                        }
+                        className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {actionId === withdrawal.id
+                          ? "Procesando..."
+                          : "Marcar pagado"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionId === withdrawal.id}
+                        onClick={() =>
+                          void handleWithdrawalAction(withdrawal, "reject")
+                        }
+                        className="rounded-lg border border-red-500/40 px-4 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </section>
+          )}
 
         {user && !isLoading && activeView === "reports" && reports.length > 0 && (
           <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,18 @@ const getBaseUrl = (request: Request) => {
 
 export async function POST(request: Request) {
   try {
+    const rateLimit = checkRateLimit(`wompi-checkout:${getClientIp(request)}`, {
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Intenta de nuevo en un momento." },
+        { status: 429 }
+      );
+    }
+
     if (!PUBLIC_KEY || !INTEGRITY_SECRET) {
       return NextResponse.json(
         { error: "Wompi no esta configurado" },

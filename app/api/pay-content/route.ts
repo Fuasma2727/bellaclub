@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import admin from "firebase-admin";
 import { calculateCommission } from "@/lib/commission";
+import { setLedgerEntry } from "@/lib/ledger";
 import { createPrivateMediaUrl } from "@/lib/privateMediaAccess";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
 
 type MediaItem = {
@@ -14,6 +16,18 @@ type MediaItem = {
 
 export async function POST(req: Request) {
   try {
+    const rateLimit = checkRateLimit(`pay-content:${getClientIp(req)}`, {
+      limit: 30,
+      windowMs: 60 * 1000,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Intenta de nuevo en un momento." },
+        { status: 429 }
+      );
+    }
+
     const decoded = await requireAuthenticatedUser(req);
     const body = await req.json();
 
@@ -92,6 +106,8 @@ export async function POST(req: Request) {
       totalAmount,
     } = calculateCommission(price);
 
+    let purchaseAlreadyCompleted = false;
+
     await adminDb.runTransaction(async (tx) => {
       const buyerSnap = await tx.get(buyerRef);
 
@@ -109,7 +125,10 @@ export async function POST(req: Request) {
         (item) => item?.sellerId === sellerId && item?.mediaId === mediaId
       );
 
-      if (alreadyPurchased) return;
+      if (alreadyPurchased) {
+        purchaseAlreadyCompleted = true;
+        return;
+      }
 
       if (buyerBalance < totalAmount) {
         throw new Error("INSUFFICIENT_BALANCE");
@@ -132,7 +151,9 @@ export async function POST(req: Request) {
         balance: admin.firestore.FieldValue.increment(releasedAmount),
       });
 
-      tx.set(adminDb.collection("contentPurchases").doc(), {
+      const purchaseRef = adminDb.collection("contentPurchases").doc();
+
+      tx.set(purchaseRef, {
         buyerId,
         sellerId,
         mediaId,
@@ -143,11 +164,53 @@ export async function POST(req: Request) {
         status: "completed",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      setLedgerEntry(tx, {
+        userId: buyerId,
+        counterpartyUserId: sellerId,
+        type: "content_purchase",
+        direction: "debit",
+        amount: totalAmount,
+        commissionAmount,
+        netAmount: releasedAmount,
+        status: "completed",
+        sourceCollection: "contentPurchases",
+        sourceId: purchaseRef.id,
+        metadata: { mediaId },
+      });
+
+      setLedgerEntry(tx, {
+        userId: sellerId,
+        counterpartyUserId: buyerId,
+        type: "content_sale",
+        direction: "credit",
+        amount: releasedAmount,
+        commissionAmount,
+        netAmount: releasedAmount,
+        status: "completed",
+        sourceCollection: "contentPurchases",
+        sourceId: purchaseRef.id,
+        metadata: { mediaId },
+      });
+
+      setLedgerEntry(tx, {
+        userId: null,
+        counterpartyUserId: sellerId,
+        type: "content_commission",
+        direction: "commission",
+        amount: commissionAmount,
+        commissionAmount,
+        status: "completed",
+        sourceCollection: "contentPurchases",
+        sourceId: purchaseRef.id,
+        metadata: { buyerId, sellerId, mediaId },
+      });
     });
 
     return NextResponse.json(
       {
         success: true,
+        alreadyPurchased: purchaseAlreadyCompleted,
         mediaId,
         commissionAmount,
         releasedAmount,

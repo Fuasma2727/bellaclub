@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebaseAdmin";
 import { creditApprovedRecharge } from "@/lib/wompiRecharge";
 
 export const runtime = "nodejs";
@@ -32,6 +33,10 @@ const getPathValue = (source: unknown, path: string) => {
 };
 
 const safeCompare = (left: string, right: string) => {
+  if (!/^[a-f0-9]+$/i.test(left) || !/^[a-f0-9]+$/i.test(right)) {
+    return false;
+  }
+
   const leftBuffer = Buffer.from(left.toLowerCase(), "hex");
   const rightBuffer = Buffer.from(right.toLowerCase(), "hex");
 
@@ -86,6 +91,24 @@ export async function POST(request: Request) {
   try {
     const event = (await request.json()) as WompiEvent;
     const headerChecksum = request.headers.get("x-event-checksum");
+
+    await adminDb.collection("wompiEvents").doc().set({
+      event: event?.event || null,
+      transactionId:
+        typeof event?.data?.transaction === "object" &&
+        event.data.transaction !== null &&
+        "id" in event.data.transaction
+          ? (event.data.transaction as Record<string, unknown>).id
+          : null,
+      reference:
+        typeof event?.data?.transaction === "object" &&
+        event.data.transaction !== null &&
+        "reference" in event.data.transaction
+          ? (event.data.transaction as Record<string, unknown>).reference
+          : null,
+      hasHeaderChecksum: Boolean(headerChecksum),
+      receivedAt: new Date().toISOString(),
+    });
 
     if (!isValidWompiEvent(event, headerChecksum)) {
       return NextResponse.json(

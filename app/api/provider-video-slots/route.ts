@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import admin from "firebase-admin";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import { setLedgerEntry } from "@/lib/ledger";
 import {
   EXTRA_VIDEO_SECONDS,
   EXTRA_VIDEO_TIME_PRICE,
@@ -41,12 +42,25 @@ export async function POST(request: Request) {
         videoTimeUpdatedAt: adminFieldValue.serverTimestamp(),
       });
 
-      tx.set(adminDb.collection("providerVideoTimePurchases").doc(), {
+      const purchaseRef = adminDb.collection("providerVideoTimePurchases").doc();
+
+      tx.set(purchaseRef, {
         providerId: decoded.uid,
         amount: EXTRA_VIDEO_TIME_PRICE,
         seconds: EXTRA_VIDEO_SECONDS,
         status: "completed",
         createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      setLedgerEntry(tx, {
+        userId: decoded.uid,
+        type: "provider_video_time_purchase",
+        direction: "debit",
+        amount: EXTRA_VIDEO_TIME_PRICE,
+        status: "completed",
+        sourceCollection: "providerVideoTimePurchases",
+        sourceId: purchaseRef.id,
+        metadata: { seconds: EXTRA_VIDEO_SECONDS },
       });
 
       tx.set(adminDb.collection("notifications").doc(), {

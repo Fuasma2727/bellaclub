@@ -1,5 +1,6 @@
 import admin from "firebase-admin";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { setLedgerEntry } from "@/lib/ledger";
 
 export const PROVIDER_MONTHLY_FEE = 100000;
 
@@ -89,6 +90,16 @@ export async function processProviderSubscription(
         source: "balance",
         createdAt: adminFieldValue.serverTimestamp(),
         nextChargeAt: nextPaidChargeAt,
+      });
+
+      setLedgerEntry(tx, {
+        userId: providerId,
+        type: "provider_subscription",
+        direction: "debit",
+        amount: PROVIDER_MONTHLY_FEE,
+        status: "completed",
+        sourceCollection: "providerSubscriptions",
+        sourceId: paymentRef.id,
       });
 
       tx.set(successNotificationRef, {

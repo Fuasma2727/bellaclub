@@ -19,6 +19,7 @@ import { logoutUser } from "@/lib/auth";
 const rechargeOptions = [100000, 200000, 500000];
 const withdrawalCommissionRate = 0.05;
 const minWithdrawalAmount = 50000;
+const supportWhatsapp = "573052330967";
 
 type NotificationItem = {
   id: string;
@@ -70,6 +71,7 @@ export default function Header() {
     withdrawalValue - withdrawalCommission,
     0
   );
+  const supportHref = `https://wa.me/${supportWhatsapp}`;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -287,7 +289,11 @@ export default function Header() {
               <div className="relative flex shrink-0 items-center gap-1 sm:gap-4">
                 <div className="relative" ref={notificationRef}>
                   <button
-                    className="relative flex h-8 w-8 items-center justify-center rounded-full text-neutral-200 transition hover:bg-white/[0.06] min-[380px]:h-9 min-[380px]:w-9"
+                    className={`relative flex h-8 w-8 items-center justify-center rounded-full border shadow-lg transition min-[380px]:h-9 min-[380px]:w-9 ${
+                      unreadCount > 0
+                        ? "border-amber-300/35 bg-amber-300/12 text-amber-200 shadow-amber-950/25 hover:border-amber-300/55 hover:bg-amber-300/18 hover:text-amber-100"
+                        : "border-white/10 bg-white/[0.04] text-amber-300/80 shadow-black/20 hover:border-amber-300/25 hover:bg-amber-300/10 hover:text-amber-200"
+                    }`}
                     aria-label="Abrir notificaciones"
                     onClick={async () => {
                       setShowNotifications((value) => !value);
@@ -304,27 +310,57 @@ export default function Header() {
                       }
                     }}
                   >
+                    {unreadCount > 0 && (
+                      <span className="absolute inset-0 rounded-full bg-amber-300/15 blur-[6px]" />
+                    )}
                     <svg
                       viewBox="0 0 24 24"
-                      className="h-5 w-5"
+                      className="relative h-5 w-5"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="2"
+                      strokeWidth="2.1"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
                       <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
                       <path d="M13.7 21a2 2 0 0 1-3.4 0" />
                     </svg>
                     {unreadCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                        {unreadCount}
+                      <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border border-black bg-gradient-to-b from-amber-300 to-amber-500 px-1 text-[10px] font-bold text-black shadow-md shadow-amber-950/40">
+                        {unreadCount > 9 ? "9+" : unreadCount}
                       </span>
                     )}
                   </button>
 
                   {showNotifications && (
-                    <div className="absolute right-[-88px] z-50 mt-2 w-[calc(100vw-24px)] max-w-sm rounded-lg border border-white/10 bg-zinc-950 text-white shadow-2xl shadow-black/50 sm:right-0 sm:w-80">
-                      <div className="border-b border-white/10 p-3 font-semibold">
-                        Notificaciones
+                    <div className="absolute right-[-88px] z-50 mt-3 w-[calc(100vw-24px)] max-w-sm overflow-hidden rounded-xl border border-white/10 bg-zinc-950 text-white shadow-2xl shadow-black/50 sm:right-0 sm:w-80">
+                      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] p-4">
+                        <div>
+                          <p className="text-sm font-semibold">
+                            Notificaciones
+                          </p>
+                          <p className="mt-0.5 text-xs text-zinc-500">
+                            {unreadCount > 0
+                              ? `${unreadCount} nueva${
+                                  unreadCount === 1 ? "" : "s"
+                                }`
+                              : "Todo al dia"}
+                          </p>
+                        </div>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-amber-300/20 bg-amber-300/10 text-amber-200">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                            <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+                          </svg>
+                        </span>
                       </div>
                       {notifications.length === 0 ? (
                         <p className="p-4 text-center text-sm text-zinc-500">
@@ -334,18 +370,31 @@ export default function Header() {
                         notifications.map((notification) => (
                           <div
                             key={notification.id}
-                            className={`border-b border-white/10 p-3 text-sm last:border-b-0 ${
-                              !notification.read ? "bg-white/[0.06]" : ""
+                            className={`border-b border-white/10 p-4 text-sm last:border-b-0 ${
+                              !notification.read
+                                ? "bg-amber-300/[0.06]"
+                                : "bg-transparent"
                             }`}
                           >
-                            <p className="font-medium">
-                              {notification.message}
-                            </p>
-                            <p className="mt-1 text-xs text-zinc-500">
-                              {notification.createdAt
-                                ?.toDate?.()
-                                .toLocaleString()}
-                            </p>
+                            <div className="flex gap-3">
+                              <span
+                                className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                                  !notification.read
+                                    ? "bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.5)]"
+                                    : "bg-white/15"
+                                }`}
+                              />
+                              <div className="min-w-0">
+                                <p className="font-medium leading-5 text-zinc-100">
+                                  {notification.message}
+                                </p>
+                                <p className="mt-1 text-xs text-zinc-500">
+                                  {notification.createdAt
+                                    ?.toDate?.()
+                                    .toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         ))
                       )}
@@ -428,6 +477,33 @@ export default function Header() {
                         </span>
                         Mi perfil
                       </Link>
+
+                      {isProvider && (
+                        <a
+                          href={supportHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => setShowProfileMenu(false)}
+                          className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-400/10 hover:text-sky-50"
+                        >
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-400/10 text-sky-200">
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+                              <path d="M9 9h6" />
+                              <path d="M9 13h4" />
+                            </svg>
+                          </span>
+                          Ayuda
+                        </a>
+                      )}
 
                       <button
                         type="button"

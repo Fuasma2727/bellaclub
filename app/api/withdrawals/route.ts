@@ -2,17 +2,37 @@ import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
 import { calculateCommission } from "@/lib/commission";
+import { setLedgerEntry } from "@/lib/ledger";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 const MIN_WITHDRAWAL_AMOUNT = 50000;
+const MAX_WITHDRAWAL_AMOUNT = 5000000;
 
 const cleanText = (value: unknown, maxLength = 120) => {
   return String(value || "")
     .trim()
+    .replace(/[<>]/g, "")
     .slice(0, maxLength);
+};
+
+const isValidPayoutText = (value: string) => {
+  return /^[\p{L}\p{N}\s.,#@+\-_/()]{3,120}$/u.test(value);
 };
 
 export async function POST(request: Request) {
   try {
+    const rateLimit = checkRateLimit(`withdrawals:${getClientIp(request)}`, {
+      limit: 10,
+      windowMs: 60 * 1000,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Intenta de nuevo en un momento." },
+        { status: 429 }
+      );
+    }
+
     const decoded = await requireAuthenticatedUser(request);
     const body = (await request.json()) as {
       amount?: number;
@@ -37,9 +57,31 @@ export async function POST(request: Request) {
       );
     }
 
+    if (amount > MAX_WITHDRAWAL_AMOUNT) {
+      return NextResponse.json(
+        {
+          error: `El retiro maximo por solicitud es $${MAX_WITHDRAWAL_AMOUNT.toLocaleString(
+            "es-CO"
+          )}`,
+        },
+        { status: 400 }
+      );
+    }
+
     if (!accountHolder || !payoutMethod || !payoutAccount) {
       return NextResponse.json(
         { error: "Completa los datos de retiro" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !isValidPayoutText(accountHolder) ||
+      !isValidPayoutText(payoutMethod) ||
+      !isValidPayoutText(payoutAccount)
+    ) {
+      return NextResponse.json(
+        { error: "Los datos de retiro tienen caracteres no validos" },
         { status: 400 }
       );
     }
@@ -109,6 +151,34 @@ export async function POST(request: Request) {
         releasedAmount,
         read: false,
         createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      setLedgerEntry(tx, {
+        userId: decoded.uid,
+        type: "withdrawal_request",
+        direction: "debit",
+        amount: totalAmount,
+        commissionAmount,
+        netAmount: releasedAmount,
+        status: "pending",
+        sourceCollection: "withdrawals",
+        sourceId: withdrawalRef.id,
+        metadata: {
+          payoutProvider: "wompi",
+          payoutMethod,
+        },
+      });
+
+      setLedgerEntry(tx, {
+        userId: null,
+        counterpartyUserId: decoded.uid,
+        type: "withdrawal_commission",
+        direction: "commission",
+        amount: commissionAmount,
+        commissionAmount,
+        status: "pending",
+        sourceCollection: "withdrawals",
+        sourceId: withdrawalRef.id,
       });
     });
 
