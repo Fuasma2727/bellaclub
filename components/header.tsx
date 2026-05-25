@@ -1,23 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { useAuth } from "@/context/AuthContext";
-import { logoutUser } from "@/lib/auth";
-
-import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import {
-  getFirestore,
-  doc,
-  onSnapshot,
   collection,
+  doc,
+  getFirestore,
+  onSnapshot,
+  orderBy,
   query,
   where,
-  orderBy,
 } from "firebase/firestore";
+import { useAuth } from "@/context/AuthContext";
 import { app } from "@/lib/firebase";
+import { logoutUser } from "@/lib/auth";
 
 const rechargeOptions = [100000, 200000, 500000];
+const withdrawalCommissionRate = 0.05;
+const minWithdrawalAmount = 50000;
 
 type NotificationItem = {
   id: string;
@@ -36,31 +37,51 @@ export default function Header() {
     "jace127127@gmail.com";
   const isOwner = user?.email?.toLowerCase() === ownerEmail;
 
-  const [role, setRole] = useState<string | null>(null);
-  const [balance, setBalance] = useState<number>(0);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<
-    number | null
-  >(null);
-
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  const [role, setRole] = useState<string | null>(null);
+  const [balance, setBalance] = useState(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [balanceMode, setBalanceMode] = useState<"recharge" | "withdraw">(
+    "recharge"
+  );
+  const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<
+    number | null
+  >(null);
+  const [withdrawalAmount, setWithdrawalAmount] = useState("");
+  const [withdrawalHolder, setWithdrawalHolder] = useState("");
+  const [withdrawalMethod, setWithdrawalMethod] = useState("");
+  const [withdrawalAccount, setWithdrawalAccount] = useState("");
+  const [balanceMessage, setBalanceMessage] = useState("");
+  const [balanceSubmitting, setBalanceSubmitting] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((notification) => !notification.read)
+    .length;
+  const isProvider = role === "prestador";
+  const withdrawalValue = Math.floor(Number(withdrawalAmount || 0));
+  const withdrawalCommission = Math.floor(
+    withdrawalValue * withdrawalCommissionRate
+  );
+  const withdrawalReleased = Math.max(
+    withdrawalValue - withdrawalCommission,
+    0
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
 
-      if (notificationRef.current && !notificationRef.current.contains(target))
+      if (notificationRef.current && !notificationRef.current.contains(target)) {
         setShowNotifications(false);
+      }
 
-      if (profileRef.current && !profileRef.current.contains(target))
+      if (profileRef.current && !profileRef.current.contains(target)) {
         setShowProfileMenu(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -70,14 +91,12 @@ export default function Header() {
   useEffect(() => {
     if (!user) return;
 
-    const ref = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      if (!snap.exists()) return;
 
-    const unsubscribe = onSnapshot(ref, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setRole(data.role || null);
-        setBalance(data.balance || 0);
-      }
+      const data = snap.data();
+      setRole(data.role || null);
+      setBalance(Number(data.balance || 0));
     });
 
     return () => unsubscribe();
@@ -86,22 +105,38 @@ export default function Header() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
+    const notificationsQuery = query(
       collection(db, "notifications"),
       where("userId", "==", user.uid),
       orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      })) as NotificationItem[];
-      setNotifications(data);
+    const unsubscribe = onSnapshot(notificationsQuery, (snap) => {
+      setNotifications(
+        snap.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        })) as NotificationItem[]
+      );
     });
 
     return () => unsubscribe();
   }, [user, db]);
+
+  const resetBalanceModal = () => {
+    setSelectedRechargeAmount(null);
+    setWithdrawalAmount("");
+    setWithdrawalHolder("");
+    setWithdrawalMethod("");
+    setWithdrawalAccount("");
+    setBalanceMessage("");
+    setBalanceSubmitting(false);
+  };
+
+  const closeBalanceModal = () => {
+    resetBalanceModal();
+    setModalOpen(false);
+  };
 
   const handleLogout = async () => {
     await logoutUser();
@@ -119,9 +154,7 @@ export default function Header() {
       return;
     }
 
-    const amountInCents = selectedRechargeAmount * 100;
     const token = await user.getIdToken();
-
     const res = await fetch("/api/wompi/checkout", {
       method: "POST",
       headers: {
@@ -129,14 +162,87 @@ export default function Header() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        amountInCents,
+        amountInCents: selectedRechargeAmount * 100,
       }),
     });
-
     const data = await res.json();
 
     if (data.url) window.location.href = data.url;
-    else alert("Error generando el pago");
+    else alert(data.error || "Error generando el pago");
+  };
+
+  const handleWithdraw = async () => {
+    setBalanceMessage("");
+
+    if (!user) {
+      setBalanceMessage("Debes iniciar sesion para retirar");
+      return;
+    }
+
+    if (!isProvider) {
+      setBalanceMessage("Solo los prestadores pueden retirar saldo");
+      return;
+    }
+
+    if (!withdrawalValue || withdrawalValue < minWithdrawalAmount) {
+      setBalanceMessage(
+        `El retiro minimo es $${minWithdrawalAmount.toLocaleString("es-CO")}`
+      );
+      return;
+    }
+
+    if (withdrawalValue > balance) {
+      setBalanceMessage("No tienes saldo suficiente para este retiro");
+      return;
+    }
+
+    if (
+      !withdrawalHolder.trim() ||
+      !withdrawalMethod.trim() ||
+      !withdrawalAccount.trim()
+    ) {
+      setBalanceMessage("Completa los datos para enviar el retiro");
+      return;
+    }
+
+    setBalanceSubmitting(true);
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/withdrawals", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: withdrawalValue,
+          accountHolder: withdrawalHolder,
+          payoutMethod: withdrawalMethod,
+          payoutAccount: withdrawalAccount,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setBalanceMessage(data.error || "No pudimos crear el retiro");
+        return;
+      }
+
+      setBalanceMessage(
+        `Retiro solicitado. Recibiras $${Number(
+          data.releasedAmount || 0
+        ).toLocaleString("es-CO")} despues de comision.`
+      );
+      setWithdrawalAmount("");
+      setWithdrawalHolder("");
+      setWithdrawalMethod("");
+      setWithdrawalAccount("");
+    } catch {
+      setBalanceMessage("No pudimos crear el retiro. Intentalo de nuevo.");
+    } finally {
+      setBalanceSubmitting(false);
+    }
   };
 
   return (
@@ -144,12 +250,13 @@ export default function Header() {
       <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.08] bg-black/95 shadow-sm backdrop-blur">
         <div className="w-full px-3 sm:px-6">
           <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-3">
-
-            {/* LOGO */}
-            <Link href="/prestadores" className="flex min-w-0 items-center gap-2">
+            <Link
+              href="/prestadores"
+              className="flex min-w-0 items-center gap-2"
+            >
               <Image
                 src="/logofinal.svg"
-                alt="logo"
+                alt="BelaClub"
                 width={36}
                 height={36}
                 className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
@@ -178,15 +285,14 @@ export default function Header() {
 
             {user && (
               <div className="relative flex shrink-0 items-center gap-1 sm:gap-4">
-
-                {/* NOTIFICACIONES */}
                 <div className="relative" ref={notificationRef}>
                   <button
-                    className="relative flex h-8 w-8 items-center justify-center rounded-full text-sm transition hover:bg-white/[0.06] min-[380px]:h-9 min-[380px]:w-9 sm:text-lg"
+                    className="relative flex h-8 w-8 items-center justify-center rounded-full text-neutral-200 transition hover:bg-white/[0.06] min-[380px]:h-9 min-[380px]:w-9"
+                    aria-label="Abrir notificaciones"
                     onClick={async () => {
-                      setShowNotifications((v) => !v);
+                      setShowNotifications((value) => !value);
 
-                      if (unreadCount > 0 && user) {
+                      if (unreadCount > 0) {
                         const token = await user.getIdToken();
                         await fetch("/api/notifications/mark-read", {
                           method: "POST",
@@ -198,9 +304,18 @@ export default function Header() {
                       }
                     }}
                   >
-                    🔔
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                      <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+                    </svg>
                     {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
+                      <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
                         {unreadCount}
                       </span>
                     )}
@@ -211,24 +326,25 @@ export default function Header() {
                       <div className="border-b border-white/10 p-3 font-semibold">
                         Notificaciones
                       </div>
-
                       {notifications.length === 0 ? (
-                        <p className="p-4 text-sm text-zinc-500 text-center">
+                        <p className="p-4 text-center text-sm text-zinc-500">
                           No tienes notificaciones
                         </p>
                       ) : (
-                        notifications.map((n) => (
+                        notifications.map((notification) => (
                           <div
-                            key={n.id}
+                            key={notification.id}
                             className={`border-b border-white/10 p-3 text-sm last:border-b-0 ${
-                              !n.read
-                                ? "bg-white/[0.06]"
-                                : ""
+                              !notification.read ? "bg-white/[0.06]" : ""
                             }`}
                           >
-                            <p className="font-medium">{n.message}</p>
-                            <p className="text-xs text-zinc-500 mt-1">
-                              {n.createdAt?.toDate?.().toLocaleString()}
+                            <p className="font-medium">
+                              {notification.message}
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-500">
+                              {notification.createdAt
+                                ?.toDate?.()
+                                .toLocaleString()}
                             </p>
                           </div>
                         ))
@@ -237,31 +353,31 @@ export default function Header() {
                   )}
                 </div>
 
-                {/* SALDO */}
-                <span
+                <button
+                  type="button"
                   onClick={() => {
-                    setSelectedRechargeAmount(null);
+                    resetBalanceModal();
+                    setBalanceMode("recharge");
                     setModalOpen(true);
                   }}
-                  className="cursor-pointer whitespace-nowrap rounded-md bg-green-500 px-2 py-1 text-[11px] font-semibold text-white shadow-lg shadow-emerald-950/20 min-[380px]:text-xs sm:px-3 sm:text-sm"
+                  className="whitespace-nowrap rounded-md bg-green-500 px-2 py-1 text-[11px] font-semibold text-white shadow-lg shadow-emerald-950/20 transition hover:bg-green-400 min-[380px]:text-xs sm:px-3 sm:text-sm"
                 >
-                  ${balance.toLocaleString()}
-                </span>
+                  ${balance.toLocaleString("es-CO")}
+                </button>
 
-                {/* PERFIL */}
                 <div className="relative" ref={profileRef}>
                   <button
-                    onClick={() => setShowProfileMenu((v) => !v)}
+                    type="button"
+                    onClick={() => setShowProfileMenu((value) => !value)}
                     className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-neutral-300 shadow-lg shadow-black/20 transition hover:border-white/20 hover:bg-white/[0.1] hover:text-white min-[380px]:h-9 min-[380px]:w-9"
                     aria-label="Abrir menu de perfil"
                   >
                     <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="currentColor"
                       viewBox="0 0 22 22"
                       className="h-5 w-5"
+                      fill="currentColor"
                     >
-                      <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/>
+                      <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z" />
                     </svg>
                   </button>
 
@@ -314,9 +430,10 @@ export default function Header() {
                       </Link>
 
                       <button
+                        type="button"
                         onClick={() => {
                           setShowProfileMenu(false);
-                          handleLogout();
+                          void handleLogout();
                         }}
                         className="mt-1 flex w-full items-center gap-3 rounded-md border-t border-white/[0.06] px-3 py-2.5 text-left text-sm font-medium text-neutral-300 transition hover:bg-rose-500/10 hover:text-rose-100"
                       >
@@ -346,19 +463,17 @@ export default function Header() {
 
       {modalOpen && (
         <div
-          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
-          onClick={() => {
-            setSelectedRechargeAmount(null);
-            setModalOpen(false);
-          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          onClick={closeBalanceModal}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-zinc-950 text-white shadow-2xl shadow-black/50"
-            onClick={(e) => e.stopPropagation()}
+            className="max-h-[calc(100vh-32px)] w-full max-w-md overflow-y-auto rounded-xl border border-white/10 bg-zinc-950 text-white shadow-2xl shadow-black/50"
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="border-b border-white/10 p-5 sm:p-6">
-              <p className="text-sm font-medium text-zinc-400">Tu saldo actual</p>
-
+              <p className="text-sm font-medium text-zinc-400">
+                Tu saldo actual
+              </p>
               <div className="mt-2 flex items-end justify-between gap-4">
                 <p className="text-2xl font-semibold sm:text-3xl">
                   ${balance.toLocaleString("es-CO")}
@@ -368,57 +483,205 @@ export default function Header() {
                 </p>
               </div>
 
-              <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-xs text-zinc-500">Monto a recargar</p>
-                <p className="mt-1 text-xl font-semibold text-emerald-300 sm:text-2xl">
-                  {selectedRechargeAmount
-                    ? `$${selectedRechargeAmount.toLocaleString("es-CO")}`
-                    : "Selecciona una opción"}
-                </p>
-              </div>
+              {isProvider && (
+                <div className="mt-5 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-black/30 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBalanceMode("recharge");
+                      setBalanceMessage("");
+                    }}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                      balanceMode === "recharge"
+                        ? "bg-emerald-500 text-white"
+                        : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+                    }`}
+                  >
+                    Recargar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBalanceMode("withdraw");
+                      setBalanceMessage("");
+                    }}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                      balanceMode === "withdraw"
+                        ? "bg-blue-600 text-white"
+                        : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+                    }`}
+                  >
+                    Retirar
+                  </button>
+                </div>
+              )}
+
+              {balanceMode === "recharge" ? (
+                <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                  <p className="text-xs text-zinc-500">Monto a recargar</p>
+                  <p className="mt-1 text-xl font-semibold text-emerald-300 sm:text-2xl">
+                    {selectedRechargeAmount
+                      ? `$${selectedRechargeAmount.toLocaleString("es-CO")}`
+                      : "Selecciona una opcion"}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-lg border border-blue-400/20 bg-blue-400/10 p-4">
+                  <p className="text-xs text-blue-100/70">
+                    Retiro por Wompi con comision BelaClub del 5%
+                  </p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-md bg-black/25 p-2">
+                      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+                        Retiras
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-white">
+                        ${withdrawalValue.toLocaleString("es-CO")}
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-black/25 p-2">
+                      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+                        5%
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-rose-200">
+                        ${withdrawalCommission.toLocaleString("es-CO")}
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-black/25 p-2">
+                      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+                        Recibes
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-emerald-300">
+                        ${withdrawalReleased.toLocaleString("es-CO")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-5 sm:p-6">
-              <p className="mb-3 text-sm font-medium text-zinc-300">
-                Elige un paquete
-              </p>
+              {balanceMode === "recharge" ? (
+                <>
+                  <p className="mb-3 text-sm font-medium text-zinc-300">
+                    Elige un paquete
+                  </p>
+                  <div className="mb-5 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+                    {rechargeOptions.map((amount) => (
+                      <button
+                        key={amount}
+                        type="button"
+                        onClick={() => setSelectedRechargeAmount(amount)}
+                        className={`rounded-lg border px-3 py-4 text-center transition ${
+                          selectedRechargeAmount === amount
+                            ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200 shadow-lg shadow-emerald-950/20"
+                            : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
+                        }`}
+                      >
+                        <span className="block text-sm font-semibold">
+                          ${amount.toLocaleString("es-CO")}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRecharge}
+                    disabled={!selectedRechargeAmount}
+                    className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Recargar saldo
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <label className="block">
+                      <span className="text-xs font-medium text-zinc-400">
+                        Monto a retirar
+                      </span>
+                      <input
+                        value={withdrawalAmount}
+                        onChange={(event) =>
+                          setWithdrawalAmount(
+                            event.target.value.replace(/\D/g, "")
+                          )
+                        }
+                        inputMode="numeric"
+                        placeholder="Ej: 100000"
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </label>
 
-              <div className="mb-5 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
-              {rechargeOptions.map((amount) => (
-                <button
-                  key={amount}
-                  type="button"
-                  onClick={() => setSelectedRechargeAmount(amount)}
-                    className={`rounded-lg border px-3 py-4 text-center transition ${
-                    selectedRechargeAmount === amount
-                        ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200 shadow-lg shadow-emerald-950/20"
-                        : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
-                  }`}
-                >
-                    <span className="block text-sm font-semibold">
-                      ${amount.toLocaleString("es-CO")}
-                    </span>
-                </button>
-              ))}
-              </div>
+                    <label className="block">
+                      <span className="text-xs font-medium text-zinc-400">
+                        Titular de la cuenta
+                      </span>
+                      <input
+                        value={withdrawalHolder}
+                        onChange={(event) =>
+                          setWithdrawalHolder(event.target.value)
+                        }
+                        placeholder="Nombre completo"
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </label>
 
-            <button
-              onClick={handleRecharge}
-              disabled={!selectedRechargeAmount}
-                className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Recargar saldo
-            </button>
+                    <div className="grid gap-3 min-[420px]:grid-cols-2">
+                      <label className="block">
+                        <span className="text-xs font-medium text-zinc-400">
+                          Banco o metodo
+                        </span>
+                        <input
+                          value={withdrawalMethod}
+                          onChange={(event) =>
+                            setWithdrawalMethod(event.target.value)
+                          }
+                          placeholder="Bancolombia, Nequi..."
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </label>
 
-            <button
-              onClick={() => {
-                setSelectedRechargeAmount(null);
-                setModalOpen(false);
-              }}
-                className="w-full mt-3 rounded-lg border border-white/10 bg-white/[0.03] py-3 text-sm font-semibold text-zinc-300 transition hover:bg-white/[0.07]"
-            >
-              Cerrar
-            </button>
+                      <label className="block">
+                        <span className="text-xs font-medium text-zinc-400">
+                          Cuenta o celular
+                        </span>
+                        <input
+                          value={withdrawalAccount}
+                          onChange={(event) =>
+                            setWithdrawalAccount(event.target.value)
+                          }
+                          placeholder="Numero"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {balanceMessage && (
+                    <p className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm text-zinc-200">
+                      {balanceMessage}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleWithdraw}
+                    disabled={balanceSubmitting}
+                    className="mt-5 w-full rounded-lg bg-blue-600 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {balanceSubmitting ? "Procesando..." : "Solicitar retiro"}
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={closeBalanceModal}
+                className="mt-3 w-full rounded-lg border border-white/10 bg-white/[0.03] py-3 text-sm font-semibold text-zinc-300 transition hover:bg-white/[0.07]"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>

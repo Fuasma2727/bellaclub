@@ -524,6 +524,12 @@ export default function AdminVerificationsPage() {
     }
   ) => {
     const { status, isBadgeRequest, isInitialRequest, isBlockedView } = options;
+    const subscriptionDisabled =
+      provider.subscriptionManualOverride ||
+      provider.subscriptionStatus === "admin_override";
+    const subscriptionAction: VerificationAction = subscriptionDisabled
+      ? "enableSubscription"
+      : "disableSubscription";
 
     return (
       <div className="mt-3 space-y-3 border-t border-white/[0.08] pt-3">
@@ -555,22 +561,32 @@ export default function AdminVerificationsPage() {
             <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-200">
               {provider.blockedReason === "subscription_unpaid"
                 ? "Mensualidad pendiente"
-                : "Bloqueado"}
+              : "Bloqueado"}
             </span>
           )}
-          <span
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
-              provider.subscriptionManualOverride ||
-              provider.subscriptionStatus === "admin_override"
-                ? "border-sky-400/30 bg-sky-400/10 text-sky-100"
-                : "border-white/10 bg-white/[0.04] text-neutral-300"
+          <button
+            type="button"
+            disabled={actionId === provider.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleAction(provider, subscriptionAction);
+            }}
+            className={`group inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              subscriptionDisabled
+                ? "border-sky-400/30 bg-sky-400/10 text-sky-100 hover:border-emerald-400/45 hover:bg-emerald-400/12 hover:text-emerald-100"
+                : "border-emerald-400/25 bg-emerald-400/10 text-emerald-100 hover:border-sky-400/45 hover:bg-sky-400/12 hover:text-sky-100"
             }`}
           >
-            {provider.subscriptionManualOverride ||
-            provider.subscriptionStatus === "admin_override"
-              ? "Mensualidad desactivada"
-              : "Mensualidad activa"}
-          </span>
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                subscriptionDisabled ? "bg-sky-300" : "bg-emerald-300"
+              }`}
+            />
+            {subscriptionDisabled ? "Mensualidad desactivada" : "Mensualidad activa"}
+            <span className="text-[10px] font-medium opacity-60 group-hover:opacity-100">
+              {subscriptionDisabled ? "Activar" : "Desactivar"}
+            </span>
+          </button>
         </div>
 
         <div className="space-y-1 text-xs text-neutral-500">
@@ -639,25 +655,17 @@ export default function AdminVerificationsPage() {
           disabled={actionId === provider.id}
           onClick={(event) => {
             event.stopPropagation();
-            handleAction(
-              provider,
-              provider.subscriptionManualOverride ||
-                provider.subscriptionStatus === "admin_override"
-                ? "enableSubscription"
-                : "disableSubscription"
-            );
+            void handleAction(provider, subscriptionAction);
           }}
           className={`w-full rounded-lg px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-            provider.subscriptionManualOverride ||
-            provider.subscriptionStatus === "admin_override"
+            subscriptionDisabled
               ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15"
               : "border border-sky-400/30 bg-sky-400/10 text-sky-100 hover:bg-sky-400/15"
           }`}
         >
           {actionId === provider.id
             ? "Procesando..."
-            : provider.subscriptionManualOverride ||
-                provider.subscriptionStatus === "admin_override"
+            : subscriptionDisabled
               ? "Activar mensualidad"
               : "Desactivar mensualidad"}
         </button>

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { doc, getDoc } from "firebase/firestore";
 import Header from "@/components/header";
 import { useAuth } from "@/context/AuthContext";
-import { colombia } from "@/lib/colombia";
 import { db } from "@/lib/firebase";
 import AuthRequiredModal from "./_components/AuthRequiredModal";
 import DepositModal from "./_components/DepositModal";
@@ -58,12 +57,29 @@ export default function PrestadoresPage() {
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState("");
 
+  const departments = useMemo(() => {
+    return Array.from(
+      new Set(
+        prestadores
+          .map((provider) => provider.department?.trim())
+          .filter((value): value is string => Boolean(value))
+      )
+    ).sort((a, b) => a.localeCompare(b, "es"));
+  }, [prestadores]);
+
   const cities = useMemo(() => {
-    return (
-      colombia.departments.find((item) => item.name === departmentFilter)
-        ?.cities || []
-    );
-  }, [departmentFilter]);
+    return Array.from(
+      new Set(
+        prestadores
+          .filter(
+            (provider) =>
+              !departmentFilter || provider.department === departmentFilter
+          )
+          .map((provider) => provider.city?.trim())
+          .filter((value): value is string => Boolean(value))
+      )
+    ).sort((a, b) => a.localeCompare(b, "es"));
+  }, [departmentFilter, prestadores]);
 
   const filtered = useMemo(() => {
     let results = [...prestadores];
@@ -132,6 +148,18 @@ export default function PrestadoresPage() {
     showReportModal,
     pendingPurchase,
   ]);
+
+  useEffect(() => {
+    if (departmentFilter && !departments.includes(departmentFilter)) {
+      setDepartmentFilter("");
+      setCityFilter("");
+      return;
+    }
+
+    if (cityFilter && !cities.includes(cityFilter)) {
+      setCityFilter("");
+    }
+  }, [cityFilter, cities, departmentFilter, departments]);
 
   useEffect(() => {
     if (!expandedMedia || mediaList.length === 0) return;
@@ -474,6 +502,7 @@ export default function PrestadoresPage() {
         <FiltersBar
           departmentFilter={departmentFilter}
           cityFilter={cityFilter}
+          departments={departments}
           cities={cities}
           resultCount={filtered.length}
           onDepartmentChange={(value) => {

@@ -1,8 +1,7 @@
-import { colombia } from "@/lib/colombia";
-
 type FiltersBarProps = {
   departmentFilter: string;
   cityFilter: string;
+  departments: string[];
   cities: string[];
   resultCount: number;
   onDepartmentChange: (value: string) => void;
@@ -13,6 +12,7 @@ type FiltersBarProps = {
 export default function FiltersBar({
   departmentFilter,
   cityFilter,
+  departments,
   cities,
   resultCount,
   onDepartmentChange,
@@ -29,9 +29,9 @@ export default function FiltersBar({
             onChange={(e) => onDepartmentChange(e.target.value)}
           >
             <option value="">Departamento</option>
-            {colombia.departments.map((department) => (
-              <option key={department.name} value={department.name}>
-                {department.name}
+            {departments.map((department) => (
+              <option key={department} value={department}>
+                {department}
               </option>
             ))}
           </select>
