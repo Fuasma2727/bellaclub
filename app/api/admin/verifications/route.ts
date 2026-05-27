@@ -156,7 +156,11 @@ export async function GET(request: Request) {
           return haystack.includes(query);
         }
 
-        return provider.badgeVerificationStatus === "pending";
+        return (
+          !provider.verificationStatus ||
+          provider.verificationStatus === "pending" ||
+          provider.badgeVerificationStatus === "pending"
+        );
       })
       .sort((a, b) => {
         if (filter === "blocked") {

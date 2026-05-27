@@ -82,6 +82,7 @@ export async function GET(request: Request) {
           releasedAmount: Number(data.releasedAmount || 0),
           payoutMethod: data.payoutMethod || "",
           payoutAccount: data.payoutAccount || "",
+          payoutAccountType: data.payoutAccountType || "",
           accountHolder: data.accountHolder || "",
           status: data.status || "pending_wompi",
           createdAt: toDateString(data.createdAt),

@@ -20,6 +20,14 @@ const rechargeOptions = [100000, 200000, 500000];
 const withdrawalCommissionRate = 0.05;
 const minWithdrawalAmount = 50000;
 const supportWhatsapp = "573052330967";
+const payoutMethods = [
+  { value: "nequi", label: "Nequi" },
+  { value: "bancolombia", label: "Bancolombia" },
+];
+const accountTypes = [
+  { value: "ahorros", label: "Ahorros" },
+  { value: "corriente", label: "Corriente" },
+];
 
 type NotificationItem = {
   id: string;
@@ -54,6 +62,7 @@ export default function Header() {
   const [withdrawalHolder, setWithdrawalHolder] = useState("");
   const [withdrawalMethod, setWithdrawalMethod] = useState("");
   const [withdrawalAccount, setWithdrawalAccount] = useState("");
+  const [withdrawalAccountType, setWithdrawalAccountType] = useState("");
   const [balanceMessage, setBalanceMessage] = useState("");
   const [balanceSubmitting, setBalanceSubmitting] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -131,6 +140,7 @@ export default function Header() {
     setWithdrawalHolder("");
     setWithdrawalMethod("");
     setWithdrawalAccount("");
+    setWithdrawalAccountType("");
     setBalanceMessage("");
     setBalanceSubmitting(false);
   };
@@ -201,7 +211,8 @@ export default function Header() {
     if (
       !withdrawalHolder.trim() ||
       !withdrawalMethod.trim() ||
-      !withdrawalAccount.trim()
+      !withdrawalAccount.trim() ||
+      !withdrawalAccountType.trim()
     ) {
       setBalanceMessage("Completa los datos para enviar el retiro");
       return;
@@ -222,6 +233,7 @@ export default function Header() {
           accountHolder: withdrawalHolder,
           payoutMethod: withdrawalMethod,
           payoutAccount: withdrawalAccount,
+          payoutAccountType: withdrawalAccountType,
         }),
       });
       const data = await res.json();
@@ -240,6 +252,7 @@ export default function Header() {
       setWithdrawalHolder("");
       setWithdrawalMethod("");
       setWithdrawalAccount("");
+      setWithdrawalAccountType("");
     } catch {
       setBalanceMessage("No pudimos crear el retiro. Intentalo de nuevo.");
     } finally {
@@ -479,6 +492,31 @@ export default function Header() {
                       </Link>
 
                       {isProvider && (
+                        <Link
+                          href="/prestador/dinero"
+                          onClick={() => setShowProfileMenu(false)}
+                          className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/10 hover:text-emerald-50"
+                        >
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-200">
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M20 12V8H6a2 2 0 0 1 0-4h12v4" />
+                              <path d="M4 6v12a2 2 0 0 0 2 2h14v-4" />
+                              <path d="M18 12h.01" />
+                            </svg>
+                          </span>
+                          Mi dinero
+                        </Link>
+                      )}
+
+                      {isProvider && (
                         <a
                           href={supportHref}
                           target="_blank"
@@ -706,32 +744,61 @@ export default function Header() {
                     <div className="grid gap-3 min-[420px]:grid-cols-2">
                       <label className="block">
                         <span className="text-xs font-medium text-zinc-400">
-                          Banco o metodo
+                          Metodo de pago
                         </span>
-                        <input
+                        <select
                           value={withdrawalMethod}
                           onChange={(event) =>
                             setWithdrawalMethod(event.target.value)
                           }
-                          placeholder="Bancolombia, Nequi..."
-                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
-                        />
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                        >
+                          <option value="">Selecciona</option>
+                          {payoutMethods.map((method) => (
+                            <option key={method.value} value={method.value}>
+                              {method.label}
+                            </option>
+                          ))}
+                        </select>
                       </label>
 
                       <label className="block">
                         <span className="text-xs font-medium text-zinc-400">
-                          Cuenta o celular
+                          Numero de cuenta o celular
                         </span>
                         <input
                           value={withdrawalAccount}
                           onChange={(event) =>
-                            setWithdrawalAccount(event.target.value)
+                            setWithdrawalAccount(
+                              event.target.value.replace(/\D/g, "")
+                            )
                           }
-                          placeholder="Numero"
+                          inputMode="numeric"
+                          placeholder="Solo numeros"
                           className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
                         />
                       </label>
                     </div>
+
+                    <label className="block">
+                      <span className="text-xs font-medium text-zinc-400">
+                        Tipo de cuenta
+                      </span>
+                      <select
+                        value={withdrawalAccountType}
+                        onChange={(event) =>
+                          setWithdrawalAccountType(event.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="">Selecciona</option>
+                        {accountTypes.map((type) => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
 
                   {balanceMessage && (

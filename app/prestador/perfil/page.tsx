@@ -56,6 +56,8 @@ type ProviderProfile = {
   badgeVerificationStatus?: BadgeVerificationStatus;
   badgeVerificationLevel?: BadgeVerificationLevel;
   profileVisible?: boolean;
+  profilePaused?: boolean;
+  subscriptionStatus?: string | null;
   videoSecondsExtra?: number;
   promotedUntil?: {
     toDate?: () => Date;
@@ -80,6 +82,14 @@ type VideoSlotResponse = {
 
 type ProviderPromotionResponse = {
   promotedUntil?: string;
+  error?: string;
+};
+
+type ProviderPauseResponse = {
+  paused?: boolean;
+  subscriptionResult?: string;
+  pauseCountThisMonth?: number;
+  maxMonthlyPauses?: number;
   error?: string;
 };
 
@@ -235,6 +245,10 @@ export default function PerfilPrestador() {
   const [badgeVerificationLevel, setBadgeVerificationLevel] =
     useState<BadgeVerificationLevel | null>(null);
   const [profileVisible, setProfileVisible] = useState(false);
+  const [profilePaused, setProfilePaused] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
+    null
+  );
 
   const [editMode, setEditMode] = useState(false);
   const [name, setName] = useState("");
@@ -254,6 +268,7 @@ export default function PerfilPrestador() {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [buyingVideoTime, setBuyingVideoTime] = useState(false);
   const [buyingPromotion, setBuyingPromotion] = useState(false);
+  const [updatingPause, setUpdatingPause] = useState(false);
   const [showVideoTimePurchase, setShowVideoTimePurchase] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [message, setMessage] = useState("");
@@ -264,6 +279,8 @@ export default function PerfilPrestador() {
 
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [showPauseModal, setShowPauseModal] = useState(false);
+  const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [contentPrice, setContentPrice] = useState("");
   const [contentDescription, setContentDescription] = useState("");
@@ -359,6 +376,8 @@ export default function PerfilPrestador() {
         setBadgeVerificationStatus(data.badgeVerificationStatus || "none");
         setBadgeVerificationLevel(data.badgeVerificationLevel || null);
         setProfileVisible(Boolean(data.profileVisible));
+        setProfilePaused(Boolean(data.profilePaused));
+        setSubscriptionStatus(data.subscriptionStatus || null);
         setVideoSecondsExtra(Number(data.videoSecondsExtra || 0));
         setPromotedUntil(getDateValue(data.promotedUntil));
       } catch (loadError) {
@@ -377,14 +396,24 @@ export default function PerfilPrestador() {
 
   useEffect(() => {
     document.body.style.overflow =
-      expandedMedia || showPriceModal || showVerificationModal
+      expandedMedia ||
+      showPriceModal ||
+      showVerificationModal ||
+      showPauseModal ||
+      showPromotionModal
         ? "hidden"
         : "auto";
 
     return () => {
       document.body.style.overflow = "auto";
     };
-  }, [expandedMedia, showPriceModal, showVerificationModal]);
+  }, [
+    expandedMedia,
+    showPriceModal,
+    showVerificationModal,
+    showPauseModal,
+    showPromotionModal,
+  ]);
 
   useEffect(() => {
     if (!expandedMedia || mediaList.length === 0) return;
@@ -650,14 +679,6 @@ export default function PerfilPrestador() {
   const buyPromotion = async () => {
     if (!user) return;
 
-    const confirmed = window.confirm(
-      `Promocionar tu perfil cuesta $${PROVIDER_PROMOTION_PRICE.toLocaleString(
-        "es-CO"
-      )} y dura ${PROVIDER_PROMOTION_DAYS} dias. El valor se descontara de tu saldo.`
-    );
-
-    if (!confirmed) return;
-
     setBuyingPromotion(true);
     setError("");
 
@@ -675,6 +696,7 @@ export default function PerfilPrestador() {
       }
 
       setPromotedUntil(data.promotedUntil);
+      setShowPromotionModal(false);
       showSuccess("Perfil promocionado por 3 dias");
     } catch (promotionError) {
       const text =
@@ -684,6 +706,62 @@ export default function PerfilPrestador() {
       setError(text);
     } finally {
       setBuyingPromotion(false);
+    }
+  };
+
+  const toggleProfilePause = async () => {
+    if (!user) return;
+
+    const nextPaused = !profilePaused;
+
+    setUpdatingPause(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/provider-profile-pause", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await user.getIdToken()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ paused: nextPaused }),
+      });
+      const data = (await res.json()) as ProviderPauseResponse;
+
+      if (!res.ok) {
+        throw new Error(data.error || "No pudimos actualizar tu perfil");
+      }
+
+      setProfilePaused(Boolean(data.paused));
+      setProfileVisible(
+        !data.paused && verificationStatus === "approved" &&
+          data.subscriptionResult !== "blocked"
+      );
+      setSubscriptionStatus(
+        data.paused
+          ? "paused"
+          : data.subscriptionResult === "blocked"
+            ? "past_due"
+            : "active"
+      );
+      setShowPauseModal(false);
+      showSuccess(
+        data.paused
+          ? `Perfil pausado${
+              data.pauseCountThisMonth && data.maxMonthlyPauses
+                ? ` (${data.pauseCountThisMonth}/${data.maxMonthlyPauses} este mes)`
+                : ""
+            }`
+          : "Perfil reactivado"
+      );
+    } catch (pauseError) {
+      const text =
+        pauseError instanceof Error
+          ? pauseError.message
+          : "No pudimos actualizar tu perfil";
+      setError(text);
+    } finally {
+      setUpdatingPause(false);
     }
   };
 
@@ -802,23 +880,31 @@ export default function PerfilPrestador() {
 
         <section className="rounded-lg border border-white/[0.08] bg-[#101012] p-4 shadow-2xl shadow-black/25">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-            <aside className="flex items-center gap-4 lg:w-80">
-              <div
-                className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-white/20 bg-zinc-900 shadow-lg shadow-black/30 ring-4 ring-white/[0.04] sm:h-28 sm:w-28"
-                onClick={() => openExpanded(0)}
-              >
-                <Image
-                  src={photoUrl || "/default-avatar.png"}
-                  alt="Foto principal del perfil"
-                  fill
-                  className="object-cover"
-                  sizes="112px"
-                  priority
-                />
-                {uploadingProfile && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-xs">
-                    Subiendo...
-                  </div>
+            <aside className="flex items-center gap-4 lg:w-[360px]">
+              <div className="flex shrink-0 flex-col items-start gap-2">
+                <div
+                  className="relative h-28 w-28 overflow-hidden rounded-full border border-white/20 bg-zinc-900 shadow-lg shadow-black/30 ring-4 ring-white/[0.04] sm:h-32 sm:w-32"
+                  onClick={() => openExpanded(0)}
+                >
+                  <Image
+                    src={photoUrl || "/default-avatar.png"}
+                    alt="Foto principal del perfil"
+                    fill
+                    className="object-cover"
+                    sizes="128px"
+                    priority
+                  />
+                  {uploadingProfile && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-xs">
+                      Subiendo...
+                    </div>
+                  )}
+                </div>
+                {effectiveVerificationBadge && (
+                  <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 text-[11px] font-semibold text-emerald-100 shadow-lg shadow-black/20">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                    {effectiveBadgeLabel}
+                  </span>
                 )}
               </div>
 
@@ -835,18 +921,23 @@ export default function PerfilPrestador() {
                   {name || "Completa tu perfil"}
                 </h1>
                 <p className="mt-1 text-xs text-neutral-500">
+                  {profilePaused
+                    ? "Pausado por ti"
+                    : profileVisible
+                      ? "Visible publicamente"
+                      : "Oculto por verificacion"}
+                </p>
+                {/* legacy visibility copy removed */}
+                <p className="hidden" aria-hidden="true">
                   {profileVisible ? "Visible públicamente" : "Oculto por verificación"}
                 </p>
 
                 {(
-                  <div className="mt-3">
+                  <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/20 p-1.5">
                     {effectiveVerificationBadge ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
-                          Aprobado: {effectiveBadgeLabel}
-                        </span>
+                      <div className="grid gap-1.5">
                         {badgeVerificationStatus === "pending" && (
-                          <span className="inline-flex rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+                          <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-amber-400/25 bg-amber-400/10 px-3 text-xs font-semibold text-amber-200">
                             Nivel {badgeVerificationLevel || ""} en revision
                           </span>
                         )}
@@ -855,23 +946,34 @@ export default function PerfilPrestador() {
                             type="button"
                             onClick={openVerificationRequest}
                             disabled={requestingBadgeVerification}
-                            className="group inline-flex items-center gap-1.5 rounded-full border border-blue-400/30 bg-blue-400/10 px-3 py-1.5 text-xs font-semibold text-blue-100 transition duration-200 hover:-translate-y-0.5 hover:border-blue-300/60 hover:bg-blue-400/20 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                            className="group inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-3 text-xs font-semibold text-neutral-100 transition hover:border-blue-300/35 hover:bg-blue-500/10 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-300 transition group-hover:scale-125" />
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-4 w-4 text-blue-300"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M12 3v18" />
+                              <path d="m6 9 6-6 6 6" />
+                            </svg>
                             Subir de nivel
                           </button>
                         )}
                       </div>
                     ) : badgeVerificationStatus === "pending" ? (
-                      <span className="inline-flex rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+                      <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-amber-400/25 bg-amber-400/10 px-3 text-xs font-semibold text-amber-200">
                         Nivel {badgeVerificationLevel || ""} en revision
                       </span>
                     ) : (
                       <button
                         type="button"
-                        onClick={openVerificationRequest}
-                        disabled={requestingBadgeVerification}
-                        className="group inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 shadow-lg shadow-emerald-950/10 transition duration-200 hover:-translate-y-0.5 hover:border-emerald-300/60 hover:bg-emerald-400/20 hover:shadow-emerald-950/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                      onClick={openVerificationRequest}
+                      disabled={requestingBadgeVerification}
+                        className="group inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-emerald-400/25 bg-emerald-400/10 px-3 text-xs font-semibold text-emerald-100 transition hover:border-emerald-300/45 hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 transition group-hover:scale-125 group-hover:bg-emerald-200" />
                         Solicitar verificacion
@@ -880,7 +982,20 @@ export default function PerfilPrestador() {
                   </div>
                 )}
 
-                <label className="mt-3 inline-flex cursor-pointer rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-neutral-300 transition hover:border-white/15 hover:bg-white/[0.07] hover:text-white">
+                {editMode && (
+                <label className="mt-2 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-3 text-xs font-semibold text-neutral-100 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4 text-neutral-300"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
                   Editar foto
                   <input
                     type="file"
@@ -889,39 +1004,115 @@ export default function PerfilPrestador() {
                     onChange={handleProfilePhoto}
                   />
                 </label>
+                )}
               </div>
             </aside>
 
             <div className="flex-1">
-              <div className="flex flex-col gap-2 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
-                    Perfil publico
-                  </p>
-                </div>
-                <div className="flex gap-2">
+              <div className="rounded-lg border border-white/[0.08] bg-black/25 p-2">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => setEditMode((value) => !value)}
+                  className={`group flex h-11 items-center justify-center gap-2 rounded-md border px-4 text-xs font-semibold transition ${
+                    editMode
+                      ? "border-white/10 bg-white/[0.05] text-neutral-100 hover:bg-white/[0.08]"
+                      : "border-white/10 bg-white/[0.035] text-neutral-100 hover:border-blue-300/35 hover:bg-blue-500/10 hover:text-blue-100"
+                  }`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4 text-blue-300"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                  {editMode ? "Cerrar edicion" : "Editar perfil"}
+                </button>
+                <button
+                  type="button"
+                  disabled={updatingPause || verificationStatus !== "approved"}
+                  onClick={() => setShowPauseModal(true)}
+                  className={`flex h-11 items-center justify-center gap-2 rounded-md border px-4 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    profilePaused
+                      ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15"
+                      : "border-white/10 bg-white/[0.035] text-neutral-100 hover:border-amber-300/35 hover:bg-amber-400/10 hover:text-amber-100"
+                  }`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className={`h-4 w-4 ${
+                      profilePaused ? "text-emerald-300" : "text-amber-300"
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {profilePaused ? (
+                      <path d="m5 3 14 9-14 9V3Z" />
+                    ) : (
+                      <>
+                        <path d="M10 4H6v16h4V4Z" />
+                        <path d="M18 4h-4v16h4V4Z" />
+                      </>
+                    )}
+                  </svg>
+                  {profilePaused ? "Reactivar perfil" : "Pausar perfil"}
+                </button>
+                <button
+                  type="button"
+                  disabled={buyingPromotion || verificationStatus !== "approved"}
+                  onClick={() => setShowPromotionModal(true)}
+                  className="flex h-11 items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-4 text-xs font-semibold text-neutral-100 transition hover:border-cyan-300/35 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4 text-cyan-300"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 3v18" />
+                    <path d="m6 9 6-6 6 6" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  {promotionActive ? "Extender promocion" : "Promocionar perfil"}
+                </button>
+              </div>
+              {editMode && (
+                <div className="mt-2 border-t border-white/[0.08] pt-2">
                   <button
                     type="button"
-                    onClick={() => setEditMode((value) => !value)}
-                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                      editMode
-                        ? "border border-white/[0.08] bg-white/[0.03] text-neutral-200 hover:bg-white/[0.07]"
-                        : "bg-blue-600 text-white shadow-lg shadow-blue-950/25 hover:-translate-y-0.5 hover:bg-blue-500"
-                    }`}
+                    onClick={saveProfile}
+                    disabled={saving}
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[180px]"
                   >
-                    {editMode ? "Cancelar" : "Editar perfil"}
-                  </button>
-                  {editMode && (
-                    <button
-                      type="button"
-                      onClick={saveProfile}
-                      disabled={saving}
-                      className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold transition hover:-translate-y-0.5 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      {saving ? "Guardando..." : "Guardar"}
-                    </button>
-                  )}
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                      <path d="M17 21v-8H7v8" />
+                      <path d="M7 3v5h8" />
+                    </svg>
+                    {saving ? "Guardando..." : "Guardar cambios"}
+                  </button>
                 </div>
+              )}
               </div>
 
               {editMode && (
@@ -1097,7 +1288,55 @@ export default function PerfilPrestador() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-lg border border-white/[0.08] bg-[#101012] p-4 shadow-2xl shadow-black/20">
+        <section className="hidden">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">
+                Pausa temporal
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-neutral-50">
+                {profilePaused ? "Perfil pausado" : "Pausar mi perfil"}
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-400">
+                Si vas a tomar vacaciones o no quieres aparecer por unos dias,
+                puedes pausar tu perfil. Mientras este pausado no aparece en
+                prestadores y la mensualidad queda detenida. Puedes usar esta
+                opcion maximo 6 veces por mes.
+              </p>
+              <p className="mt-2 text-xs text-neutral-500">
+                Estado de mensualidad:{" "}
+                <span className="font-semibold text-neutral-300">
+                  {subscriptionStatus === "paused"
+                    ? "Pausada"
+                    : subscriptionStatus === "past_due"
+                      ? "Pendiente"
+                      : subscriptionStatus === "admin_override"
+                        ? "Desactivada"
+                        : "Activa"}
+                </span>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={updatingPause || verificationStatus !== "approved"}
+              onClick={() => void toggleProfilePause()}
+              className={`rounded-full px-5 py-3 text-sm font-semibold shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
+                profilePaused
+                  ? "border border-emerald-300/30 bg-emerald-600 text-white shadow-emerald-950/25 hover:bg-emerald-500"
+                  : "border border-amber-300/30 bg-amber-400/10 text-amber-100 shadow-amber-950/15 hover:bg-amber-400/15"
+              }`}
+            >
+              {updatingPause
+                ? "Procesando..."
+                : profilePaused
+                  ? "Reactivar perfil"
+                  : "Pausar perfil"}
+            </button>
+          </div>
+        </section>
+
+        <section className="hidden">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">
@@ -1107,7 +1346,7 @@ export default function PerfilPrestador() {
                 Promocionar mi perfil
               </h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-400">
-                Por $${PROVIDER_PROMOTION_PRICE.toLocaleString("es-CO")} tu
+                Por ${PROVIDER_PROMOTION_PRICE.toLocaleString("es-CO")} tu
                 perfil aparecera entre los primeros durante{" "}
                 {PROVIDER_PROMOTION_DAYS} dias. Primero se muestran los perfiles
                 promocionados y luego el orden va de Diamante a no verificados.
@@ -1258,6 +1497,102 @@ export default function PerfilPrestador() {
           )}
         </section>
       </main>
+
+      {showPauseModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
+          onClick={() => setShowPauseModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border border-white/[0.08] bg-[#101012] p-6 shadow-2xl shadow-black/40"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">
+              Pausa temporal
+            </p>
+            <h3 className="mt-2 text-xl font-semibold">
+              {profilePaused ? "Reactivar perfil" : "Pausar perfil"}
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-neutral-400">
+              {profilePaused
+                ? "Tu perfil volvera a aparecer si esta aprobado y la mensualidad se reactivara inmediatamente."
+                : "Tu perfil dejara de aparecer en prestadores y la mensualidad quedara detenida hasta que lo reactives. Puedes pausar maximo 6 veces por mes."}
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPauseModal(false)}
+                className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={updatingPause}
+                onClick={() => void toggleProfilePause()}
+                className={`rounded-md px-4 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  profilePaused
+                    ? "bg-emerald-600 hover:bg-emerald-500"
+                    : "bg-amber-500 hover:bg-amber-400"
+                }`}
+              >
+                {updatingPause
+                  ? "Procesando..."
+                  : profilePaused
+                    ? "Reactivar"
+                    : "Pausar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPromotionModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
+          onClick={() => setShowPromotionModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border border-white/[0.08] bg-[#101012] p-6 shadow-2xl shadow-black/40"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">
+              Visibilidad
+            </p>
+            <h3 className="mt-2 text-xl font-semibold">
+              {promotionActive ? "Extender promocion" : "Promocionar perfil"}
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-neutral-400">
+              Por ${PROVIDER_PROMOTION_PRICE.toLocaleString("es-CO")} tu perfil
+              aparecera entre los primeros durante {PROVIDER_PROMOTION_DAYS} dias.
+              El valor se descontara de tu saldo.
+            </p>
+            {promotionActive && promotedUntil && (
+              <p className="mt-3 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100">
+                Promocion activa hasta{" "}
+                {new Date(promotedUntil).toLocaleString("es-CO")}
+              </p>
+            )}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPromotionModal(false)}
+                className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={buyingPromotion}
+                onClick={() => void buyPromotion()}
+                className="rounded-md bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {buyingPromotion ? "Procesando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showPriceModal && (
         <div

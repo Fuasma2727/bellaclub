@@ -7,6 +7,8 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 const MIN_WITHDRAWAL_AMOUNT = 50000;
 const MAX_WITHDRAWAL_AMOUNT = 5000000;
+const allowedPayoutMethods = ["nequi", "bancolombia"] as const;
+const allowedAccountTypes = ["ahorros", "corriente"] as const;
 
 const cleanText = (value: unknown, maxLength = 120) => {
   return String(value || "")
@@ -15,8 +17,14 @@ const cleanText = (value: unknown, maxLength = 120) => {
     .slice(0, maxLength);
 };
 
-const isValidPayoutText = (value: string) => {
-  return /^[\p{L}\p{N}\s.,#@+\-_/()]{3,120}$/u.test(value);
+const isValidPayoutText = (value: string) =>
+  /^[\p{L}\s.'-]{3,120}$/u.test(value);
+
+const isAllowedValue = <T extends readonly string[]>(
+  value: string,
+  allowed: T
+): value is T[number] => {
+  return allowed.includes(value);
 };
 
 export async function POST(request: Request) {
@@ -39,12 +47,14 @@ export async function POST(request: Request) {
       accountHolder?: string;
       payoutMethod?: string;
       payoutAccount?: string;
+      payoutAccountType?: string;
     };
 
     const amount = Math.floor(Number(body.amount || 0));
     const accountHolder = cleanText(body.accountHolder);
-    const payoutMethod = cleanText(body.payoutMethod);
-    const payoutAccount = cleanText(body.payoutAccount);
+    const payoutMethod = cleanText(body.payoutMethod).toLowerCase();
+    const payoutAccount = String(body.payoutAccount || "").replace(/\D/g, "");
+    const payoutAccountType = cleanText(body.payoutAccountType).toLowerCase();
 
     if (!amount || amount < MIN_WITHDRAWAL_AMOUNT) {
       return NextResponse.json(
@@ -68,20 +78,37 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!accountHolder || !payoutMethod || !payoutAccount) {
+    if (!accountHolder || !payoutMethod || !payoutAccount || !payoutAccountType) {
       return NextResponse.json(
         { error: "Completa los datos de retiro" },
         { status: 400 }
       );
     }
 
-    if (
-      !isValidPayoutText(accountHolder) ||
-      !isValidPayoutText(payoutMethod) ||
-      !isValidPayoutText(payoutAccount)
-    ) {
+    if (!isAllowedValue(payoutMethod, allowedPayoutMethods)) {
+      return NextResponse.json(
+        { error: "Selecciona Nequi o Bancolombia" },
+        { status: 400 }
+      );
+    }
+
+    if (!isAllowedValue(payoutAccountType, allowedAccountTypes)) {
+      return NextResponse.json(
+        { error: "Selecciona cuenta de ahorros o corriente" },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidPayoutText(accountHolder)) {
       return NextResponse.json(
         { error: "Los datos de retiro tienen caracteres no validos" },
+        { status: 400 }
+      );
+    }
+
+    if (!/^\d{10,16}$/.test(payoutAccount)) {
+      return NextResponse.json(
+        { error: "El numero debe tener entre 10 y 16 digitos" },
         { status: 400 }
       );
     }
@@ -131,6 +158,7 @@ export async function POST(request: Request) {
         payoutProvider: "wompi",
         payoutMethod,
         payoutAccount,
+        payoutAccountType,
         accountHolder,
         status: "pending_wompi",
         createdAt: adminFieldValue.serverTimestamp(),
@@ -166,6 +194,7 @@ export async function POST(request: Request) {
         metadata: {
           payoutProvider: "wompi",
           payoutMethod,
+          payoutAccountType,
         },
       });
 

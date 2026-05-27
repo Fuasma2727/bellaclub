@@ -23,6 +23,7 @@ type WithdrawalItem = {
   releasedAmount: number;
   payoutMethod?: string;
   payoutAccount?: string;
+  payoutAccountType?: string;
   accountHolder?: string;
   status: "pending_wompi" | "paid" | "rejected" | string;
   createdAt: string | null;
@@ -308,6 +309,7 @@ export default function ProviderMoneyPage() {
                           </div>
                           <p className="mt-3 text-xs text-neutral-500">
                             {withdrawal.payoutMethod || "Metodo sin definir"} ·{" "}
+                            {withdrawal.payoutAccountType || "Tipo sin definir"} ·{" "}
                             {withdrawal.payoutAccount || "Cuenta sin definir"}
                           </p>
                           <p className="mt-1 text-xs text-neutral-600">

@@ -62,6 +62,16 @@ export async function processProviderSubscription(
     const isDue = !nextChargeAt || nextChargeAt.getTime() <= now.getTime();
     const manualOverride = Boolean(user.subscriptionManualOverride);
 
+    if (manualOverride) {
+      tx.update(userRef, {
+        subscriptionStatus: user.subscriptionStatus || "admin_override",
+        subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return "manual_override";
+    }
+
     if (!isDue && user.blockedReason !== "subscription_unpaid") {
       return "not_due";
     }
@@ -115,16 +125,6 @@ export async function processProviderSubscription(
       });
 
       return "paid";
-    }
-
-    if (manualOverride) {
-      tx.update(userRef, {
-        subscriptionStatus: "admin_override",
-        subscriptionAmount: PROVIDER_MONTHLY_FEE,
-        subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
-      });
-
-      return "manual_override";
     }
 
     const shouldNotify = shouldNotifyFailedPayment(user.subscriptionLastFailedAt);

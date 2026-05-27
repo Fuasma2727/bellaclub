@@ -22,7 +22,19 @@ import {
   Prestador,
 } from "./_components/types";
 
-export default function PrestadoresPage() {
+type PrestadoresPageProps = {
+  initialCity?: string;
+  initialDepartment?: string;
+  pageTitle?: string;
+  pageEyebrow?: string;
+};
+
+export default function PrestadoresPage({
+  initialCity = "",
+  initialDepartment = "",
+  pageTitle,
+  pageEyebrow = "Prestadores por ciudad",
+}: PrestadoresPageProps = {}) {
   const { user } = useAuth();
   const router = useRouter();
 
@@ -43,8 +55,8 @@ export default function PrestadoresPage() {
   const [reportEligibilityLoading, setReportEligibilityLoading] =
     useState(false);
 
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [cityFilter, setCityFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState(initialDepartment);
+  const [cityFilter, setCityFilter] = useState(initialCity);
 
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
@@ -499,6 +511,24 @@ export default function PrestadoresPage() {
       <Header />
 
       <main>
+        {initialCity && (
+          <section className="border-b border-white/[0.08] bg-[#080809]">
+            <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+                {pageEyebrow}
+              </p>
+              <h1 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">
+                {pageTitle || `Prestadores en ${initialCity}`}
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
+                Explora perfiles aprobados en {initialCity}
+                {initialDepartment ? `, ${initialDepartment}` : ""}, revisa
+                galerias publicas y contacta directamente por WhatsApp.
+              </p>
+            </div>
+          </section>
+        )}
+
         <FiltersBar
           departmentFilter={departmentFilter}
           cityFilter={cityFilter}

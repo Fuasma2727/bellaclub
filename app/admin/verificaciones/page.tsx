@@ -86,6 +86,7 @@ type WithdrawalItem = {
   payoutProvider?: string;
   payoutMethod?: string;
   payoutAccount?: string;
+  payoutAccountType?: string;
   accountHolder?: string;
   status?: "pending_wompi" | "paid" | "rejected";
   createdAt?: string | null;
@@ -1102,6 +1103,9 @@ export default function AdminVerificationsPage() {
                         <p>Titular: {withdrawal.accountHolder || "Sin dato"}</p>
                         <p>
                           Metodo: {withdrawal.payoutMethod || "Sin dato"}
+                        </p>
+                        <p>
+                          Tipo: {withdrawal.payoutAccountType || "Sin dato"}
                         </p>
                         <p>
                           Cuenta/celular:{" "}
