@@ -301,6 +301,7 @@ export default function PerfilPrestador() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [showDailyVideoModal, setShowDailyVideoModal] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [contentPrice, setContentPrice] = useState("");
   const [contentDescription, setContentDescription] = useState("");
@@ -430,7 +431,8 @@ export default function PerfilPrestador() {
       showPriceModal ||
       showVerificationModal ||
       showPauseModal ||
-      showPromotionModal
+      showPromotionModal ||
+      showDailyVideoModal
         ? "hidden"
         : "auto";
 
@@ -443,6 +445,7 @@ export default function PerfilPrestador() {
     showVerificationModal,
     showPauseModal,
     showPromotionModal,
+    showDailyVideoModal,
   ]);
 
   useEffect(() => {
@@ -1479,14 +1482,13 @@ export default function PerfilPrestador() {
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {dailyVideoActive && dailyVideoUrl && (
-                <a
-                  href={dailyVideoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setShowDailyVideoModal(true)}
                   className="inline-flex h-11 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.08] hover:text-white"
                 >
                   Ver activo
-                </a>
+                </button>
               )}
               <label
                 className={`inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold text-white shadow-lg shadow-sky-950/20 transition ${
@@ -1696,7 +1698,7 @@ export default function PerfilPrestador() {
         </div>
       )}
 
-      {showPromotionModal && (
+        {showPromotionModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
           onClick={() => setShowPromotionModal(false)}
@@ -1937,9 +1939,37 @@ export default function PerfilPrestador() {
             </div>
           </div>
         </div>
-      )}
+        )}
 
-      {expandedMedia && (
+        {showDailyVideoModal && dailyVideoUrl && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+            onClick={() => setShowDailyVideoModal(false)}
+          >
+            <div
+              className="relative w-full max-w-4xl overflow-hidden rounded-xl border border-white/10 bg-black text-white shadow-2xl shadow-black/60"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setShowDailyVideoModal(false)}
+                className="absolute right-3 top-3 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/60 text-neutral-200 shadow-lg shadow-black/40 backdrop-blur transition hover:bg-white/10 hover:text-white"
+                aria-label="Cerrar video"
+              >
+                X
+              </button>
+              <video
+                src={dailyVideoUrl}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[82vh] w-full bg-black object-contain"
+              />
+            </div>
+          </div>
+        )}
+
+        {expandedMedia && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setExpandedMedia(null)}

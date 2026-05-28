@@ -70,6 +70,7 @@ export default function Header() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [providerCanPostDailyVideo, setProviderCanPostDailyVideo] =
     useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const unreadCount = notifications.filter((notification) => !notification.read)
     .length;
@@ -83,6 +84,10 @@ export default function Header() {
     0
   );
   const supportHref = `https://wa.me/${supportWhatsapp}`;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -268,6 +273,34 @@ export default function Header() {
       setBalanceSubmitting(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.08] bg-black/95 shadow-sm backdrop-blur">
+        <div className="w-full px-3 sm:px-6">
+          <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-3">
+            <Link
+              href="/prestadores"
+              className="flex min-w-0 items-center gap-2"
+            >
+              <Image
+                src="/logofinal.svg"
+                alt="BelaClub"
+                width={36}
+                height={36}
+                className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
+                priority
+              />
+              <span className="hidden truncate text-lg font-bold text-white min-[360px]:inline sm:text-xl">
+                BelaClub
+              </span>
+            </Link>
+            <div className="h-8 w-28 rounded-full border border-white/[0.08] bg-white/[0.03]" />
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <>

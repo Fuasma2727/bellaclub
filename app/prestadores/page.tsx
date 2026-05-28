@@ -160,6 +160,19 @@ export default function PrestadoresPage({
     [canViewMedia, mediaList]
   );
 
+  const moveExpandedMedia = useCallback(
+    (direction: 1 | -1) => {
+      if (mediaList.length === 0) return;
+
+      setCurrentIndex((index) => {
+        const nextIndex = getNextViewableIndex(index, direction);
+        setExpandedMedia(mediaList[nextIndex]);
+        return nextIndex;
+      });
+    },
+    [getNextViewableIndex, mediaList]
+  );
+
   useEffect(() => {
     const isAnyModalOpen =
       !!expandedMedia ||
@@ -202,19 +215,11 @@ export default function PrestadoresPage({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") {
-        setCurrentIndex((index) => {
-          const nextIndex = getNextViewableIndex(index, 1);
-          setExpandedMedia(mediaList[nextIndex]);
-          return nextIndex;
-        });
+        moveExpandedMedia(1);
       }
 
       if (e.key === "ArrowLeft") {
-        setCurrentIndex((index) => {
-          const nextIndex = getNextViewableIndex(index, -1);
-          setExpandedMedia(mediaList[nextIndex]);
-          return nextIndex;
-        });
+        moveExpandedMedia(-1);
       }
 
       if (e.key === "Escape") {
@@ -224,7 +229,7 @@ export default function PrestadoresPage({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [expandedMedia, getNextViewableIndex, mediaList]);
+  }, [expandedMedia, mediaList.length, moveExpandedMedia]);
 
   useEffect(() => {
     const fetchPrestadores = async () => {
@@ -670,37 +675,24 @@ export default function PrestadoresPage({
           onClick={() => setDailyVideoProvider(null)}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-xl border border-white/10 bg-[#101012] text-white shadow-2xl shadow-black/60"
+            className="relative w-full max-w-4xl overflow-hidden rounded-xl border border-white/10 bg-black text-white shadow-2xl shadow-black/60"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
-                  Video del dia
-                </p>
-                <h2 className="truncate text-base font-semibold">
-                  {dailyVideoProvider.name || "Escort verificada"}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDailyVideoProvider(null)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08] hover:text-white"
-                aria-label="Cerrar video del dia"
-              >
-                X
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setDailyVideoProvider(null)}
+              className="absolute right-3 top-3 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/60 text-neutral-200 shadow-lg shadow-black/40 backdrop-blur transition hover:bg-white/10 hover:text-white"
+              aria-label="Cerrar video"
+            >
+              X
+            </button>
             <video
               src={dailyVideoProvider.dailyVideo.url}
               controls
               autoPlay
               playsInline
-              className="aspect-video w-full bg-black object-contain"
+              className="max-h-[82vh] w-full bg-black object-contain"
             />
-            <div className="px-4 py-3 text-xs text-neutral-500">
-              Disponible por tiempo limitado.
-            </div>
           </div>
         </div>
       )}
@@ -770,6 +762,10 @@ export default function PrestadoresPage({
         <ExpandedMediaModal
           item={mediaList[currentIndex]}
           watermarkText={user?.email || user?.uid}
+          canGoNext={mediaList.length > 1}
+          canGoPrevious={mediaList.length > 1}
+          onNext={() => moveExpandedMedia(1)}
+          onPrevious={() => moveExpandedMedia(-1)}
           onClose={() => setExpandedMedia(null)}
         />
       )}

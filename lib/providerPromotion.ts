@@ -7,13 +7,12 @@ export const getVerificationRank = (
 ) => {
   const numericLevel = Number(level || 0);
 
-  if (numericLevel >= 1 && numericLevel <= 4) return numericLevel;
-
   if (badge === "platinum") return 4;
   if (badge === "gold") return 3;
   if (badge === "silver") return 2;
   if (badge === "bronze") return 1;
 
+  if (numericLevel >= 1 && numericLevel <= 4) return numericLevel;
+
   return 0;
 };
-

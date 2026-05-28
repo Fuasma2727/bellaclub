@@ -36,6 +36,80 @@ function WhatsAppIcon() {
   );
 }
 
+function VerificationGem({
+  badge,
+  className,
+}: {
+  badge: "bronze" | "silver" | "gold" | "platinum";
+  className?: string;
+}) {
+  const fill =
+    badge === "bronze"
+      ? "#b8734c"
+      : badge === "silver"
+        ? "#d7dde7"
+        : badge === "gold"
+          ? "#f3bd3e"
+          : "#dff8ff";
+  const glow =
+    badge === "bronze"
+      ? "rgba(184,115,76,0.45)"
+      : badge === "silver"
+        ? "rgba(226,232,240,0.55)"
+        : badge === "gold"
+          ? "rgba(251,191,36,0.7)"
+          : "rgba(125,211,252,0.95)";
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      style={{ filter: `drop-shadow(0 0 5px ${glow})` }}
+    >
+      <path
+        d="M7.2 4.5h9.6l3.2 4.4L12 20 4 8.9l3.2-4.4Z"
+        fill={fill}
+        stroke="currentColor"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+      />
+      {badge === "platinum" && (
+        <path
+          d="M8.2 5.7h7.6l2.1 2.9L12 17.2 6.1 8.6l2.1-2.9Z"
+          fill="url(#diamondTopShine)"
+          opacity="0.95"
+        />
+      )}
+      <path
+        d="M4.2 8.9h15.6M7.2 4.5l2.2 4.4L12 4.5l2.6 4.4 2.2-4.4M9.4 8.9 12 20l2.6-11.1"
+        stroke="white"
+        strokeOpacity={badge === "bronze" ? "0.58" : "0.82"}
+        strokeWidth="0.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {badge === "platinum" && (
+        <defs>
+          <linearGradient
+            id="diamondTopShine"
+            x1="7"
+            x2="17"
+            y1="5"
+            y2="16"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#ffffff" />
+            <stop offset="0.42" stopColor="#bae6fd" />
+            <stop offset="1" stopColor="#8b5cf6" />
+          </linearGradient>
+        </defs>
+      )}
+    </svg>
+  );
+}
+
 export default function ProviderCard({
   provider,
   isOpening = false,
@@ -50,7 +124,8 @@ export default function ProviderCard({
   const rating = Number(provider.rating || 0);
   const badgeLevel = Number(provider.badgeVerificationLevel);
   const verificationBadge =
-    badgeLevel === 1
+    provider.verificationBadge ||
+    (badgeLevel === 1
       ? "bronze"
       : badgeLevel === 2
         ? "silver"
@@ -58,7 +133,7 @@ export default function ProviderCard({
           ? "gold"
           : badgeLevel === 4
             ? "platinum"
-            : provider.verificationBadge;
+            : null);
   const badgeText =
     verificationBadge === "bronze"
       ? "Este usuario fue verificado por foto"
@@ -71,25 +146,25 @@ export default function ProviderCard({
     verificationBadge === "bronze"
       ? {
           shell:
-            "border-[#b7784d]/45 bg-[#b7784d]/12 shadow-[#4a2415]/20 hover:bg-[#b7784d]/18",
-          gem: "linear-gradient(135deg, #e7aa78 0%, #a9673f 52%, #5f3525 100%)",
+            "border-[#b7784d]/45 bg-[#b7784d]/12 text-[#d79263] shadow-[#4a2415]/20 hover:bg-[#b7784d]/18",
+          gem: "h-4 w-4 sm:h-[18px] sm:w-[18px]",
         }
       : verificationBadge === "silver"
         ? {
             shell:
-              "border-slate-100/45 bg-slate-200/10 shadow-slate-950/20 hover:bg-slate-100/16",
-            gem: "linear-gradient(135deg, #ffffff 0%, #cbd5e1 52%, #64748b 100%)",
+              "border-slate-100/50 bg-slate-200/12 text-slate-100 shadow-slate-950/20 hover:bg-slate-100/18",
+            gem: "h-4 w-4 sm:h-[18px] sm:w-[18px]",
           }
         : verificationBadge === "gold"
           ? {
               shell:
-                "border-amber-300/45 bg-amber-300/12 shadow-amber-950/22 hover:bg-amber-300/18",
-              gem: "linear-gradient(135deg, #fff2b8 0%, #d9a328 52%, #8a5a12 100%)",
+                "border-amber-200/60 bg-amber-300/14 text-amber-200 shadow-[0_0_16px_rgba(251,191,36,0.22)] hover:bg-amber-300/22",
+              gem: "h-[17px] w-[17px] sm:h-5 sm:w-5",
             }
           : {
               shell:
-                "border-white/85 bg-[radial-gradient(circle_at_30%_18%,rgba(255,255,255,0.72),rgba(219,234,254,0.26)_34%,rgba(125,211,252,0.18)_58%,rgba(167,139,250,0.16)_100%)] shadow-[0_0_24px_rgba(191,219,254,0.50)] ring-1 ring-white/30 hover:border-white hover:shadow-[0_0_34px_rgba(191,219,254,0.78)]",
-              gem: "text-sky-100 drop-shadow-[0_0_7px_rgba(255,255,255,0.95)]",
+                "border-white/90 bg-[radial-gradient(circle_at_28%_16%,rgba(255,255,255,0.9),rgba(186,230,253,0.34)_34%,rgba(125,211,252,0.24)_58%,rgba(139,92,246,0.22)_100%)] text-white shadow-[0_0_28px_rgba(125,211,252,0.62)] ring-1 ring-white/35 hover:border-white hover:shadow-[0_0_40px_rgba(125,211,252,0.9)]",
+              gem: "h-5 w-5 sm:h-[22px] sm:w-[22px]",
             };
   const privateCount = (provider.media || []).filter((item) => item.private)
     .length;
@@ -103,47 +178,34 @@ export default function ProviderCard({
       onClick={() => onOpen?.(provider.id)}
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-zinc-900">
-        {hasDailyVideo ? (
-          <>
-            <video
-              src={provider.dailyVideo?.url}
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-            <button
-              type="button"
-              aria-label={`Reproducir video del dia de ${name}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpenDailyVideo?.(provider);
-              }}
-              className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-2xl shadow-black/40 backdrop-blur transition hover:scale-105 hover:bg-black/60 sm:h-14 sm:w-14"
+        <Image
+          src={provider.photoUrl || "/default-avatar.png"}
+          alt={name}
+          fill
+          className="object-cover transition duration-300 group-hover:scale-105"
+          sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
+        />
+
+        {hasDailyVideo && (
+          <button
+            type="button"
+            aria-label={`Reproducir video del dia de ${name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenDailyVideo?.(provider);
+            }}
+            className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/48 text-white shadow-2xl shadow-black/45 backdrop-blur transition hover:scale-105 hover:border-sky-200/50 hover:bg-black/65 sm:h-14 sm:w-14"
+          >
+            <span className="absolute inset-0 rounded-full bg-sky-300/10 blur-md" />
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="relative ml-0.5 h-5 w-5 sm:h-6 sm:w-6"
+              fill="currentColor"
             >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="ml-0.5 h-5 w-5 sm:h-6 sm:w-6"
-                fill="currentColor"
-              >
-                <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
-              </svg>
-            </button>
-            <span className="absolute left-2 top-2 rounded-full border border-sky-200/20 bg-black/55 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-100 backdrop-blur">
-              Video del dia
-            </span>
-          </>
-        ) : (
-          <Image
-            src={provider.photoUrl || "/default-avatar.png"}
-            alt={name}
-            fill
-            className="object-cover transition duration-300 group-hover:scale-105"
-            sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
-          />
+              <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
+            </svg>
+          </button>
         )}
 
         {privateCount > 0 && (
@@ -195,51 +257,10 @@ export default function ProviderCard({
                 }}
                 className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border shadow-lg transition hover:-translate-y-0.5 sm:h-7 sm:w-7 ${badgeStyle.shell}`}
               >
-                {verificationBadge === "platinum" ? (
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    className={`h-4 w-4 sm:h-[18px] sm:w-[18px] ${badgeStyle.gem}`}
-                    fill="none"
-                  >
-                    <path
-                      d="M7.2 4.5h9.6l3.2 4.4L12 20 4 8.9l3.2-4.4Z"
-                      fill="url(#diamondFill)"
-                      stroke="currentColor"
-                      strokeWidth="1.15"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M4.2 8.9h15.6M7.2 4.5l2.2 4.4L12 4.5l2.6 4.4 2.2-4.4M9.4 8.9 12 20l2.6-11.1"
-                      stroke="white"
-                      strokeOpacity="0.82"
-                      strokeWidth="0.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <defs>
-                      <linearGradient
-                        id="diamondFill"
-                        x1="5"
-                        x2="18.5"
-                        y1="5"
-                        y2="18"
-                        gradientUnits="userSpaceOnUse"
-                      >
-                        <stop stopColor="#FFFFFF" />
-                        <stop offset="0.36" stopColor="#DBEAFE" />
-                        <stop offset="0.72" stopColor="#7DD3FC" />
-                        <stop offset="1" stopColor="#A78BFA" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    className="h-3 w-3 rotate-45 rounded-[2px] shadow-sm ring-1 ring-white/20 sm:h-3.5 sm:w-3.5"
-                    style={{ background: badgeStyle.gem }}
-                  />
-                )}
+                <VerificationGem
+                  badge={verificationBadge}
+                  className={badgeStyle.gem}
+                />
               </button>
             )}
 

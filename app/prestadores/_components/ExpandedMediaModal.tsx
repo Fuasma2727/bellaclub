@@ -1,20 +1,29 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import { MediaItem } from "./types";
 
 type ExpandedMediaModalProps = {
   item: MediaItem;
   watermarkText?: string;
+  canGoNext?: boolean;
+  canGoPrevious?: boolean;
+  onNext?: () => void;
+  onPrevious?: () => void;
   onClose: () => void;
 };
 
 export default function ExpandedMediaModal({
   item,
   watermarkText,
+  canGoNext = false,
+  canGoPrevious = false,
+  onNext,
+  onPrevious,
   onClose,
 }: ExpandedMediaModalProps) {
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const protectedContent = Boolean(item.private);
   const watermark = useMemo(() => {
     const label = watermarkText?.trim() || "Usuario verificado";
@@ -65,6 +74,30 @@ export default function ExpandedMediaModal({
 
   if (!item.url) return null;
 
+  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = touchStart.current;
+    const end = event.changedTouches[0];
+    touchStart.current = null;
+
+    if (!start || !end) return;
+
+    const deltaX = end.clientX - start.x;
+    const deltaY = end.clientY - start.y;
+    const isHorizontalSwipe = Math.abs(deltaX) > 55 && Math.abs(deltaY) < 70;
+
+    if (!isHorizontalSwipe) return;
+
+    event.stopPropagation();
+
+    if (deltaX < 0 && canGoNext) {
+      onNext?.();
+    }
+
+    if (deltaX > 0 && canGoPrevious) {
+      onPrevious?.();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-[90] flex select-none items-center justify-center bg-black/90 p-4"
@@ -74,8 +107,15 @@ export default function ExpandedMediaModal({
       }}
     >
       <div
-        className="relative inline-flex overflow-hidden rounded-lg"
+        className="relative inline-flex touch-pan-y overflow-hidden rounded-lg"
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          touchStart.current = touch
+            ? { x: touch.clientX, y: touch.clientY }
+            : null;
+        }}
+        onTouchEnd={handleTouchEnd}
       >
         <button
           type="button"
