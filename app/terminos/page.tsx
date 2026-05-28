@@ -20,7 +20,7 @@ export default function TerminosPage() {
         <h1 className="mt-6 text-3xl font-semibold">Terminos de uso</h1>
         <div className="mt-6 space-y-5 text-sm leading-7 text-neutral-300">
           <p>
-            BelaClub es una plataforma para conectar clientes con prestadores
+            BelaClub es una plataforma para conectar clientes con escorts
             independientes. Cada usuario es responsable de la informacion que
             publica, de sus comunicaciones y de cumplir la ley aplicable.
           </p>
@@ -31,7 +31,7 @@ export default function TerminosPage() {
             riesgo a otros usuarios.
           </p>
           <p>
-            Los perfiles de prestadores pueden requerir revision manual antes
+            Los perfiles de escorts pueden requerir revision manual antes
             de aparecer publicamente. BelaClub puede ocultar, bloquear o retirar
             perfiles, contenido o cuentas cuando detecte riesgo, abuso o uso
             indebido.

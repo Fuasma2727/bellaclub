@@ -176,7 +176,7 @@ export default function ProviderMoneyPage() {
           <section className="rounded-lg border border-white/10 bg-[#101012] p-8 text-center">
             <h2 className="text-xl font-semibold">Debes iniciar sesion</h2>
             <p className="mt-2 text-sm text-neutral-400">
-              Entra con tu cuenta de prestador para revisar tu dinero.
+              Entra con tu cuenta de escort para revisar tu dinero.
             </p>
             <Link
               href="/login"

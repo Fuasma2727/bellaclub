@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       sellerData.blocked === true
     ) {
       return NextResponse.json(
-        { error: "Prestador no disponible" },
+        { error: "Perfil no disponible" },
         { status: 404 }
       );
     }
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
       sellerData.fullName ||
       sellerData.username ||
       sellerData.email ||
-      "Prestador";
+      "Escort";
     const depositCode = createDepositCode();
 
     await adminDb.runTransaction(async (tx) => {

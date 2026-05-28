@@ -68,6 +68,8 @@ export default function Header() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [providerCanPostDailyVideo, setProviderCanPostDailyVideo] =
+    useState(false);
 
   const unreadCount = notifications.filter((notification) => !notification.read)
     .length;
@@ -108,6 +110,13 @@ export default function Header() {
       const data = snap.data();
       setRole(data.role || null);
       setBalance(Number(data.balance || 0));
+      setProviderCanPostDailyVideo(
+        data.role === "prestador" &&
+          data.verificationStatus === "approved" &&
+          data.profileVisible === true &&
+          data.profilePaused !== true &&
+          data.blocked !== true
+      );
     });
 
     return () => unsubscribe();
@@ -192,7 +201,7 @@ export default function Header() {
     }
 
     if (!isProvider) {
-      setBalanceMessage("Solo los prestadores pueden retirar saldo");
+      setBalanceMessage("Solo las escorts pueden retirar saldo");
       return;
     }
 
@@ -300,6 +309,25 @@ export default function Header() {
 
             {user && (
               <div className="relative flex shrink-0 items-center gap-1 sm:gap-4">
+                {providerCanPostDailyVideo && (
+                  <Link
+                    href="/prestador/perfil#video-del-dia"
+                    aria-label="Subir video del dia"
+                    title="Video del dia"
+                    className="relative flex h-8 w-8 items-center justify-center rounded-full border border-sky-300/30 bg-sky-400/12 text-sky-100 shadow-lg shadow-sky-950/25 transition hover:-translate-y-0.5 hover:border-sky-200/50 hover:bg-sky-400/20 hover:text-white min-[380px]:h-9 min-[380px]:w-9"
+                  >
+                    <span className="absolute inset-0 rounded-full bg-sky-300/10 blur-[6px]" />
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="relative h-4.5 w-4.5"
+                      fill="currentColor"
+                    >
+                      <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
+                    </svg>
+                  </Link>
+                )}
+
                 <div className="relative" ref={notificationRef}>
                   <button
                     className={`relative flex h-8 w-8 items-center justify-center rounded-full border shadow-lg transition min-[380px]:h-9 min-[380px]:w-9 ${

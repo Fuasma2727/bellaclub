@@ -25,7 +25,7 @@ export default function PrivacidadPage() {
             verificaciones, compras, abonos y notificaciones.
           </p>
           <p>
-            La informacion publica de prestadores aprobados puede mostrarse a
+            La informacion publica de escorts aprobadas puede mostrarse a
             otros usuarios. El contenido marcado como privado solo debe
             mostrarse despues de una compra valida dentro de la plataforma.
           </p>

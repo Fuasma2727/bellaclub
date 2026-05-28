@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PrestadoresPage from "@/app/prestadores/page";
+import JsonLd from "@/components/JsonLd";
 import {
   findProviderCityBySlug,
   getPublicProviderCities,
+  targetSeoCities,
 } from "@/lib/providerCitySeo";
+
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
 
 type CityPageProps = {
   params: Promise<{
@@ -40,11 +44,18 @@ export async function generateMetadata({
     ? `${city.city}, ${city.department}`
     : city.city;
   const title = `Prepagos en ${city.city}`;
-  const description = `Encuentra perfiles aprobados en ${place}. Revisa galerias publicas y contacta directamente por WhatsApp en BelaClub.`;
+  const description = `Encuentra prepagos en ${place}. Revisa perfiles aprobados, galerias publicas y contacta directamente por WhatsApp en BelaClub.`;
 
   return {
     title,
     description,
+    keywords: [
+      `prepagos en ${city.city}`,
+      `prepagos ${city.city}`,
+      `escorts en ${city.city}`,
+      `escorts ${city.city}`,
+      `BelaClub ${city.city}`,
+    ],
     alternates: {
       canonical: `/prepagos/${city.slug}`,
     },
@@ -78,12 +89,72 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
 
   if (!city) notFound();
 
+  const title = `Prepagos en ${city.city}`;
+  const pageUrl = `${siteUrl}/prepagos/${city.slug}`;
+  const cityLinks = targetSeoCities
+    .filter((item) => item.slug !== city.slug)
+    .map((item) => ({
+      href: `/prepagos/${item.slug}`,
+      label: `Prepagos en ${item.city}`,
+    }));
+
   return (
-    <PrestadoresPage
-      initialCity={city.city}
-      initialDepartment={city.department}
-      pageTitle={`Prepagos en ${city.city}`}
-      pageEyebrow="Prepagos por ciudad"
-    />
+    <>
+      <JsonLd
+        data={[
+          {
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: title,
+            description: `Perfiles aprobados en ${city.city}${
+              city.department ? `, ${city.department}` : ""
+            } dentro de BelaClub.`,
+            url: pageUrl,
+            isPartOf: {
+              "@type": "WebSite",
+              name: "BelaClub",
+              url: siteUrl,
+            },
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              {
+                "@type": "ListItem",
+                position: 1,
+                name: "BelaClub",
+                item: siteUrl,
+              },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: "Prepagos",
+                item: `${siteUrl}/prepagos`,
+              },
+              {
+                "@type": "ListItem",
+                position: 3,
+                name: city.city,
+                item: pageUrl,
+              },
+            ],
+          },
+        ]}
+      />
+      <PrestadoresPage
+        initialCity={city.city}
+        initialDepartment={city.department}
+        pageTitle={`Prepagos en ${city.city}`}
+        pageEyebrow="Prepagos por ciudad"
+        pageDescription={`Explora prepagos verificadas en ${city.city}${
+          city.department ? `, ${city.department}` : ""
+        }. Revisa perfiles aprobados, galerias publicas, video del dia y contacto directo por WhatsApp.`}
+        seoCityLinks={[
+          { href: `/escorts/${city.slug}`, label: `Escorts en ${city.city}` },
+          ...cityLinks,
+        ]}
+      />
+    </>
   );
 }

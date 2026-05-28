@@ -39,6 +39,14 @@ type MediaItem = {
   duration?: number | null;
 };
 
+type DailyVideo = {
+  url?: string;
+  duration?: number | null;
+  expiresAt?: {
+    toDate?: () => Date;
+  } | string | null;
+};
+
 type StatusTone = "approved" | "pending" | "rejected";
 
 type ProviderProfile = {
@@ -51,6 +59,7 @@ type ProviderProfile = {
   whatsapp?: string;
   photoUrl?: string;
   media?: MediaItem[];
+  dailyVideo?: DailyVideo | null;
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
   badgeVerificationStatus?: BadgeVerificationStatus;
@@ -93,6 +102,17 @@ type ProviderPauseResponse = {
   error?: string;
 };
 
+type DailyVideoResponse = {
+  dailyVideo?: {
+    url: string;
+    duration?: number | null;
+    expiresAt?: string | null;
+  };
+  error?: string;
+};
+
+const DAILY_VIDEO_MAX_SECONDS = 30;
+
 const statusCopy: Record<
   VerificationStatus,
   { label: string; description: string; tone: StatusTone }
@@ -106,7 +126,7 @@ const statusCopy: Record<
   approved: {
     label: "Perfil aprobado",
     description:
-      "Tu perfil puede aparecer en la página pública de prestadores.",
+      "Tu perfil puede aparecer en la pagina publica de escorts.",
     tone: "approved",
   },
   rejected: {
@@ -288,6 +308,11 @@ export default function PerfilPrestador() {
     useState<BadgeVerificationLevel>(1);
   const [verificationFile, setVerificationFile] = useState<File | null>(null);
   const [promotedUntil, setPromotedUntil] = useState<string | null>(null);
+  const [dailyVideoUrl, setDailyVideoUrl] = useState("");
+  const [dailyVideoExpiresAt, setDailyVideoExpiresAt] = useState<string | null>(
+    null
+  );
+  const [uploadingDailyVideo, setUploadingDailyVideo] = useState(false);
 
   const mediaList = useMemo<MediaItem[]>(() => {
     return [
@@ -304,6 +329,9 @@ export default function PerfilPrestador() {
   const hasReachedVideoTimeLimit = videoSecondsUsed >= videoSecondsLimit;
   const promotionActive = promotedUntil
     ? new Date(promotedUntil).getTime() > Date.now()
+    : false;
+  const dailyVideoActive = dailyVideoExpiresAt
+    ? new Date(dailyVideoExpiresAt).getTime() > Date.now()
     : false;
 
   const cities = useMemo(() => {
@@ -380,6 +408,8 @@ export default function PerfilPrestador() {
         setSubscriptionStatus(data.subscriptionStatus || null);
         setVideoSecondsExtra(Number(data.videoSecondsExtra || 0));
         setPromotedUntil(getDateValue(data.promotedUntil));
+        setDailyVideoUrl(data.dailyVideo?.url || "");
+        setDailyVideoExpiresAt(getDateValue(data.dailyVideo?.expiresAt));
       } catch (loadError) {
         const text =
           loadError instanceof Error
@@ -709,6 +739,54 @@ export default function PerfilPrestador() {
     }
   };
 
+  const uploadDailyVideo = async (file: File) => {
+    if (!user) return;
+
+    setUploadingDailyVideo(true);
+    setError("");
+
+    try {
+      if (!file.type.startsWith("video")) {
+        throw new Error("Selecciona un video para publicar como video del dia");
+      }
+
+      const duration = await getVideoDuration(file);
+
+      if (duration > DAILY_VIDEO_MAX_SECONDS) {
+        throw new Error(
+          `El video del dia debe durar maximo ${DAILY_VIDEO_MAX_SECONDS} segundos`
+        );
+      }
+
+      const url = await uploadFile(file, await user.getIdToken());
+      const res = await fetch("/api/provider-daily-video", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await user.getIdToken()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url, duration }),
+      });
+      const data = (await res.json()) as DailyVideoResponse;
+
+      if (!res.ok || !data.dailyVideo) {
+        throw new Error(data.error || "No pudimos guardar el video del dia");
+      }
+
+      setDailyVideoUrl(data.dailyVideo.url);
+      setDailyVideoExpiresAt(data.dailyVideo.expiresAt || null);
+      showSuccess("Video del dia publicado por 4 horas");
+    } catch (dailyVideoError) {
+      const text =
+        dailyVideoError instanceof Error
+          ? dailyVideoError.message
+          : "No pudimos publicar el video del dia";
+      setError(text);
+    } finally {
+      setUploadingDailyVideo(false);
+    }
+  };
+
   const toggleProfilePause = async () => {
     if (!user) return;
 
@@ -850,7 +928,7 @@ export default function PerfilPrestador() {
         <div className="mx-auto max-w-3xl px-6 py-12">
           <div className="rounded-lg border border-white/[0.08] bg-[#101012] p-8 text-center shadow-2xl shadow-black/30">
             <h1 className="text-2xl font-semibold">
-              Este perfil es solo para prestadores
+              Este perfil es solo para escorts
             </h1>
             <p className="mt-2 text-sm text-neutral-400">
               Tu cuenta actual está registrada como cliente.
@@ -1300,7 +1378,7 @@ export default function PerfilPrestador() {
               <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-400">
                 Si vas a tomar vacaciones o no quieres aparecer por unos dias,
                 puedes pausar tu perfil. Mientras este pausado no aparece en
-                prestadores y la mensualidad queda detenida. Puedes usar esta
+                escorts y la mensualidad queda detenida. Puedes usar esta
                 opcion maximo 6 veces por mes.
               </p>
               <p className="mt-2 text-xs text-neutral-500">
@@ -1371,6 +1449,77 @@ export default function PerfilPrestador() {
                   ? "Extender promocion"
                   : "Promocionar perfil"}
             </button>
+          </div>
+        </section>
+
+        <section
+          id="video-del-dia"
+          className="mt-4 scroll-mt-24 rounded-lg border border-sky-300/15 bg-[linear-gradient(135deg,rgba(14,165,233,0.10),rgba(16,16,18,0.96)_45%,rgba(16,16,18,1))] p-4 shadow-2xl shadow-black/20 sm:p-5"
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">
+                Video del dia
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-white">
+                Destaca tu perfil durante 4 horas
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-400">
+                Sube un video corto de maximo {DAILY_VIDEO_MAX_SECONDS} segundos.
+                Mientras este activo, tu tarjeta aparece primero y los clientes
+                veran el boton de video.
+              </p>
+              {dailyVideoActive && dailyVideoExpiresAt && (
+                <p className="mt-2 text-xs font-semibold text-emerald-200">
+                  Activo hasta{" "}
+                  {new Date(dailyVideoExpiresAt).toLocaleString("es-CO")}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {dailyVideoActive && dailyVideoUrl && (
+                <a
+                  href={dailyVideoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-11 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.08] hover:text-white"
+                >
+                  Ver activo
+                </a>
+              )}
+              <label
+                className={`inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold text-white shadow-lg shadow-sky-950/20 transition ${
+                  uploadingDailyVideo || verificationStatus !== "approved"
+                    ? "cursor-not-allowed bg-sky-700/60 opacity-60"
+                    : "bg-sky-600 hover:bg-sky-500"
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="currentColor"
+                >
+                  <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
+                </svg>
+                {uploadingDailyVideo
+                  ? "Subiendo..."
+                  : dailyVideoActive
+                    ? "Reemplazar video"
+                    : "Subir video del dia"}
+                <input
+                  type="file"
+                  accept="video/*"
+                  hidden
+                  disabled={uploadingDailyVideo || verificationStatus !== "approved"}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void uploadDailyVideo(file);
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </section>
 
@@ -1516,7 +1665,7 @@ export default function PerfilPrestador() {
             <p className="mt-3 text-sm leading-6 text-neutral-400">
               {profilePaused
                 ? "Tu perfil volvera a aparecer si esta aprobado y la mensualidad se reactivara inmediatamente."
-                : "Tu perfil dejara de aparecer en prestadores y la mensualidad quedara detenida hasta que lo reactives. Puedes pausar maximo 6 veces por mes."}
+                : "Tu perfil dejara de aparecer en escorts y la mensualidad quedara detenida hasta que lo reactives. Puedes pausar maximo 6 veces por mes."}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
     if (user.role !== "prestador") {
       return NextResponse.json(
-        { error: "Solo prestadores pueden pausar su perfil" },
+        { error: "Solo las escorts pueden pausar su perfil" },
         { status: 403 }
       );
     }

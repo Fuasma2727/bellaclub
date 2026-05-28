@@ -15,6 +15,12 @@ export type MediaItem = {
   description?: string;
 };
 
+export type DailyVideo = {
+  url: string;
+  duration?: number | null;
+  expiresAt?: string | null;
+};
+
 export type Prestador = {
   id: string;
   name?: string;
@@ -33,6 +39,7 @@ export type Prestador = {
   verificationBadge?: VerificationBadge | null;
   badgeVerificationLevel?: 1 | 2 | 3 | 4 | number | string | null;
   promotedUntil?: string | null;
+  dailyVideo?: DailyVideo | null;
 };
 
 export type PurchasedContentItem = {
@@ -48,4 +55,9 @@ export type ApiResponse = {
 export type PendingPurchase = {
   item: MediaItem;
   index: number;
+};
+
+export type CitySeoLink = {
+  href: string;
+  label: string;
 };

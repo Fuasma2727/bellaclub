@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Prestadores verificados",
+  title: "Escorts verificadas",
   description:
-    "Explora perfiles aprobados en BelaClub, revisa galerias publicas, desbloquea contenido privado y contacta prestadores por WhatsApp.",
+    "Explora escorts verificadas en BelaClub, revisa galerias publicas, desbloquea contenido privado y contacta por WhatsApp.",
   alternates: {
     canonical: "/prestadores",
   },
   openGraph: {
-    title: "Prestadores verificados | BelaClub",
+    title: "Escorts verificadas | BelaClub",
     description:
-      "Perfiles aprobados, galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
+      "Escorts verificadas, galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
     url: "/prestadores",
     images: [
       {
@@ -24,9 +24,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Prestadores verificados | BelaClub",
+    title: "Escorts verificadas | BelaClub",
     description:
-      "Perfiles aprobados, galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
+      "Escorts verificadas, galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
     images: ["/og-image.png"],
   },
 };

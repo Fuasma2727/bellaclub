@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     if (error instanceof Error) {
       const messages: Record<string, { message: string; status: number }> = {
         USER_NOT_FOUND: { message: "Usuario no encontrado", status: 404 },
-        NOT_PROVIDER: { message: "Solo prestadores pueden comprar cupos", status: 403 },
+        NOT_PROVIDER: { message: "Solo las escorts pueden comprar cupos", status: 403 },
         INSUFFICIENT_BALANCE: {
           message: "Saldo insuficiente para comprar tiempo extra de video",
           status: 400,

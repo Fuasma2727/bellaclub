@@ -16,6 +16,32 @@ type PurchasedItem = {
   mediaId?: string;
 };
 
+const getActiveDailyVideo = (dailyVideo: unknown) => {
+  if (!dailyVideo || typeof dailyVideo !== "object") return null;
+
+  const video = dailyVideo as {
+    url?: string;
+    duration?: number | string | null;
+    expiresAt?: { toDate?: () => Date } | string | Date | null;
+  };
+  const expiresAt =
+    typeof video.expiresAt === "string"
+      ? new Date(video.expiresAt)
+      : video.expiresAt instanceof Date
+        ? video.expiresAt
+        : video.expiresAt?.toDate?.() || null;
+
+  if (!video.url || !expiresAt || expiresAt.getTime() <= Date.now()) {
+    return null;
+  }
+
+  return {
+    url: video.url,
+    duration: Number(video.duration || 0) || null,
+    expiresAt: expiresAt.toISOString(),
+  };
+};
+
 type Params = {
   params: Promise<{
     id: string;
@@ -59,7 +85,7 @@ export async function GET(request: Request, { params }: Params) {
 
     if (!providerSnap.exists) {
       return NextResponse.json(
-        { error: "Prestador no encontrado" },
+        { error: "Perfil no encontrado" },
         { status: 404 }
       );
     }
@@ -73,7 +99,7 @@ export async function GET(request: Request, { params }: Params) {
       data.blocked === true
     ) {
       return NextResponse.json(
-        { error: "Prestador no disponible" },
+        { error: "Perfil no disponible" },
         { status: 404 }
       );
     }
@@ -118,13 +144,14 @@ export async function GET(request: Request, { params }: Params) {
         rating: data.rating || 0,
         verificationBadge: data.verificationBadge || null,
         badgeVerificationLevel: data.badgeVerificationLevel || null,
+        dailyVideo: getActiveDailyVideo(data.dailyVideo),
         media: safeMedia,
       },
     });
   } catch (error) {
     console.error("Error loading provider:", error);
     return NextResponse.json(
-      { error: "No pudimos cargar el prestador" },
+      { error: "No pudimos cargar el perfil" },
       { status: 500 }
     );
   }

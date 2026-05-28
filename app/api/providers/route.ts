@@ -11,6 +11,30 @@ type MediaItem = {
   description?: string;
 };
 
+const getActiveDailyVideo = (dailyVideo: unknown, now: number) => {
+  if (!dailyVideo || typeof dailyVideo !== "object") return null;
+
+  const video = dailyVideo as {
+    url?: string;
+    duration?: number | string | null;
+    expiresAt?: { toDate?: () => Date } | string | Date | null;
+  };
+  const expiresAt =
+    typeof video.expiresAt === "string"
+      ? new Date(video.expiresAt)
+      : video.expiresAt instanceof Date
+        ? video.expiresAt
+        : video.expiresAt?.toDate?.() || null;
+
+  if (!video.url || !expiresAt || expiresAt.getTime() <= now) return null;
+
+  return {
+    url: video.url,
+    duration: Number(video.duration || 0) || null,
+    expiresAt: expiresAt.toISOString(),
+  };
+};
+
 const sanitizeMediaForCard = (media?: MediaItem[]) => {
   return Array.isArray(media)
     ? media.map((item, index) => ({
@@ -52,6 +76,8 @@ export async function GET() {
           promotedUntil: data.promotedUntil?.toDate?.().toISOString() || null,
           promotedRank:
             data.promotedUntil?.toDate?.().getTime?.() > now ? 1 : 0,
+          dailyVideo: getActiveDailyVideo(data.dailyVideo, now),
+          dailyVideoRank: getActiveDailyVideo(data.dailyVideo, now) ? 1 : 0,
           verificationRank: getVerificationRank(
             data.badgeVerificationLevel,
             data.verificationBadge
@@ -62,6 +88,10 @@ export async function GET() {
       })
       .filter((provider) => !provider.blocked)
       .sort((a, b) => {
+        if (b.dailyVideoRank !== a.dailyVideoRank) {
+          return b.dailyVideoRank - a.dailyVideoRank;
+        }
+
         if (b.promotedRank !== a.promotedRank) {
           return b.promotedRank - a.promotedRank;
         }
@@ -85,6 +115,7 @@ export async function GET() {
         verificationBadge: provider.verificationBadge,
         badgeVerificationLevel: provider.badgeVerificationLevel,
         promotedUntil: provider.promotedUntil,
+        dailyVideo: provider.dailyVideo,
         media: provider.media,
       }));
 
@@ -92,7 +123,7 @@ export async function GET() {
   } catch (error) {
     console.error("Error loading providers:", error);
     return NextResponse.json(
-      { error: "No pudimos cargar los prestadores" },
+      { error: "No pudimos cargar los perfiles" },
       { status: 500 }
     );
   }

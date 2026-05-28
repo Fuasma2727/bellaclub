@@ -17,6 +17,7 @@ import PurchaseModal from "./_components/PurchaseModal";
 import ReportModal from "./_components/ReportModal";
 import {
   ApiResponse,
+  CitySeoLink,
   MediaItem,
   PendingPurchase,
   Prestador,
@@ -27,13 +28,27 @@ type PrestadoresPageProps = {
   initialDepartment?: string;
   pageTitle?: string;
   pageEyebrow?: string;
+  pageDescription?: string;
+  seoCityLinks?: CitySeoLink[];
+};
+
+const citySlugValue = (value: string) => {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 };
 
 export default function PrestadoresPage({
   initialCity = "",
   initialDepartment = "",
   pageTitle,
-  pageEyebrow = "Prestadores por ciudad",
+  pageEyebrow = "Escorts por ciudad",
+  pageDescription,
+  seoCityLinks = [],
 }: PrestadoresPageProps = {}) {
   const { user } = useAuth();
   const router = useRouter();
@@ -43,6 +58,8 @@ export default function PrestadoresPage({
   const [pageError, setPageError] = useState("");
 
   const [modalData, setModalData] = useState<Prestador | null>(null);
+  const [dailyVideoProvider, setDailyVideoProvider] =
+    useState<Prestador | null>(null);
   const [expandedMedia, setExpandedMedia] = useState<MediaItem | null>(null);
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -103,7 +120,10 @@ export default function PrestadoresPage({
     }
 
     if (cityFilter) {
-      results = results.filter((provider) => provider.city === cityFilter);
+      const selectedCitySlug = citySlugValue(cityFilter);
+      results = results.filter(
+        (provider) => citySlugValue(provider.city || "") === selectedCitySlug
+      );
     }
 
     return results;
@@ -146,7 +166,8 @@ export default function PrestadoresPage({
       !!showDepositModal ||
       !!showAuthRequiredModal ||
       !!showReportModal ||
-      !!pendingPurchase;
+      !!pendingPurchase ||
+      !!dailyVideoProvider;
 
     document.body.style.overflow = isAnyModalOpen ? "hidden" : "auto";
 
@@ -159,9 +180,12 @@ export default function PrestadoresPage({
     showAuthRequiredModal,
     showReportModal,
     pendingPurchase,
+    dailyVideoProvider,
   ]);
 
   useEffect(() => {
+    if (initialCity) return;
+
     if (departmentFilter && !departments.includes(departmentFilter)) {
       setDepartmentFilter("");
       setCityFilter("");
@@ -171,7 +195,7 @@ export default function PrestadoresPage({
     if (cityFilter && !cities.includes(cityFilter)) {
       setCityFilter("");
     }
-  }, [cityFilter, cities, departmentFilter, departments]);
+  }, [cityFilter, cities, departmentFilter, departments, initialCity]);
 
   useEffect(() => {
     if (!expandedMedia || mediaList.length === 0) return;
@@ -215,7 +239,7 @@ export default function PrestadoresPage({
         };
 
         if (!res.ok) {
-          throw new Error(payload.error || "No pudimos cargar los prestadores");
+          throw new Error(payload.error || "No pudimos cargar los perfiles");
         }
 
         setPrestadores(payload.providers || []);
@@ -223,7 +247,7 @@ export default function PrestadoresPage({
         const message =
           error instanceof Error
             ? error.message
-            : "No pudimos cargar los prestadores";
+            : "No pudimos cargar los perfiles";
         setPageError(message);
       } finally {
         setLoading(false);
@@ -511,20 +535,37 @@ export default function PrestadoresPage({
       <Header />
 
       <main>
-        {initialCity && (
+        {(initialCity || pageTitle) && (
           <section className="border-b border-white/[0.08] bg-[#080809]">
             <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
                 {pageEyebrow}
               </p>
               <h1 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">
-                {pageTitle || `Prestadores en ${initialCity}`}
+                {pageTitle || `Escorts en ${initialCity}`}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
-                Explora perfiles aprobados en {initialCity}
-                {initialDepartment ? `, ${initialDepartment}` : ""}, revisa
-                galerias publicas y contacta directamente por WhatsApp.
+                {pageDescription ||
+                  `Explora perfiles aprobados en ${initialCity}${
+                    initialDepartment ? `, ${initialDepartment}` : ""
+                  }, revisa galerias publicas y contacta directamente por WhatsApp.`}
               </p>
+              {seoCityLinks.length > 0 && (
+                <nav
+                  aria-label="Ciudades populares"
+                  className="mt-4 flex flex-wrap gap-2"
+                >
+                  {seoCityLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              )}
             </div>
           </section>
         )}
@@ -546,7 +587,7 @@ export default function PrestadoresPage({
         <section className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 sm:py-5 lg:px-8">
           {loading && (
             <div className="rounded-md border border-white/[0.08] bg-[#101012] p-8 text-center text-sm text-neutral-400">
-              Cargando prestadores...
+              Cargando perfiles...
             </div>
           )}
 
@@ -573,6 +614,7 @@ export default function PrestadoresPage({
                   provider={provider}
                   isOpening={openingProfileId === provider.id}
                   onOpen={(id) => void openModal(id)}
+                  onOpenDailyVideo={setDailyVideoProvider}
                 />
               ))}
             </div>
@@ -620,6 +662,47 @@ export default function PrestadoresPage({
           onOpenMedia={openExpandedMedia}
           onMediaClick={handleMediaClick}
         />
+      )}
+
+      {dailyVideoProvider?.dailyVideo?.url && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+          onClick={() => setDailyVideoProvider(null)}
+        >
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-xl border border-white/10 bg-[#101012] text-white shadow-2xl shadow-black/60"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
+                  Video del dia
+                </p>
+                <h2 className="truncate text-base font-semibold">
+                  {dailyVideoProvider.name || "Escort verificada"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDailyVideoProvider(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08] hover:text-white"
+                aria-label="Cerrar video del dia"
+              >
+                X
+              </button>
+            </div>
+            <video
+              src={dailyVideoProvider.dailyVideo.url}
+              controls
+              autoPlay
+              playsInline
+              className="aspect-video w-full bg-black object-contain"
+            />
+            <div className="px-4 py-3 text-xs text-neutral-500">
+              Disponible por tiempo limitado.
+            </div>
+          </div>
+        </div>
       )}
 
       {pendingPurchase && (

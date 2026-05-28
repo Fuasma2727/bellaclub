@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PrestadoresPage from "../page";
-import { findProviderCityBySlug, getPublicProviderCities } from "@/lib/providerCitySeo";
+import JsonLd from "@/components/JsonLd";
+import {
+  findProviderCityBySlug,
+  getPublicProviderCities,
+} from "@/lib/providerCitySeo";
+
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
 
 type CityPageProps = {
   params: Promise<{
@@ -25,7 +31,7 @@ export async function generateMetadata({
 
   if (!city) {
     return {
-      title: "Prestadores por ciudad",
+      title: "Escorts por ciudad",
       robots: {
         index: false,
         follow: false,
@@ -36,8 +42,8 @@ export async function generateMetadata({
   const place = city.department
     ? `${city.city}, ${city.department}`
     : city.city;
-  const title = `Prestadores en ${city.city}`;
-  const description = `Encuentra prestadores aprobados en ${place}. Revisa perfiles, galerias publicas y contacta directamente por WhatsApp en BelaClub.`;
+  const title = `Escorts en ${city.city}`;
+  const description = `Encuentra escorts verificadas en ${place}. Revisa perfiles, galerias publicas y contacta directamente por WhatsApp en BelaClub.`;
 
   return {
     title,
@@ -75,10 +81,57 @@ export default async function PrestadoresCityPage({ params }: CityPageProps) {
 
   if (!city) notFound();
 
+  const title = `Escorts en ${city.city}`;
+  const pageUrl = `${siteUrl}/prestadores/${city.slug}`;
+
   return (
-    <PrestadoresPage
-      initialCity={city.city}
-      initialDepartment={city.department}
-    />
+    <>
+      <JsonLd
+        data={[
+          {
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: title,
+            description: `Perfiles aprobados en ${city.city}${
+              city.department ? `, ${city.department}` : ""
+            } dentro de BelaClub.`,
+            url: pageUrl,
+            isPartOf: {
+              "@type": "WebSite",
+              name: "BelaClub",
+              url: siteUrl,
+            },
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              {
+                "@type": "ListItem",
+                position: 1,
+                name: "BelaClub",
+                item: siteUrl,
+              },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: "Escorts",
+                item: `${siteUrl}/prestadores`,
+              },
+              {
+                "@type": "ListItem",
+                position: 3,
+                name: city.city,
+                item: pageUrl,
+              },
+            ],
+          },
+        ]}
+      />
+      <PrestadoresPage
+        initialCity={city.city}
+        initialDepartment={city.department}
+      />
+    </>
   );
 }

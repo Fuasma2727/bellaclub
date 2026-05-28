@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "BelaClub",
     short_name: "BelaClub",
     description:
-      "Plataforma privada para conectar clientes con prestadores verificados.",
+      "Plataforma privada para conectar clientes con escorts verificadas.",
     start_url: "/prestadores",
     display: "standalone",
     background_color: "#050505",

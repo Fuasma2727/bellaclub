@@ -12,13 +12,35 @@ type ProviderCardProps = {
   provider: Prestador;
   isOpening?: boolean;
   onOpen?: (id: string) => void;
+  onOpenDailyVideo?: (provider: Prestador) => void;
   afterContent?: ReactNode;
 };
+
+function WhatsAppIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-[15px] w-[15px] sm:h-4 sm:w-4"
+      fill="none"
+    >
+      <path
+        d="M4.7 19.5 6 15.7a7.8 7.8 0 1 1 2.9 2.8l-4.2 1Z"
+        fill="#fff"
+      />
+      <path
+        d="M9.1 7.7c.18-.4.38-.42.68-.42h.52c.23 0 .46.05.62.46l.62 1.48c.1.25.08.48-.08.68l-.46.55c-.12.15-.15.32-.04.5.48.86 1.2 1.6 2.08 2.08.18.1.36.08.5-.06l.7-.72c.18-.18.42-.22.66-.1l1.48.7c.34.16.48.34.46.62-.02.42-.28 1.18-.92 1.66-.58.44-1.55.56-2.96-.02-2.42-.98-4.02-2.86-4.62-4.44-.42-1.08-.32-2.06.26-2.96Z"
+        fill="#16a34a"
+      />
+    </svg>
+  );
+}
 
 export default function ProviderCard({
   provider,
   isOpening = false,
   onOpen,
+  onOpenDailyVideo,
   afterContent,
 }: ProviderCardProps) {
   const [showBadgeInfo, setShowBadgeInfo] = useState(false);
@@ -50,19 +72,19 @@ export default function ProviderCard({
       ? {
           shell:
             "border-[#b7784d]/45 bg-[#b7784d]/12 shadow-[#4a2415]/20 hover:bg-[#b7784d]/18",
-          gem: "from-[#e7aa78] via-[#a9673f] to-[#5f3525]",
+          gem: "linear-gradient(135deg, #e7aa78 0%, #a9673f 52%, #5f3525 100%)",
         }
       : verificationBadge === "silver"
         ? {
             shell:
               "border-slate-100/45 bg-slate-200/10 shadow-slate-950/20 hover:bg-slate-100/16",
-            gem: "from-white via-slate-300 to-slate-500",
+            gem: "linear-gradient(135deg, #ffffff 0%, #cbd5e1 52%, #64748b 100%)",
           }
         : verificationBadge === "gold"
           ? {
               shell:
                 "border-amber-300/45 bg-amber-300/12 shadow-amber-950/22 hover:bg-amber-300/18",
-              gem: "from-[#fff2b8] via-[#d9a328] to-[#8a5a12]",
+              gem: "linear-gradient(135deg, #fff2b8 0%, #d9a328 52%, #8a5a12 100%)",
             }
           : {
               shell:
@@ -71,6 +93,7 @@ export default function ProviderCard({
             };
   const privateCount = (provider.media || []).filter((item) => item.private)
     .length;
+  const hasDailyVideo = Boolean(provider.dailyVideo?.url);
 
   return (
     <article
@@ -80,13 +103,48 @@ export default function ProviderCard({
       onClick={() => onOpen?.(provider.id)}
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-zinc-900">
-        <Image
-          src={provider.photoUrl || "/default-avatar.png"}
-          alt={name}
-          fill
-          className="object-cover transition duration-300 group-hover:scale-105"
-          sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
-        />
+        {hasDailyVideo ? (
+          <>
+            <video
+              src={provider.dailyVideo?.url}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+            <button
+              type="button"
+              aria-label={`Reproducir video del dia de ${name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenDailyVideo?.(provider);
+              }}
+              className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-2xl shadow-black/40 backdrop-blur transition hover:scale-105 hover:bg-black/60 sm:h-14 sm:w-14"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="ml-0.5 h-5 w-5 sm:h-6 sm:w-6"
+                fill="currentColor"
+              >
+                <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
+              </svg>
+            </button>
+            <span className="absolute left-2 top-2 rounded-full border border-sky-200/20 bg-black/55 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-100 backdrop-blur">
+              Video del dia
+            </span>
+          </>
+        ) : (
+          <Image
+            src={provider.photoUrl || "/default-avatar.png"}
+            alt={name}
+            fill
+            className="object-cover transition duration-300 group-hover:scale-105"
+            sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
+          />
+        )}
 
         {privateCount > 0 && (
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent p-2">
@@ -178,7 +236,8 @@ export default function ProviderCard({
                 ) : (
                   <span
                     aria-hidden="true"
-                    className={`h-2.5 w-2.5 rotate-45 rounded-[2px] bg-gradient-to-br shadow-sm sm:h-3 sm:w-3 ${badgeStyle.gem}`}
+                    className="h-3 w-3 rotate-45 rounded-[2px] shadow-sm ring-1 ring-white/20 sm:h-3.5 sm:w-3.5"
+                    style={{ background: badgeStyle.gem }}
                   />
                 )}
               </button>
@@ -191,24 +250,9 @@ export default function ProviderCard({
                 rel="noopener noreferrer"
                 aria-label={`Contactar a ${name} por WhatsApp`}
                 onClick={(event) => event.stopPropagation()}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-500 text-white shadow-lg shadow-emerald-950/25 transition hover:bg-emerald-400 sm:h-7 sm:w-7"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-200/30 bg-[#16a34a] text-white shadow-lg shadow-emerald-950/25 transition hover:-translate-y-0.5 hover:border-emerald-100/50 hover:bg-[#22c55e] sm:h-7 sm:w-7"
               >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                >
-                  <path
-                    d="M5.2 18.8 6.3 15.5A7 7 0 1 1 8.6 17.7L5.2 18.8Z"
-                    fill="currentColor"
-                    opacity="0.95"
-                  />
-                  <path
-                    d="M9.3 8.2c.2-.4.4-.4.7-.4h.5c.2 0 .4.1.5.4l.5 1.2c.1.2.1.4 0 .6l-.4.5c-.1.2-.1.3 0 .5.4.8 1.2 1.5 2 1.9.2.1.3.1.5-.1l.6-.7c.1-.2.3-.2.6-.1l1.3.6c.2.1.4.3.4.5 0 .4-.2 1.2-.8 1.6-.5.4-1.4.5-2.7 0-2.4-.9-4-2.8-4.5-4.4-.3-.9-.2-1.6.2-2.1Z"
-                    fill="#101012"
-                  />
-                </svg>
+                <WhatsAppIcon />
               </a>
             )}
           </div>

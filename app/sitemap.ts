@@ -1,5 +1,8 @@
 import type { MetadataRoute } from "next";
-import { getPublicProviderCities } from "@/lib/providerCitySeo";
+import {
+  getPublicProviderCities,
+  targetSeoCities,
+} from "@/lib/providerCitySeo";
 
 const getBaseUrl = () =>
   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -8,6 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = getBaseUrl();
   const now = new Date();
   const cities = await getPublicProviderCities();
+  const targetCitySlugs = new Set(targetSeoCities.map((city) => city.slug));
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {
@@ -21,6 +25,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "daily",
       priority: 1,
+    },
+    {
+      url: `${baseUrl}/prepagos`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/escorts`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.9,
     },
     {
       url: `${baseUrl}/terminos`,
@@ -46,19 +62,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${baseUrl}/prestadores/${city.slug}`,
     lastModified: now,
     changeFrequency: "daily",
-    priority: 0.85,
+    priority: targetCitySlugs.has(city.slug) ? 0.92 : 0.85,
   }));
   const prepagosRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
     url: `${baseUrl}/prepagos/${city.slug}`,
     lastModified: now,
     changeFrequency: "daily",
-    priority: 0.8,
+    priority: targetCitySlugs.has(city.slug) ? 0.95 : 0.8,
   }));
   const escortsRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
     url: `${baseUrl}/escorts/${city.slug}`,
     lastModified: now,
     changeFrequency: "daily",
-    priority: 0.8,
+    priority: targetCitySlugs.has(city.slug) ? 0.95 : 0.8,
   }));
 
   return [...staticRoutes, ...cityRoutes, ...prepagosRoutes, ...escortsRoutes];

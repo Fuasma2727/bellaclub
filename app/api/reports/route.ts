@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     if (!providerId) {
       return NextResponse.json(
-        { error: "Prestador requerido" },
+        { error: "Perfil requerido" },
         { status: 400 }
       );
     }

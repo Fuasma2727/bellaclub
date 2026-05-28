@@ -7,6 +7,27 @@ export type ProviderCitySeo = {
   count: number;
 };
 
+export const targetSeoCities: ProviderCitySeo[] = [
+  {
+    city: "Medellín",
+    department: "Antioquia",
+    slug: "medellin",
+    count: 0,
+  },
+  {
+    city: "La Ceja",
+    department: "Antioquia",
+    slug: "la-ceja",
+    count: 0,
+  },
+  {
+    city: "Rionegro",
+    department: "Antioquia",
+    slug: "rionegro",
+    count: 0,
+  },
+];
+
 export const citySlug = (value: string) => {
   return value
     .normalize("NFD")
@@ -45,6 +66,17 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
       department: current?.department || department,
       slug,
       count: (current?.count || 0) + 1,
+    });
+  });
+
+  targetSeoCities.forEach((city) => {
+    const current = bySlug.get(city.slug);
+
+    bySlug.set(city.slug, {
+      ...city,
+      city: current?.city || city.city,
+      department: current?.department || city.department,
+      count: current?.count || city.count,
     });
   });
 

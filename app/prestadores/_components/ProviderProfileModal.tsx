@@ -287,7 +287,7 @@ export default function ProviderProfileModal({
                   </p>
                 ) : (
                   <p className="text-sm text-neutral-500">
-                    Este prestador aun no agrego una descripcion.
+                    Este perfil aun no agrego una descripcion.
                   </p>
                 )}
               </div>

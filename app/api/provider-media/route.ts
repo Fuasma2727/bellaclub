@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     if (error instanceof Error) {
       const messages: Record<string, { message: string; status: number }> = {
         USER_NOT_FOUND: { message: "Usuario no encontrado", status: 404 },
-        NOT_PROVIDER: { message: "Solo prestadores pueden subir contenido", status: 403 },
+        NOT_PROVIDER: { message: "Solo las escorts pueden subir contenido", status: 403 },
         MEDIA_REQUIRED: { message: "Contenido requerido", status: 400 },
         INVALID_MEDIA: { message: "Contenido invalido", status: 400 },
         INVALID_VIDEO_DURATION: {

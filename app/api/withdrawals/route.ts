@@ -221,7 +221,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "ONLY_PROVIDERS") {
       return NextResponse.json(
-        { error: "Solo los prestadores pueden retirar saldo" },
+        { error: "Solo las escorts pueden retirar saldo" },
         { status: 403 }
       );
     }

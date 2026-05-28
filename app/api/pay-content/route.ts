@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       sellerData.blocked === true
     ) {
       return NextResponse.json(
-        { error: "Prestador no disponible" },
+        { error: "Perfil no disponible" },
         { status: 404 }
       );
     }

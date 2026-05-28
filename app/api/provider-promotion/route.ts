@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       const messages: Record<string, { message: string; status: number }> = {
         USER_NOT_FOUND: { message: "Usuario no encontrado", status: 404 },
         NOT_PROVIDER: {
-          message: "Solo prestadores pueden promocionar su perfil",
+          message: "Solo las escorts pueden promocionar su perfil",
           status: 403,
         },
         PROVIDER_BLOCKED: {

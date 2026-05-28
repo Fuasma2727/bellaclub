@@ -25,7 +25,7 @@ export default function SeguridadPage() {
             privados de terceros ni compartir contenido sin autorizacion.
           </p>
           <p>
-            Los prestadores deben usar fotos reales y pueden pasar por
+            Las escorts deben usar fotos reales y pueden pasar por
             verificaciones adicionales. Una insignia indica que el administrador
             reviso una solicitud, pero no reemplaza el criterio personal de cada
             usuario al tomar contacto.

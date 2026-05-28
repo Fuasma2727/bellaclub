@@ -8,7 +8,15 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/prestadores", "/terminos", "/privacidad", "/seguridad"],
+        allow: [
+          "/",
+          "/prestadores",
+          "/prepagos",
+          "/escorts",
+          "/terminos",
+          "/privacidad",
+          "/seguridad",
+        ],
         disallow: [
           "/admin/",
           "/api/",

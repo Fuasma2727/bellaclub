@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
     if (user.role !== "prestador") {
       return NextResponse.json(
-        { error: "Solo los prestadores pueden ver esta seccion" },
+        { error: "Solo las escorts pueden ver esta seccion" },
         { status: 403 }
       );
     }

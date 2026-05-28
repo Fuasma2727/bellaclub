@@ -109,7 +109,7 @@ function WompiResultContent() {
             href="/prestadores"
             className="mt-6 inline-flex rounded-md bg-white px-5 py-3 text-sm font-semibold text-[#101012] transition hover:bg-neutral-200"
           >
-            Volver a prestadores
+            Volver a escorts
           </Link>
         </section>
       </main>

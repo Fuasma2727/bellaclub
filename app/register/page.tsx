@@ -70,17 +70,17 @@ export default function RegisterPage() {
               Crea tu acceso a la red
             </p>
             <h1 className="max-w-xl text-4xl font-semibold leading-tight xl:text-5xl">
-              Unete como cliente o crea tu cuenta de prestador.
+              Unete como cliente o crea tu perfil de escort.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-neutral-300">
-              Los clientes pueden explorar perfiles al instante. Los prestadores
+              Los clientes pueden explorar perfiles al instante. Las escorts
               completan su perfil y solicitan verificacion antes de aparecer
               publicamente.
             </p>
 
             <div className="mt-10 max-w-xl rounded-lg border border-white/10 bg-white/[0.04] p-5">
               <p className="text-sm font-semibold text-white">
-                Verificacion de prestadores
+                Verificacion de escorts
               </p>
               <div className="mt-4 space-y-3">
                 {providerSteps.map((step) => (
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                       }`}
                     >
                       <span className="block text-sm font-semibold">
-                        Prestador
+                        Escort
                       </span>
                       <span className="mt-1 block text-xs">
                         Crear perfil

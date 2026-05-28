@@ -63,7 +63,7 @@ export default function DashboardPage() {
       {/* 🔥 Mostrar contenido distinto según el rol */}
       {role === "prestador" && (
         <div>
-          <h2>Panel de Prestador de Servicios</h2>
+          <h2>Panel de Escort</h2>
           <p>Aquí podrás subir fotos, videos, poner precios y cambiar disponibilidad.</p>
         </div>
       )}
@@ -71,7 +71,7 @@ export default function DashboardPage() {
       {role === "cliente" && (
         <div>
           <h2>Panel de Cliente</h2>
-          <p>Aquí podrás ver perfiles de prestadores y comprar contenido.</p>
+          <p>Aqui podras ver perfiles de escorts y comprar contenido.</p>
         </div>
       )}
 

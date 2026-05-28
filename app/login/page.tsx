@@ -86,10 +86,10 @@ export default function LoginPage() {
             </Link>
 
             <p className="mb-4 text-sm font-medium text-blue-300">
-              Servicios, perfiles y contenido privado
+              Escorts, perfiles y contenido privado
             </p>
             <h1 className="max-w-xl text-4xl font-semibold leading-tight xl:text-5xl">
-              Entra a una red segura para descubrir prestadores verificados.
+              Entra a una red segura para descubrir escorts verificadas.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-neutral-300">
               Explora perfiles, revisa contenido disponible y gestiona tus
@@ -226,7 +226,7 @@ export default function LoginPage() {
                   href="/prestadores"
                   className="text-neutral-500 hover:text-neutral-300 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
-                  Explorar prestadores sin iniciar sesion
+                  Explorar escorts sin iniciar sesion
                 </Link>
               </div>
             </div>

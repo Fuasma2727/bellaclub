@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/context/AuthContext";
+import JsonLd from "@/components/JsonLd";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,20 +15,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com"
-  ),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "BelaClub",
     template: "%s | BelaClub",
   },
   description:
-    "Plataforma privada para conectar clientes con prestadores verificados, contenido seguro y abonos dentro de BelaClub.",
+    "Plataforma privada para conectar clientes con escorts verificadas, contenido seguro y abonos dentro de BelaClub.",
   applicationName: "BelaClub",
   keywords: [
     "BelaClub",
-    "prestadores verificados",
+    "escorts verificadas",
     "servicios privados",
     "contenido privado",
     "abonos seguros",
@@ -42,7 +43,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "BelaClub",
     description:
-      "Conecta con prestadores verificados y gestiona contenido privado de forma segura.",
+      "Conecta con escorts verificadas y gestiona contenido privado de forma segura.",
     url: "/prestadores",
     siteName: "BelaClub",
     images: [
@@ -60,7 +61,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BelaClub",
     description:
-      "Conecta con prestadores verificados y gestiona contenido privado de forma segura.",
+      "Conecta con escorts verificadas y gestiona contenido privado de forma segura.",
     images: ["/og-image.png"],
   },
   robots: {
@@ -80,11 +81,30 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const siteSchema = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "BelaClub",
+      url: siteUrl,
+      inLanguage: "es-CO",
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "BelaClub",
+      url: siteUrl,
+      logo: `${siteUrl}/logo.jpg`,
+    },
+  ];
+
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
+        <JsonLd data={siteSchema} />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

@@ -11,7 +11,7 @@ export const formatMoney = (value?: number | string | null) => {
 };
 
 export const getDisplayName = (provider: Prestador) => {
-  return provider.name?.trim() || "Prestador verificado";
+  return provider.name?.trim() || "Escort verificada";
 };
 
 export const getLocation = (provider: Prestador) => {
