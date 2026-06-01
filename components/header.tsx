@@ -19,7 +19,7 @@ import { logoutUser } from "@/lib/auth";
 const rechargeOptions = [100000, 200000, 500000];
 const withdrawalCommissionRate = 0.05;
 const minWithdrawalAmount = 50000;
-const supportWhatsapp = "573052330967";
+const supportInstagramUrl = "https://www.instagram.com/belaclub_0/";
 const payoutMethods = [
   { value: "nequi", label: "Nequi" },
   { value: "bancolombia", label: "Bancolombia" },
@@ -83,7 +83,7 @@ export default function Header() {
     withdrawalValue - withdrawalCommission,
     0
   );
-  const supportHref = `https://wa.me/${supportWhatsapp}`;
+  const supportHref = supportInstagramUrl;
 
   useEffect(() => {
     setMounted(true);
@@ -276,7 +276,10 @@ export default function Header() {
 
   if (!mounted) {
     return (
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.08] bg-black/95 shadow-sm backdrop-blur">
+      <header
+        className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.08] bg-black/95 shadow-sm backdrop-blur"
+        suppressHydrationWarning
+      >
         <div className="w-full px-3 sm:px-6">
           <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-3">
             <Link
@@ -304,7 +307,10 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.08] bg-black/95 shadow-sm backdrop-blur">
+      <header
+        className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.08] bg-black/95 shadow-sm backdrop-blur"
+        suppressHydrationWarning
+      >
         <div className="w-full px-3 sm:px-6">
           <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-3">
             <Link

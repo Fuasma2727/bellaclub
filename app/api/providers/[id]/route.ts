@@ -96,6 +96,7 @@ export async function GET(request: Request, { params }: Params) {
       data.role !== "prestador" ||
       data.profileVisible !== true ||
       data.verificationStatus !== "approved" ||
+      !data.photoUrl ||
       data.blocked === true
     ) {
       return NextResponse.json(

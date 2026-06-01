@@ -78,13 +78,14 @@ export async function processProviderSubscription(
 
     const balance = Number(user.balance || 0);
     const nextPaidChargeAt = addOneMonth(now);
+    const hasProfilePhoto = Boolean(user.photoUrl);
 
     if (balance >= PROVIDER_MONTHLY_FEE) {
       tx.update(userRef, {
         balance: admin.firestore.FieldValue.increment(-PROVIDER_MONTHLY_FEE),
         blocked: false,
         blockedReason: admin.firestore.FieldValue.delete(),
-        profileVisible: true,
+        profileVisible: hasProfilePhoto,
         subscriptionStatus: "active",
         subscriptionAmount: PROVIDER_MONTHLY_FEE,
         subscriptionManualOverride: false,

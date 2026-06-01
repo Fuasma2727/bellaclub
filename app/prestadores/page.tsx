@@ -536,7 +536,10 @@ export default function PrestadoresPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] pb-16 pt-14 text-white sm:pt-16">
+    <div
+      className="min-h-screen bg-[#050505] pb-16 pt-14 text-white sm:pt-16"
+      suppressHydrationWarning
+    >
       <Header />
 
       <main>

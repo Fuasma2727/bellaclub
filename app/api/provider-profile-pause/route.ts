@@ -100,7 +100,8 @@ export async function POST(request: Request) {
 
     await userRef.update({
       profilePaused: false,
-      profileVisible: user.verificationStatus === "approved",
+      profileVisible:
+        user.verificationStatus === "approved" && Boolean(user.photoUrl),
       subscriptionManualOverride: false,
       subscriptionStatus: "pending_payment",
       subscriptionNextChargeAt: adminFieldValue.serverTimestamp(),

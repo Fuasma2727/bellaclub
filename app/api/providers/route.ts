@@ -86,7 +86,7 @@ export async function GET() {
           media: sanitizeMediaForCard(data.media),
         };
       })
-      .filter((provider) => !provider.blocked)
+      .filter((provider) => !provider.blocked && Boolean(provider.photoUrl))
       .sort((a, b) => {
         if (b.dailyVideoRank !== a.dailyVideoRank) {
           return b.dailyVideoRank - a.dailyVideoRank;

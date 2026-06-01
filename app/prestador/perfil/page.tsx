@@ -73,6 +73,9 @@ type ProviderProfile = {
   } | string | null;
 };
 
+
+
+
 type UploadResponse = {
   url?: string;
   error?: string;
@@ -156,13 +159,13 @@ const verificationOptions = [
     level: 1 as BadgeVerificationLevel,
     badge: "bronze" as VerificationBadge,
     title: "Bronce",
-    text: "Requiere foto de verificacion.",
+    text: "Foto sosteniendo un papel que diga BelaClub.",
   },
   {
     level: 2 as BadgeVerificationLevel,
     badge: "silver" as VerificationBadge,
     title: "Plata",
-    text: "Requiere video de verificacion.",
+    text: "Video sosteniendo un papel que diga BelaClub.",
   },
   {
     level: 3 as BadgeVerificationLevel,
@@ -241,6 +244,80 @@ const formatVideoTime = (seconds: number) => {
 
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 };
+
+function VerificationGem({
+  badge,
+  className,
+}: {
+  badge: VerificationBadge;
+  className?: string;
+}) {
+  const fill =
+    badge === "bronze"
+      ? "#b8734c"
+      : badge === "silver"
+        ? "#d7dde7"
+        : badge === "gold"
+          ? "#f3bd3e"
+          : "#dff8ff";
+  const glow =
+    badge === "bronze"
+      ? "rgba(184,115,76,0.45)"
+      : badge === "silver"
+        ? "rgba(226,232,240,0.55)"
+        : badge === "gold"
+          ? "rgba(251,191,36,0.7)"
+          : "rgba(125,211,252,0.95)";
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      style={{ filter: `drop-shadow(0 0 5px ${glow})` }}
+    >
+      <path
+        d="M7.2 4.5h9.6l3.2 4.4L12 20 4 8.9l3.2-4.4Z"
+        fill={fill}
+        stroke="currentColor"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+      />
+      {badge === "platinum" && (
+        <path
+          d="M8.2 5.7h7.6l2.1 2.9L12 17.2 6.1 8.6l2.1-2.9Z"
+          fill="url(#profileDiamondTopShine)"
+          opacity="0.95"
+        />
+      )}
+      <path
+        d="M4.2 8.9h15.6M7.2 4.5l2.2 4.4L12 4.5l2.6 4.4 2.2-4.4M9.4 8.9 12 20l2.6-11.1"
+        stroke="white"
+        strokeOpacity={badge === "bronze" ? "0.58" : "0.82"}
+        strokeWidth="0.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {badge === "platinum" && (
+        <defs>
+          <linearGradient
+            id="profileDiamondTopShine"
+            x1="7"
+            x2="17"
+            y1="5"
+            y2="16"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#ffffff" />
+            <stop offset="0.42" stopColor="#bae6fd" />
+            <stop offset="1" stopColor="#8b5cf6" />
+          </linearGradient>
+        </defs>
+      )}
+    </svg>
+  );
+}
 
 const getDateValue = (value: ProviderProfile["promotedUntil"]) => {
   if (!value) return null;
@@ -328,6 +405,7 @@ export default function PerfilPrestador() {
   );
   const videoSecondsLimit = getProviderVideoSecondsLimit(videoSecondsExtra);
   const hasReachedVideoTimeLimit = videoSecondsUsed >= videoSecondsLimit;
+  const showVideoTimeAction = hasReachedVideoTimeLimit || showVideoTimePurchase;
   const promotionActive = promotedUntil
     ? new Date(promotedUntil).getTime() > Date.now()
     : false;
@@ -343,6 +421,8 @@ export default function PerfilPrestador() {
   }, [department]);
 
   const status = statusCopy[verificationStatus];
+  const hasProfilePhoto = Boolean(photoUrl);
+  const visiblePublicly = profileVisible && hasProfilePhoto;
   const effectiveVerificationBadge = verificationBadge;
   const currentVerificationLevel = effectiveVerificationBadge
     ? badgeLevelByType[effectiveVerificationBadge]
@@ -517,9 +597,23 @@ export default function PerfilPrestador() {
 
       await setDoc(
         doc(db, "users", user.uid),
-        { photoUrl: url },
+        {
+          photoUrl: url,
+          profileVisible:
+            verificationStatus === "approved" &&
+            !profilePaused &&
+            subscriptionStatus !== "past_due",
+        },
         { merge: true }
       );
+
+      if (
+        verificationStatus === "approved" &&
+        !profilePaused &&
+        subscriptionStatus !== "past_due"
+      ) {
+        setProfileVisible(true);
+      }
 
       showSuccess("Foto de perfil actualizada");
     } catch (uploadError) {
@@ -870,8 +964,8 @@ export default function PerfilPrestador() {
     ) {
       setError(
         selectedVerificationLevel === 1
-          ? "Sube una foto de verificacion para solicitar bronce"
-          : "Sube un video de verificacion para solicitar plata"
+          ? "Sube una foto sosteniendo un papel que diga BelaClub"
+          : "Sube un video sosteniendo un papel que diga BelaClub"
       );
       return;
     }
@@ -892,6 +986,8 @@ export default function PerfilPrestador() {
           badgeVerificationStatus: "pending",
           badgeVerificationLevel: selectedVerificationLevel,
           badgeVerificationVideoUrl: evidenceUrl,
+          badgeVerificationEvidenceType:
+            selectedVerificationLevel === 1 ? "photo" : "video",
           badgeVerificationRequestedAt: serverTimestamp(),
         },
         { merge: true }
@@ -943,7 +1039,10 @@ export default function PerfilPrestador() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] pt-14 text-white sm:pt-16">
+    <div
+      className="min-h-screen bg-[#050505] pt-14 text-white sm:pt-16"
+      suppressHydrationWarning
+    >
       <Header />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
@@ -959,12 +1058,38 @@ export default function PerfilPrestador() {
           </div>
         )}
 
+        {!hasProfilePhoto && (
+          <div className="mb-4 rounded-lg border border-amber-300/25 bg-amber-300/10 p-4 shadow-lg shadow-black/20">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-amber-100">
+                  Sube una foto de perfil para aparecer en escorts
+                </p>
+                <p className="mt-1 text-xs leading-5 text-amber-50/75">
+                  Tu perfil puede estar aprobado, pero no se mostrara en la
+                  pagina principal hasta que tengas una foto principal.
+                </p>
+              </div>
+              <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-amber-200/30 bg-amber-300/15 px-4 text-xs font-semibold text-amber-50 transition hover:bg-amber-300/20">
+                {uploadingProfile ? "Subiendo..." : "Subir foto"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  disabled={uploadingProfile}
+                  onChange={handleProfilePhoto}
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
         <section className="rounded-lg border border-white/[0.08] bg-[#101012] p-4 shadow-2xl shadow-black/25">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-            <aside className="flex items-center gap-4 lg:w-[360px]">
-              <div className="flex shrink-0 flex-col items-start gap-2">
+          <div className="flex flex-col gap-4">
+            <aside className="flex flex-col gap-4 lg:flex-row lg:items-start">
+              <div className="flex shrink-0 flex-col items-start gap-3 sm:w-40 sm:items-center">
                 <div
-                  className="relative h-28 w-28 overflow-hidden rounded-full border border-white/20 bg-zinc-900 shadow-lg shadow-black/30 ring-4 ring-white/[0.04] sm:h-32 sm:w-32"
+                  className="relative h-32 w-32 overflow-hidden rounded-full border-2 border-white/80 bg-zinc-900 shadow-xl shadow-black/35 ring-4 ring-white/[0.04] sm:h-36 sm:w-36"
                   onClick={() => openExpanded(0)}
                 >
                   <Image
@@ -982,14 +1107,29 @@ export default function PerfilPrestador() {
                   )}
                 </div>
                 {effectiveVerificationBadge && (
-                  <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 text-[11px] font-semibold text-emerald-100 shadow-lg shadow-black/20">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                    {effectiveBadgeLabel}
+                  <span
+                    className="inline-flex h-7 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2.5 text-[11px] font-semibold text-neutral-100 shadow-lg shadow-black/20"
+                    aria-label={`Nivel ${effectiveBadgeLabel}`}
+                    title={`Nivel ${effectiveBadgeLabel}`}
+                  >
+                    <VerificationGem
+                      badge={effectiveVerificationBadge}
+                      className={
+                        effectiveVerificationBadge === "platinum"
+                          ? "h-4.5 w-4.5 text-white"
+                          : effectiveVerificationBadge === "gold"
+                            ? "h-4 w-4 text-amber-200"
+                            : effectiveVerificationBadge === "silver"
+                              ? "h-4 w-4 text-slate-100"
+                              : "h-4 w-4 text-[#d79263]"
+                      }
+                    />
+                    <span className="text-neutral-300">Aprobado</span>
                   </span>
                 )}
               </div>
 
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 pt-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs font-medium text-neutral-500">Perfil</p>
                   <span
@@ -1004,17 +1144,104 @@ export default function PerfilPrestador() {
                 <p className="mt-1 text-xs text-neutral-500">
                   {profilePaused
                     ? "Pausado por ti"
-                    : profileVisible
+                    : visiblePublicly
                       ? "Visible publicamente"
-                      : "Oculto por verificacion"}
+                      : hasProfilePhoto
+                        ? "Oculto por verificacion"
+                        : "Oculto: falta foto de perfil"}
                 </p>
                 {/* legacy visibility copy removed */}
                 <p className="hidden" aria-hidden="true">
-                  {profileVisible ? "Visible públicamente" : "Oculto por verificación"}
+                  {visiblePublicly ? "Visible públicamente" : "Oculto"}
                 </p>
 
+                <div className="mt-3 grid max-w-sm gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditMode((value) => !value)}
+                    className={`group inline-flex h-7 items-center justify-start gap-2 rounded-md px-2 text-sm font-semibold transition ${
+                      editMode
+                        ? "bg-white/[0.06] text-neutral-100 hover:bg-white/[0.09]"
+                        : "text-neutral-100 hover:bg-blue-500/10 hover:text-blue-100"
+                    }`}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 text-blue-300"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                    {editMode ? "Cerrar edicion" : "Editar perfil"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={updatingPause || verificationStatus !== "approved"}
+                    onClick={() => setShowPauseModal(true)}
+                    className={`inline-flex h-7 items-center justify-start gap-2 rounded-md px-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      profilePaused
+                        ? "text-emerald-100 hover:bg-emerald-400/10"
+                        : "text-neutral-100 hover:bg-amber-400/10 hover:text-amber-100"
+                    }`}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`h-4 w-4 ${
+                        profilePaused ? "text-emerald-300" : "text-amber-300"
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      {profilePaused ? (
+                        <path d="m5 3 14 9-14 9V3Z" />
+                      ) : (
+                        <>
+                          <path d="M10 4H6v16h4V4Z" />
+                          <path d="M18 4h-4v16h4V4Z" />
+                        </>
+                      )}
+                    </svg>
+                    {profilePaused ? "Reactivar perfil" : "Pausar perfil"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      buyingPromotion ||
+                      verificationStatus !== "approved" ||
+                      !hasProfilePhoto
+                    }
+                    onClick={() => setShowPromotionModal(true)}
+                    className="inline-flex h-7 items-center justify-start gap-2 rounded-md px-2 text-sm font-semibold text-neutral-100 transition hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 text-cyan-300"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 3v18" />
+                      <path d="m6 9 6-6 6 6" />
+                      <path d="M5 21h14" />
+                    </svg>
+                    {promotionActive ? "Extender promocion" : "Promocionar perfil"}
+                  </button>
+                </div>
+
                 {(
-                  <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/20 p-1.5">
+                  <div className="mt-3 max-w-sm rounded-lg border border-white/[0.08] bg-black/20 p-1.5">
                     {effectiveVerificationBadge ? (
                       <div className="grid gap-1.5">
                         {badgeVerificationStatus === "pending" && (
@@ -1087,90 +1314,102 @@ export default function PerfilPrestador() {
                 </label>
                 )}
               </div>
+
+              <div
+                id="video-del-dia"
+                className="scroll-mt-24 rounded-lg border border-sky-300/12 bg-[linear-gradient(135deg,rgba(14,165,233,0.08),rgba(10,10,11,0.96)_42%,rgba(10,10,11,1))] p-4 shadow-xl shadow-black/20 lg:ml-auto lg:min-h-[190px] lg:flex-1"
+              >
+                <div className="flex h-full flex-col justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-sky-300/20 bg-sky-400/10 text-sky-200">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4"
+                          fill="currentColor"
+                        >
+                          <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
+                        </svg>
+                      </span>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">
+                          Video del dia
+                        </p>
+                        <p className="mt-0.5 text-xs text-neutral-400">
+                          Activo por 4 horas en tu tarjeta.
+                        </p>
+                      </div>
+                    </div>
+
+                    {dailyVideoActive && dailyVideoExpiresAt ? (
+                      <p className="mt-3 rounded-md border border-emerald-300/15 bg-emerald-300/10 px-3 py-2 text-xs font-semibold text-emerald-100">
+                        Activo hasta{" "}
+                        {new Date(dailyVideoExpiresAt).toLocaleString("es-CO")}
+                      </p>
+                    ) : (
+                      <p className="mt-3 max-w-md text-xs leading-5 text-neutral-500">
+                        Sube un video corto de maximo{" "}
+                        {DAILY_VIDEO_MAX_SECONDS} segundos para destacar tu
+                        perfil.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    {dailyVideoActive && dailyVideoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setShowDailyVideoModal(true)}
+                        className="inline-flex h-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-neutral-200 transition hover:bg-white/[0.08] hover:text-white"
+                      >
+                        Ver activo
+                      </button>
+                    )}
+                    <label
+                      className={`inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold text-white shadow-lg shadow-sky-950/20 transition ${
+                        uploadingDailyVideo ||
+                        verificationStatus !== "approved" ||
+                        !hasProfilePhoto
+                          ? "cursor-not-allowed bg-sky-700/60 opacity-60"
+                          : "bg-sky-600 hover:bg-sky-500"
+                      }`}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="currentColor"
+                      >
+                        <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
+                      </svg>
+                      {uploadingDailyVideo
+                        ? "Subiendo..."
+                        : dailyVideoActive
+                          ? "Reemplazar video"
+                          : "Subir video"}
+                      <input
+                        type="file"
+                        accept="video/*"
+                        hidden
+                        disabled={
+                          uploadingDailyVideo ||
+                          verificationStatus !== "approved" ||
+                          !hasProfilePhoto
+                        }
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) void uploadDailyVideo(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
             </aside>
 
-            <div className="flex-1">
-              <div className="rounded-lg border border-white/[0.08] bg-black/25 p-2">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={() => setEditMode((value) => !value)}
-                  className={`group flex h-11 items-center justify-center gap-2 rounded-md border px-4 text-xs font-semibold transition ${
-                    editMode
-                      ? "border-white/10 bg-white/[0.05] text-neutral-100 hover:bg-white/[0.08]"
-                      : "border-white/10 bg-white/[0.035] text-neutral-100 hover:border-blue-300/35 hover:bg-blue-500/10 hover:text-blue-100"
-                  }`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4 text-blue-300"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                  {editMode ? "Cerrar edicion" : "Editar perfil"}
-                </button>
-                <button
-                  type="button"
-                  disabled={updatingPause || verificationStatus !== "approved"}
-                  onClick={() => setShowPauseModal(true)}
-                  className={`flex h-11 items-center justify-center gap-2 rounded-md border px-4 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    profilePaused
-                      ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15"
-                      : "border-white/10 bg-white/[0.035] text-neutral-100 hover:border-amber-300/35 hover:bg-amber-400/10 hover:text-amber-100"
-                  }`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className={`h-4 w-4 ${
-                      profilePaused ? "text-emerald-300" : "text-amber-300"
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    {profilePaused ? (
-                      <path d="m5 3 14 9-14 9V3Z" />
-                    ) : (
-                      <>
-                        <path d="M10 4H6v16h4V4Z" />
-                        <path d="M18 4h-4v16h4V4Z" />
-                      </>
-                    )}
-                  </svg>
-                  {profilePaused ? "Reactivar perfil" : "Pausar perfil"}
-                </button>
-                <button
-                  type="button"
-                  disabled={buyingPromotion || verificationStatus !== "approved"}
-                  onClick={() => setShowPromotionModal(true)}
-                  className="flex h-11 items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-4 text-xs font-semibold text-neutral-100 transition hover:border-cyan-300/35 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4 text-cyan-300"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 3v18" />
-                    <path d="m6 9 6-6 6 6" />
-                    <path d="M5 21h14" />
-                  </svg>
-                  {promotionActive ? "Extender promocion" : "Promocionar perfil"}
-                </button>
-              </div>
+            <div>
               {editMode && (
-                <div className="mt-2 border-t border-white/[0.08] pt-2">
+                <div className="rounded-lg border border-white/[0.08] bg-black/25 p-2">
                   <button
                     type="button"
                     onClick={saveProfile}
@@ -1194,7 +1433,6 @@ export default function PerfilPrestador() {
                   </button>
                 </div>
               )}
-              </div>
 
               {editMode && (
               <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/25 p-3">
@@ -1442,7 +1680,11 @@ export default function PerfilPrestador() {
 
             <button
               type="button"
-              disabled={buyingPromotion || verificationStatus !== "approved"}
+              disabled={
+                buyingPromotion ||
+                verificationStatus !== "approved" ||
+                !hasProfilePhoto
+              }
               onClick={() => void buyPromotion()}
               className="rounded-full border border-blue-300/30 bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-950/25 transition hover:-translate-y-0.5 hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
             >
@@ -1455,79 +1697,9 @@ export default function PerfilPrestador() {
           </div>
         </section>
 
-        <section
-          id="video-del-dia"
-          className="mt-4 scroll-mt-24 rounded-lg border border-sky-300/15 bg-[linear-gradient(135deg,rgba(14,165,233,0.10),rgba(16,16,18,0.96)_45%,rgba(16,16,18,1))] p-4 shadow-2xl shadow-black/20 sm:p-5"
-        >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">
-                Video del dia
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-white">
-                Destaca tu perfil durante 4 horas
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-400">
-                Sube un video corto de maximo {DAILY_VIDEO_MAX_SECONDS} segundos.
-                Mientras este activo, tu tarjeta aparece primero y los clientes
-                veran el boton de video.
-              </p>
-              {dailyVideoActive && dailyVideoExpiresAt && (
-                <p className="mt-2 text-xs font-semibold text-emerald-200">
-                  Activo hasta{" "}
-                  {new Date(dailyVideoExpiresAt).toLocaleString("es-CO")}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {dailyVideoActive && dailyVideoUrl && (
-                <button
-                  type="button"
-                  onClick={() => setShowDailyVideoModal(true)}
-                  className="inline-flex h-11 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.08] hover:text-white"
-                >
-                  Ver activo
-                </button>
-              )}
-              <label
-                className={`inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold text-white shadow-lg shadow-sky-950/20 transition ${
-                  uploadingDailyVideo || verificationStatus !== "approved"
-                    ? "cursor-not-allowed bg-sky-700/60 opacity-60"
-                    : "bg-sky-600 hover:bg-sky-500"
-                }`}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="currentColor"
-                >
-                  <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
-                </svg>
-                {uploadingDailyVideo
-                  ? "Subiendo..."
-                  : dailyVideoActive
-                    ? "Reemplazar video"
-                    : "Subir video del dia"}
-                <input
-                  type="file"
-                  accept="video/*"
-                  hidden
-                  disabled={uploadingDailyVideo || verificationStatus !== "approved"}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = "";
-                    if (file) void uploadDailyVideo(file);
-                  }}
-                />
-              </label>
-            </div>
-          </div>
-        </section>
-
         <section className="mt-4 rounded-lg border border-white/[0.08] bg-[#101012] p-5 shadow-2xl shadow-black/20">
-          <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+          <div className="relative flex flex-col gap-4 border-b border-white/[0.08] pb-5 sm:min-h-[92px] sm:block">
+            <div className="sm:pr-[470px]">
               <h2 className="text-2xl font-semibold text-neutral-50">Galería</h2>
               <p className="mt-1 text-sm text-neutral-500">
                 Tiempo de video: {formatVideoTime(videoSecondsUsed)} /{" "}
@@ -1535,13 +1707,17 @@ export default function PerfilPrestador() {
               </p>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-3">
-              {(hasReachedVideoTimeLimit || showVideoTimePurchase) && (
+            <div
+              className={`grid w-full gap-2 sm:absolute sm:right-0 sm:top-0 sm:w-auto sm:grid-cols-2 ${
+                showVideoTimeAction ? "sm:min-w-[420px] lg:grid-cols-3" : "sm:min-w-[310px]"
+              }`}
+            >
+              {showVideoTimeAction && (
                 <button
                   type="button"
                   disabled={buyingVideoTime}
                   onClick={() => void buyExtraVideoTime()}
-                  className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-6 py-3 text-center text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-12 items-center justify-center rounded-md border border-emerald-400/30 bg-emerald-400/10 px-4 text-center text-xs font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {buyingVideoTime
                     ? "Comprando..."
@@ -1551,8 +1727,28 @@ export default function PerfilPrestador() {
                 </button>
               )}
 
-              <label className="cursor-pointer rounded-md border border-white/[0.08] bg-white/[0.03] px-6 py-3 text-center text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]">
-                Subir público
+              <label className="group flex h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.035] px-4 text-center text-xs font-semibold text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition group-hover:border-white/20 group-hover:text-white">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <path d="m17 8-5-5-5 5" />
+                    <path d="M12 3v12" />
+                  </svg>
+                </span>
+                <span className="flex flex-col items-start leading-tight">
+                  <span>Subir publico</span>
+                  <span className="text-[10px] font-medium text-neutral-500">
+                    Visible gratis
+                  </span>
+                </span>
                 <input
                   type="file"
                   accept="image/*,video/*"
@@ -1565,11 +1761,17 @@ export default function PerfilPrestador() {
                 />
               </label>
 
-              <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-blue-600 px-6 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-blue-950/25 transition hover:bg-blue-500">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/15 text-xs">
+              <label className="group relative flex h-12 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-md border border-emerald-300/30 bg-emerald-500 px-4 text-center text-xs font-semibold text-white shadow-lg shadow-emerald-950/30 transition hover:-translate-y-0.5 hover:border-emerald-100/50 hover:bg-emerald-400">
+                <span className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.22),transparent_34%)] opacity-80" />
+                <span className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-black/15 text-sm shadow-inner">
                   $
                 </span>
-                Subir privado
+                <span className="relative flex flex-col items-start leading-tight">
+                  <span>Subir privado</span>
+                  <span className="text-[10px] font-medium text-emerald-950/80">
+                    Contenido pago
+                  </span>
+                </span>
                 <input
                   type="file"
                   accept="image/*,video/*"
@@ -1897,6 +2099,26 @@ export default function PerfilPrestador() {
 
             {(selectedVerificationLevel === 1 ||
               selectedVerificationLevel === 2) && (
+              <div className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-xs leading-5 text-amber-50">
+                {selectedVerificationLevel === 1 ? (
+                  <>
+                    La foto debe mostrarte sosteniendo un papel que diga
+                    BelaClub. Debe verse con claridad tu rostro y tu cuerpo
+                    completo para validar tus atributos fisicos.
+                  </>
+                ) : (
+                  <>
+                    En el video debes sostener un papel que diga BelaClub y
+                    decir: soy parte de BelaClub. Debe verse con claridad tu
+                    rostro y tu cuerpo completo para validar tus atributos
+                    fisicos.
+                  </>
+                )}
+              </div>
+            )}
+
+            {(selectedVerificationLevel === 1 ||
+              selectedVerificationLevel === 2) && (
               <label className="mt-5 block cursor-pointer rounded-lg border border-dashed border-white/15 bg-black/20 p-4 text-center text-sm text-neutral-300 transition hover:bg-white/[0.04]">
                 {verificationFile
                   ? verificationFile.name
@@ -2006,4 +2228,3 @@ export default function PerfilPrestador() {
     </div>
   );
 }
-

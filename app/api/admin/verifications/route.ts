@@ -33,6 +33,7 @@ type ProviderVerification = {
   badgeVerificationStatus?: BadgeVerificationStatus;
   badgeVerificationLevel?: 1 | 2 | 3 | 4;
   badgeVerificationVideoUrl?: string | null;
+  badgeVerificationEvidenceType?: "photo" | "video" | null;
   badgeVerificationRequestedAt?: string | null;
   blockedAt?: string | null;
   subscriptionStatus?: string | null;
@@ -108,6 +109,8 @@ export async function GET(request: Request) {
           badgeVerificationStatus: data.badgeVerificationStatus,
           badgeVerificationLevel: data.badgeVerificationLevel,
           badgeVerificationVideoUrl: data.badgeVerificationVideoUrl || null,
+          badgeVerificationEvidenceType:
+            data.badgeVerificationEvidenceType || null,
           badgeVerificationRequestedAt: toDateString(
             data.badgeVerificationRequestedAt
           ),

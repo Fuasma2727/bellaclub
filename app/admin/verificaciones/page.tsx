@@ -39,6 +39,7 @@ type ProviderVerification = {
   badgeVerificationStatus?: BadgeVerificationStatus;
   badgeVerificationLevel?: 1 | 2 | 3 | 4;
   badgeVerificationVideoUrl?: string | null;
+  badgeVerificationEvidenceType?: "photo" | "video" | null;
   badgeVerificationRequestedAt?: string | null;
   blockedAt?: string | null;
   subscriptionStatus?: string | null;
@@ -622,6 +623,15 @@ export default function AdminVerificationsPage() {
     const subscriptionAction: VerificationAction = subscriptionDisabled
       ? "enableSubscription"
       : "disableSubscription";
+    const evidenceUrl =
+      provider.badgeVerificationVideoUrl || provider.verificationPhotoUrl || "";
+    const evidenceType =
+      provider.badgeVerificationEvidenceType ||
+      (provider.badgeVerificationLevel === 2 ? "video" : "photo");
+    const evidenceLabel =
+      evidenceType === "video"
+        ? "Video de verificacion privado"
+        : "Foto de verificacion privada";
 
     return (
       <div className="mt-3 space-y-3 border-t border-white/[0.08] pt-3">
@@ -707,22 +717,25 @@ export default function AdminVerificationsPage() {
           )}
         </div>
 
-        {isBadgeRequest && (
+        {(isBadgeRequest || evidenceUrl) && (
           <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200/80">
               Evidencia de verificacion
             </p>
-            {provider.badgeVerificationVideoUrl &&
-            provider.badgeVerificationLevel === 2 ? (
+            <p className="mt-1 text-xs text-emerald-50/80">
+              {evidenceLabel}. Este contenido es solo para revision del
+              administrador y no se muestra publicamente.
+            </p>
+            {evidenceUrl && evidenceType === "video" ? (
               <video
-                src={provider.badgeVerificationVideoUrl}
+                src={evidenceUrl}
                 controls
                 className="mt-3 aspect-video w-full rounded-md bg-black object-contain"
               />
-            ) : provider.badgeVerificationVideoUrl ? (
+            ) : evidenceUrl ? (
               <div className="relative mt-3 aspect-video overflow-hidden rounded-md bg-black">
                 <Image
-                  src={provider.badgeVerificationVideoUrl}
+                  src={evidenceUrl}
                   alt={`Evidencia de verificacion de ${
                     provider.email || "prestador"
                   }`}

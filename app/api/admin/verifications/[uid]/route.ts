@@ -92,9 +92,11 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     if (action === "approve") {
+      const hasProfilePhoto = Boolean(userData.photoUrl);
+
       await userRef.update({
         isVerified: true,
-        profileVisible: true,
+        profileVisible: hasProfilePhoto,
         verificationStatus: "approved",
         blocked: false,
         blockedReason: adminFieldValue.delete(),
@@ -120,6 +122,7 @@ export async function PATCH(request: Request, { params }: Params) {
     if (action === "verifyVisit") {
       const level = Number(userData.badgeVerificationLevel || 0);
       const badge = badgeByLevel(level);
+      const hasProfilePhoto = Boolean(userData.photoUrl);
 
       if (!badge || userData.badgeVerificationStatus !== "pending") {
         return NextResponse.json(
@@ -130,7 +133,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
       await userRef.update({
         isVerified: true,
-        profileVisible: true,
+        profileVisible: hasProfilePhoto,
         verificationStatus: "approved",
         blocked: false,
         blockedReason: adminFieldValue.delete(),
@@ -189,7 +192,9 @@ export async function PATCH(request: Request, { params }: Params) {
       await userRef.update({
         blocked: false,
         blockedReason: adminFieldValue.delete(),
-        profileVisible: userData.verificationStatus === "approved",
+        profileVisible:
+          userData.verificationStatus === "approved" &&
+          Boolean(userData.photoUrl),
         subscriptionStatus: "admin_override",
         subscriptionManualOverride: true,
         subscriptionAmount: PROVIDER_MONTHLY_FEE,
@@ -308,7 +313,9 @@ export async function PATCH(request: Request, { params }: Params) {
       await userRef.update({
         blocked: false,
         blockedReason: adminFieldValue.delete(),
-        profileVisible: userData.verificationStatus === "approved",
+        profileVisible:
+          userData.verificationStatus === "approved" &&
+          Boolean(userData.photoUrl),
         subscriptionStatus:
           userData.blockedReason === "subscription_unpaid"
             ? "admin_override"
