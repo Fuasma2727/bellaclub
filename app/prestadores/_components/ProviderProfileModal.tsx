@@ -67,6 +67,8 @@ export default function ProviderProfileModal({
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 px-3 py-3 backdrop-blur-sm sm:px-4 sm:py-6"
       onClick={onClose}
+      onContextMenu={(event) => event.preventDefault()}
+      onDragStart={(event) => event.preventDefault()}
     >
       <div
         className="relative max-h-[calc(100dvh-24px)] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-lg border border-white/[0.08] bg-[#101012] shadow-2xl shadow-black/50 sm:max-h-[calc(100dvh-48px)]"
@@ -96,6 +98,8 @@ export default function ProviderProfileModal({
                 src={provider.photoUrl || "/default-avatar.png"}
                 alt={providerName}
                 fill
+                draggable={false}
+                onContextMenu={(event) => event.preventDefault()}
                 className="object-cover"
                 sizes="176px"
                 priority
@@ -203,6 +207,7 @@ export default function ProviderProfileModal({
                           type="button"
                           className="group relative aspect-square overflow-hidden rounded-md border border-white/[0.08] bg-zinc-900"
                           onClick={() => onMediaClick(item, realIndex)}
+                          onContextMenu={(event) => event.preventDefault()}
                         >
                           {item.url &&
                           item.type === "photo" &&
@@ -212,6 +217,7 @@ export default function ProviderProfileModal({
                               src={item.url}
                               alt="Contenido"
                               draggable={false}
+                              onContextMenu={(event) => event.preventDefault()}
                               className={`absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105 ${
                                 isPrivate ? "scale-110 blur-md" : ""
                               }`}
@@ -221,6 +227,8 @@ export default function ProviderProfileModal({
                               src={item.url}
                               alt="Contenido"
                               fill
+                              draggable={false}
+                              onContextMenu={(event) => event.preventDefault()}
                               className={`object-cover transition duration-300 group-hover:scale-105 ${
                                 isPrivate ? "scale-110 blur-md" : ""
                               }`}
@@ -230,6 +238,10 @@ export default function ProviderProfileModal({
                             <video
                               src={item.url}
                               muted
+                              draggable={false}
+                              controlsList="nodownload noplaybackrate"
+                              disablePictureInPicture
+                              onContextMenu={(event) => event.preventDefault()}
                               className={`absolute inset-0 h-full w-full object-cover ${
                                 isPrivate ? "scale-110 blur-md" : ""
                               }`}

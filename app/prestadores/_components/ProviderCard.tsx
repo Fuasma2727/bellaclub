@@ -182,6 +182,8 @@ export default function ProviderCard({
           src={provider.photoUrl || "/default-avatar.png"}
           alt={name}
           fill
+          draggable={false}
+          onContextMenu={(event) => event.preventDefault()}
           className="object-cover transition duration-300 group-hover:scale-105"
           sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
         />

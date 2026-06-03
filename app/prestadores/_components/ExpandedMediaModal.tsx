@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { MediaItem } from "./types";
 
 type ExpandedMediaModalProps = {
   item: MediaItem;
-  watermarkText?: string;
   canGoNext?: boolean;
   canGoPrevious?: boolean;
   onNext?: () => void;
@@ -16,7 +15,6 @@ type ExpandedMediaModalProps = {
 
 export default function ExpandedMediaModal({
   item,
-  watermarkText,
   canGoNext = false,
   canGoPrevious = false,
   onNext,
@@ -24,18 +22,30 @@ export default function ExpandedMediaModal({
   onClose,
 }: ExpandedMediaModalProps) {
   const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const protectedContent = Boolean(item.private);
-  const watermark = useMemo(() => {
-    const label = watermarkText?.trim() || "Usuario verificado";
-    const date = new Date().toLocaleDateString("es-CO");
-    return `BelaClub · ${label} · ${date}`;
-  }, [watermarkText]);
+  const overlayTimeout = useRef<number | null>(null);
+  const [securityOverlay, setSecurityOverlay] = useState(false);
+  const protectedContent = Boolean(item.url);
+  const watermark = "BelaClub";
 
   useEffect(() => {
     if (!protectedContent) return;
 
+    const showProtectionOverlay = () => {
+      setSecurityOverlay(true);
+
+      if (overlayTimeout.current) {
+        window.clearTimeout(overlayTimeout.current);
+      }
+
+      overlayTimeout.current = window.setTimeout(() => {
+        setSecurityOverlay(false);
+        overlayTimeout.current = null;
+      }, 2800);
+    };
+
     const blockEvent = (event: Event) => {
       event.preventDefault();
+      showProtectionOverlay();
     };
 
     const blockKeys = (event: KeyboardEvent) => {
@@ -52,6 +62,7 @@ export default function ExpandedMediaModal({
       if (blockedCombo || blockedDevTools || key === "printscreen") {
         event.preventDefault();
         event.stopPropagation();
+        showProtectionOverlay();
 
         if (key === "printscreen") {
           void navigator.clipboard?.writeText("");
@@ -59,16 +70,30 @@ export default function ExpandedMediaModal({
       }
     };
 
+    const blockPrintScreenKeyUp = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "printscreen") return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      showProtectionOverlay();
+      void navigator.clipboard?.writeText("");
+    };
+
     document.addEventListener("contextmenu", blockEvent);
     document.addEventListener("dragstart", blockEvent);
     document.addEventListener("selectstart", blockEvent);
     window.addEventListener("keydown", blockKeys, true);
+    window.addEventListener("keyup", blockPrintScreenKeyUp, true);
 
     return () => {
+      if (overlayTimeout.current) {
+        window.clearTimeout(overlayTimeout.current);
+      }
       document.removeEventListener("contextmenu", blockEvent);
       document.removeEventListener("dragstart", blockEvent);
       document.removeEventListener("selectstart", blockEvent);
       window.removeEventListener("keydown", blockKeys, true);
+      window.removeEventListener("keyup", blockPrintScreenKeyUp, true);
     };
   }, [protectedContent]);
 
@@ -172,6 +197,23 @@ export default function ExpandedMediaModal({
               Contenido protegido
             </div>
           </>
+        )}
+
+        {securityOverlay && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/95 px-6 text-center backdrop-blur-md">
+            <div className="max-w-sm rounded-lg border border-white/10 bg-white/[0.04] px-5 py-4 shadow-2xl shadow-black/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+                BelaClub
+              </p>
+              <p className="mt-2 text-lg font-semibold text-white">
+                Contenido protegido
+              </p>
+              <p className="mt-2 text-sm leading-5 text-neutral-400">
+                Las descargas, capturas y copias no estan permitidas dentro de
+                la plataforma.
+              </p>
+            </div>
+          </div>
         )}
       </div>
     </div>

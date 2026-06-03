@@ -293,6 +293,7 @@ export default function Header() {
                 height={36}
                 className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
                 priority
+                suppressHydrationWarning
               />
               <span className="hidden truncate text-lg font-bold text-white min-[360px]:inline sm:text-xl">
                 BelaClub
@@ -323,6 +324,7 @@ export default function Header() {
                 width={36}
                 height={36}
                 className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
+                suppressHydrationWarning
               />
               <span className="hidden truncate text-lg font-bold text-white min-[360px]:inline sm:text-xl">
                 BelaClub

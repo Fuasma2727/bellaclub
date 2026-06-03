@@ -539,6 +539,8 @@ export default function PrestadoresPage({
     <div
       className="min-h-screen bg-[#050505] pb-16 pt-14 text-white sm:pt-16"
       suppressHydrationWarning
+      onContextMenu={(event) => event.preventDefault()}
+      onDragStart={(event) => event.preventDefault()}
     >
       <Header />
 
@@ -676,6 +678,7 @@ export default function PrestadoresPage({
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
           onClick={() => setDailyVideoProvider(null)}
+          onContextMenu={(event) => event.preventDefault()}
         >
           <div
             className="relative w-full max-w-4xl overflow-hidden rounded-xl border border-white/10 bg-black text-white shadow-2xl shadow-black/60"
@@ -694,6 +697,9 @@ export default function PrestadoresPage({
               controls
               autoPlay
               playsInline
+              controlsList="nodownload noplaybackrate"
+              disablePictureInPicture
+              onContextMenu={(event) => event.preventDefault()}
               className="max-h-[82vh] w-full bg-black object-contain"
             />
           </div>
@@ -764,7 +770,6 @@ export default function PrestadoresPage({
       {expandedMedia && (
         <ExpandedMediaModal
           item={mediaList[currentIndex]}
-          watermarkText={user?.email || user?.uid}
           canGoNext={mediaList.length > 1}
           canGoPrevious={mediaList.length > 1}
           onNext={() => moveExpandedMedia(1)}

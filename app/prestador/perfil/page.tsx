@@ -159,13 +159,13 @@ const verificationOptions = [
     level: 1 as BadgeVerificationLevel,
     badge: "bronze" as VerificationBadge,
     title: "Bronce",
-    text: "Foto sosteniendo un papel que diga BelaClub.",
+    text: "Foto de cuerpo completo sosteniendo un papel que diga BelaClub y la fecha.",
   },
   {
     level: 2 as BadgeVerificationLevel,
     badge: "silver" as VerificationBadge,
     title: "Plata",
-    text: "Video sosteniendo un papel que diga BelaClub.",
+    text: "Video de cuerpo completo sosteniendo un papel que diga BelaClub y la fecha.",
   },
   {
     level: 3 as BadgeVerificationLevel,
@@ -319,6 +319,105 @@ function VerificationGem({
   );
 }
 
+function ProfileGalleryItem({
+  item,
+  isDeleting,
+  onOpen,
+  onDelete,
+}: {
+  item: MediaItem;
+  isDeleting: boolean;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  const retrySrc =
+    retryCount > 0
+      ? `${item.url}${item.url.includes("?") ? "&" : "?"}retry=${retryCount}`
+      : item.url;
+
+  const retryImage = () => {
+    if (retryCount >= 3) {
+      setFailed(true);
+      return;
+    }
+
+    window.setTimeout(() => {
+      setRetryCount((value) => value + 1);
+    }, 900 * (retryCount + 1));
+  };
+
+  return (
+    <div className="group relative aspect-square overflow-hidden rounded-md border border-white/[0.08] bg-zinc-900">
+      <button
+        type="button"
+        className="absolute inset-0 z-10"
+        aria-label="Ver contenido"
+        onClick={onOpen}
+      />
+
+      {item.type === "photo" ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={retrySrc}
+          alt=""
+          draggable={false}
+          onLoad={() => {
+            setLoaded(true);
+            setFailed(false);
+          }}
+          onError={retryImage}
+          className={`absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105 ${
+            loaded && !failed ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ) : (
+        <video
+          src={item.url}
+          muted
+          preload="metadata"
+          controlsList="nodownload noplaybackrate"
+          disablePictureInPicture
+          onLoadedData={() => setLoaded(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+
+      {(!loaded || failed) && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/[0.025] px-4 text-center">
+          <div className="h-8 w-8 rounded-full border border-white/10 border-t-blue-300/80 animate-spin" />
+          <p className="mt-3 text-xs font-semibold text-neutral-300">
+            {failed ? "Procesando imagen" : "Cargando contenido"}
+          </p>
+          <p className="mt-1 text-[11px] leading-4 text-neutral-500">
+            {failed
+              ? "Puede tardar unos segundos en aparecer."
+              : "Preparando vista previa..."}
+          </p>
+        </div>
+      )}
+
+      {item.private && (
+        <span className="absolute bottom-2 left-2 z-20 rounded-full border border-white/10 bg-black/70 px-2 py-1 text-xs text-white backdrop-blur">
+          Privado · ${Number(item.price || 0).toLocaleString("es-CO")}
+        </span>
+      )}
+
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={isDeleting}
+        className="absolute right-2 top-2 z-20 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-xs font-semibold text-white opacity-90 backdrop-blur transition hover:bg-rose-600 disabled:opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
+      >
+        {isDeleting ? "..." : "Eliminar"}
+      </button>
+    </div>
+  );
+}
+
 const getDateValue = (value: ProviderProfile["promotedUntil"]) => {
   if (!value) return null;
   if (typeof value === "string") return value;
@@ -379,7 +478,7 @@ export default function PerfilPrestador() {
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showDailyVideoModal, setShowDailyVideoModal] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [contentPrice, setContentPrice] = useState("");
   const [contentDescription, setContentDescription] = useState("");
   const [selectedVerificationLevel, setSelectedVerificationLevel] =
@@ -632,7 +731,8 @@ export default function PerfilPrestador() {
       file: File,
       isPrivate: boolean,
       forcedPrice?: number,
-      privateDescription?: string
+      privateDescription?: string,
+      showUploadMessage = true
     ) => {
       if (!user) return;
 
@@ -657,7 +757,7 @@ export default function PerfilPrestador() {
               videoSecondsLimit
             )} incluidos. Para subirlo debes comprar tiempo extra.`
           );
-          return;
+          return false;
         }
 
         const url = await uploadFile(file, await user.getIdToken());
@@ -689,13 +789,19 @@ export default function PerfilPrestador() {
 
         setMedia(data.media);
 
-        showSuccess(isPrivate ? "Contenido privado subido" : "Foto pública subida");
+        if (showUploadMessage) {
+          showSuccess(
+            isPrivate ? "Contenido privado subido" : "Foto publica subida"
+          );
+        }
+        return true;
       } catch (uploadError) {
         const text =
           uploadError instanceof Error
             ? uploadError.message
             : "No pudimos subir el contenido";
         setError(text);
+        return false;
       } finally {
         setUploadingMedia(false);
       }
@@ -746,8 +852,27 @@ export default function PerfilPrestador() {
     setExpandedMedia(mediaList[index]);
   };
 
+  const handlePublicUpload = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    let uploadedCount = 0;
+
+    for (const file of files) {
+      const uploaded = await uploadMedia(file, false, undefined, undefined, false);
+      if (uploaded) uploadedCount += 1;
+    }
+
+    if (uploadedCount > 0) {
+      showSuccess(
+        uploadedCount === 1
+          ? "Contenido publico subido"
+          : `${uploadedCount} contenidos publicos subidos`
+      );
+    }
+  };
+
   const handlePrivateUpload = async () => {
-    if (!pendingFile) return;
+    if (pendingFiles.length === 0) return;
 
     const priceNum = Number(contentPrice);
     const description = contentDescription.trim();
@@ -762,10 +887,23 @@ export default function PerfilPrestador() {
       return;
     }
 
-    await uploadMedia(pendingFile, true, priceNum, description);
+    let uploadedCount = 0;
+
+    for (const file of pendingFiles) {
+      const uploaded = await uploadMedia(file, true, priceNum, description, false);
+      if (uploaded) uploadedCount += 1;
+    }
+
+    if (uploadedCount > 0) {
+      showSuccess(
+        uploadedCount === 1
+          ? "Contenido privado subido"
+          : `${uploadedCount} contenidos privados subidos`
+      );
+    }
 
     setShowPriceModal(false);
-    setPendingFile(null);
+    setPendingFiles([]);
     setContentPrice("");
     setContentDescription("");
   };
@@ -964,8 +1102,8 @@ export default function PerfilPrestador() {
     ) {
       setError(
         selectedVerificationLevel === 1
-          ? "Sube una foto sosteniendo un papel que diga BelaClub"
-          : "Sube un video sosteniendo un papel que diga BelaClub"
+          ? "Sube una foto sosteniendo un papel que diga BelaClub y la fecha de hoy"
+          : "Sube un video sosteniendo un papel que diga BelaClub y la fecha de hoy"
       );
       return;
     }
@@ -1753,10 +1891,11 @@ export default function PerfilPrestador() {
                   type="file"
                   accept="image/*,video/*"
                   hidden
+                  multiple
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
+                    const files = Array.from(e.target.files || []);
                     e.target.value = "";
-                    if (file) void uploadMedia(file, false);
+                    if (files.length > 0) void handlePublicUpload(files);
                   }}
                 />
               </label>
@@ -1776,11 +1915,12 @@ export default function PerfilPrestador() {
                   type="file"
                   accept="image/*,video/*"
                   hidden
+                  multiple
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
+                    const files = Array.from(e.target.files || []);
                     e.target.value = "";
-                    if (!file) return;
-                    setPendingFile(file);
+                    if (files.length === 0) return;
+                    setPendingFiles(files);
                     setContentPrice("");
                     setContentDescription("");
                     setShowPriceModal(true);
@@ -1803,48 +1943,13 @@ export default function PerfilPrestador() {
           ) : (
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {media.map((item, index) => (
-                <div
+                <ProfileGalleryItem
                   key={`${item.url}-${index}`}
-                  className="group relative aspect-square overflow-hidden rounded-md border border-white/[0.08] bg-zinc-900"
-                >
-                  <button
-                    type="button"
-                    className="absolute inset-0 z-10"
-                    aria-label="Ver contenido"
-                    onClick={() => openExpanded(index + 1)}
-                  />
-
-                  {item.type === "photo" ? (
-                    <Image
-                      src={item.url}
-                      alt="Contenido del perfil"
-                      fill
-                      className="object-cover transition duration-300 group-hover:scale-105"
-                      sizes="(min-width: 1024px) 25vw, 50vw"
-                    />
-                  ) : (
-                    <video
-                      src={item.url}
-                      muted
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                  )}
-
-                  {item.private && (
-                    <span className="absolute bottom-2 left-2 z-20 rounded-full border border-white/10 bg-black/70 px-2 py-1 text-xs text-white backdrop-blur">
-                      Privado · ${Number(item.price || 0).toLocaleString("es-CO")}
-                    </span>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => void deleteMedia(index)}
-                    disabled={deletingIndex === index}
-                    className="absolute right-2 top-2 z-20 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-xs font-semibold text-white opacity-90 backdrop-blur transition hover:bg-rose-600 disabled:opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
-                  >
-                    {deletingIndex === index ? "..." : "Eliminar"}
-                  </button>
-                </div>
+                  item={item}
+                  isDeleting={deletingIndex === index}
+                  onOpen={() => openExpanded(index + 1)}
+                  onDelete={() => void deleteMedia(index)}
+                />
               ))}
             </div>
           )}
@@ -1952,7 +2057,7 @@ export default function PerfilPrestador() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
           onClick={() => {
             setShowPriceModal(false);
-            setPendingFile(null);
+            setPendingFiles([]);
             setContentPrice("");
             setContentDescription("");
           }}
@@ -1968,11 +2073,19 @@ export default function PerfilPrestador() {
               Define qué hay detrás y cuánto deberá pagar el cliente para
               desbloquearlo.
             </p>
-            {pendingFile?.type.startsWith("video") && (
+            {pendingFiles.some((file) => file.type.startsWith("video")) && (
               <div className="mt-4 rounded-md border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
-                Los primeros 3 minutos de video estan incluidos. Si este video
-                supera tu tiempo disponible, deberas comprar tiempo extra para
-                poder subirlo.
+                Los primeros 3 minutos de video estan incluidos. Si alguno de
+                estos videos supera tu tiempo disponible, deberas comprar
+                tiempo extra para poder subirlo.
+              </div>
+            )}
+
+            {pendingFiles.length > 0 && (
+              <div className="mt-4 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-neutral-300">
+                {pendingFiles.length === 1
+                  ? pendingFiles[0]?.name
+                  : `${pendingFiles.length} archivos seleccionados`}
               </div>
             )}
 
@@ -2025,7 +2138,7 @@ export default function PerfilPrestador() {
                 className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]"
                 onClick={() => {
                   setShowPriceModal(false);
-                  setPendingFile(null);
+                  setPendingFiles([]);
                   setContentPrice("");
                   setContentDescription("");
                 }}
@@ -2103,15 +2216,16 @@ export default function PerfilPrestador() {
                 {selectedVerificationLevel === 1 ? (
                   <>
                     La foto debe mostrarte sosteniendo un papel que diga
-                    BelaClub. Debe verse con claridad tu rostro y tu cuerpo
-                    completo para validar tus atributos fisicos.
+                    BelaClub y la fecha del dia. Debe verse con claridad tu
+                    rostro y cuerpo completo para verificar la veracidad del
+                    perfil.
                   </>
                 ) : (
                   <>
                     En el video debes sostener un papel que diga BelaClub y
-                    decir: soy parte de BelaClub. Debe verse con claridad tu
-                    rostro y tu cuerpo completo para validar tus atributos
-                    fisicos.
+                    la fecha del dia, y decir: soy parte de BelaClub. Debe verse
+                    con claridad tu rostro y cuerpo completo para verificar la
+                    veracidad del perfil.
                   </>
                 )}
               </div>
