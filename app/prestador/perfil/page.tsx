@@ -202,15 +202,16 @@ const createMediaId = () => {
 };
 
 const uploadFile = async (file: File, token: string) => {
-  const formData = new FormData();
-  formData.append("file", file);
-
   const res = await fetch("/api/upload-profile-photo", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
+      "Content-Type": file.type || "application/octet-stream",
+      "x-file-name": encodeURIComponent(file.name),
+      "x-file-size": file.size.toString(),
+      "x-file-type": file.type || "application/octet-stream",
     },
-    body: formData,
+    body: file,
   });
 
   const data = (await res.json()) as UploadResponse;
