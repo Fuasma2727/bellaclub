@@ -18,10 +18,17 @@ type AddMediaBody = {
   item?: ProviderMediaItem;
 };
 
+type AddManyMediaBody = {
+  action?: "addMany";
+  items?: ProviderMediaItem[];
+};
+
 type DeleteMediaBody = {
   action?: "delete";
   mediaId?: string;
 };
+
+const MAX_BATCH_MEDIA = 20;
 
 const isValidMediaItem = (item: unknown): item is ProviderMediaItem => {
   if (!item || typeof item !== "object") return false;
@@ -42,11 +49,14 @@ export async function POST(request: Request) {
       rateLimitKey: "provider-media",
       limit: 80,
       windowMs: 10 * 60 * 1000,
-      maxBodyBytes: 32 * 1024,
+      maxBodyBytes: 128 * 1024,
     });
 
     const decoded = await requireAuthenticatedUser(request);
-    const body = (await request.json()) as AddMediaBody | DeleteMediaBody;
+    const body = (await request.json()) as
+      | AddMediaBody
+      | AddManyMediaBody
+      | DeleteMediaBody;
     const userRef = adminDb.collection("users").doc(decoded.uid);
 
     const result = await adminDb.runTransaction(async (tx) => {
@@ -81,14 +91,66 @@ export async function POST(request: Request) {
         return { media: updated };
       }
 
-      if (body.action !== "add" || !isValidMediaItem(body.item)) {
-        throw new Error("INVALID_MEDIA");
-      }
-
       const videoSecondsUsed = getProviderVideoSecondsUsed(media);
       const videoSecondsLimit = getProviderVideoSecondsLimit(
         user.videoSecondsExtra
       );
+
+      if (body.action === "addMany") {
+        const items = Array.isArray(body.items) ? body.items : [];
+
+        if (
+          items.length === 0 ||
+          items.length > MAX_BATCH_MEDIA ||
+          !items.every(isValidMediaItem)
+        ) {
+          throw new Error("INVALID_MEDIA");
+        }
+
+        let incomingVideoSeconds = 0;
+        const sanitizedItems = items.map((item) => {
+          const incomingDuration =
+            item.type === "video" ? Math.ceil(Number(item.duration || 0)) : 0;
+
+          if (item.type === "video") {
+            if (!incomingDuration || incomingDuration <= 0) {
+              throw new Error("INVALID_VIDEO_DURATION");
+            }
+
+            incomingVideoSeconds += incomingDuration;
+          }
+
+          return {
+            id: item.id,
+            type: item.type,
+            url: item.url,
+            private: Boolean(item.private),
+            price: item.private ? Number(item.price || 0) : null,
+            duration: item.type === "video" ? incomingDuration : null,
+            description: item.private
+              ? String(item.description || "").trim()
+              : "",
+          };
+        });
+
+        if (videoSecondsUsed + incomingVideoSeconds > videoSecondsLimit) {
+          throw new Error("VIDEO_TIME_LIMIT_REACHED");
+        }
+
+        const updated = [...media, ...sanitizedItems];
+
+        tx.update(userRef, {
+          media: updated,
+          mediaUpdatedAt: adminFieldValue.serverTimestamp(),
+        });
+
+        return { media: updated, videoSecondsLimit };
+      }
+
+      if (body.action !== "add" || !isValidMediaItem(body.item)) {
+        throw new Error("INVALID_MEDIA");
+      }
+
       const incomingDuration = Math.ceil(Number(body.item.duration || 0));
 
       if (body.item.type === "video") {

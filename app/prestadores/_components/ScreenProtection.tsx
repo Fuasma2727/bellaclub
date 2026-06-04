@@ -61,14 +61,6 @@ export default function ScreenProtection({
       }
     };
 
-    const protectOnFocusLoss = () => {
-      showOverlay(5000);
-    };
-
-    const protectOnVisibilityChange = () => {
-      if (document.hidden) showOverlay(5000);
-    };
-
     const protectBeforePrint = (event: Event) => {
       event.preventDefault();
       showOverlay(5000);
@@ -77,13 +69,10 @@ export default function ScreenProtection({
 
     document.addEventListener("contextmenu", blockEvent);
     document.addEventListener("dragstart", blockEvent);
-    document.addEventListener("selectstart", blockEvent);
     document.addEventListener("copy", blockEvent);
     document.addEventListener("cut", blockEvent);
-    document.addEventListener("visibilitychange", protectOnVisibilityChange);
     window.addEventListener("keydown", blockKeys, true);
     window.addEventListener("keyup", blockKeys, true);
-    window.addEventListener("blur", protectOnFocusLoss);
     window.addEventListener("beforeprint", protectBeforePrint);
 
     return () => {
@@ -93,16 +82,10 @@ export default function ScreenProtection({
 
       document.removeEventListener("contextmenu", blockEvent);
       document.removeEventListener("dragstart", blockEvent);
-      document.removeEventListener("selectstart", blockEvent);
       document.removeEventListener("copy", blockEvent);
       document.removeEventListener("cut", blockEvent);
-      document.removeEventListener(
-        "visibilitychange",
-        protectOnVisibilityChange
-      );
       window.removeEventListener("keydown", blockKeys, true);
       window.removeEventListener("keyup", blockKeys, true);
-      window.removeEventListener("blur", protectOnFocusLoss);
       window.removeEventListener("beforeprint", protectBeforePrint);
     };
   }, [active]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getFirestore,
   doc,
@@ -491,6 +491,8 @@ export default function PerfilPrestador() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [contentPrice, setContentPrice] = useState("");
   const [contentDescription, setContentDescription] = useState("");
+  const [privateDescriptionError, setPrivateDescriptionError] = useState("");
+  const privateDescriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const [selectedVerificationLevel, setSelectedVerificationLevel] =
     useState<BadgeVerificationLevel>(1);
   const [verificationFile, setVerificationFile] = useState<File | null>(null);
@@ -871,59 +873,81 @@ export default function PerfilPrestador() {
     }
   };
 
-  const uploadMedia = useCallback(
+  const uploadMediaBatch = useCallback(
     async (
-      file: File,
+      files: File[],
       isPrivate: boolean,
       forcedPrice?: number,
-      privateDescription?: string,
-      showUploadMessage = true
+      privateDescription?: string
     ) => {
-      if (!user) return;
+      if (!user || files.length === 0) return 0;
 
       setUploadingMedia(true);
       setError("");
 
       try {
-        const type = file.type.startsWith("video") ? "video" : "photo";
+        const token = await user.getIdToken();
+        const preparedFiles = await Promise.all(
+          files.map(async (file) => {
+            const type: MediaItem["type"] = file.type.startsWith("video")
+              ? "video"
+              : "photo";
+            const duration =
+              type === "video" ? await getVideoDuration(file) : null;
 
-        const duration = type === "video" ? await getVideoDuration(file) : null;
+            return { file, type, duration };
+          })
+        );
+
+        const incomingVideoSeconds = preparedFiles.reduce(
+          (total, item) => total + (item.duration || 0),
+          0
+        );
 
         if (
-          type === "video" &&
-          duration &&
-          videoSecondsUsed + duration > videoSecondsLimit
+          incomingVideoSeconds > 0 &&
+          videoSecondsUsed + incomingVideoSeconds > videoSecondsLimit
         ) {
           setShowVideoTimePurchase(true);
           setError(
-            `Este video dura ${formatVideoTime(
-              duration
-            )} y supera tus ${formatVideoTime(
+            `Estos videos suman ${formatVideoTime(
+              incomingVideoSeconds
+            )} y superan tus ${formatVideoTime(
               videoSecondsLimit
-            )} incluidos. Para subirlo debes comprar tiempo extra.`
+            )} incluidos. Para subirlos debes comprar tiempo extra.`
           );
-          return false;
+          return 0;
         }
 
-        const url = await uploadFile(file, await user.getIdToken());
-        const newItem: MediaItem = {
-          id: createMediaId(),
-          type,
-          url,
-          private: isPrivate,
-          price: isPrivate ? forcedPrice || 0 : null,
-          duration,
-          description: isPrivate ? privateDescription?.trim() || "" : "",
-        };
+        const uploadedItems: MediaItem[] = [];
+        const uploadBatchSize = 4;
+
+        for (let index = 0; index < preparedFiles.length; index += uploadBatchSize) {
+          const group = preparedFiles.slice(index, index + uploadBatchSize);
+          const groupItems = await Promise.all(
+            group.map(async (item) => ({
+              id: createMediaId(),
+              type: item.type,
+              url: await uploadFile(item.file, token),
+              private: isPrivate,
+              price: isPrivate ? forcedPrice || 0 : null,
+              duration: item.duration,
+              description: isPrivate ? privateDescription?.trim() || "" : "",
+            }))
+          );
+
+          uploadedItems.push(...groupItems);
+        }
+
         const res = await fetch("/api/provider-media", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${await user.getIdToken()}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            action: "add",
-            item: newItem,
+            action: "addMany",
+            items: uploadedItems,
           }),
         });
         const data = (await res.json()) as ProviderMediaResponse;
@@ -933,20 +957,14 @@ export default function PerfilPrestador() {
         }
 
         setMedia(data.media);
-
-        if (showUploadMessage) {
-          showSuccess(
-            isPrivate ? "Contenido privado subido" : "Foto publica subida"
-          );
-        }
-        return true;
+        return uploadedItems.length;
       } catch (uploadError) {
         const text =
           uploadError instanceof Error
             ? uploadError.message
             : "No pudimos subir el contenido";
         setError(text);
-        return false;
+        return 0;
       } finally {
         setUploadingMedia(false);
       }
@@ -1000,12 +1018,7 @@ export default function PerfilPrestador() {
   const handlePublicUpload = async (files: File[]) => {
     if (files.length === 0) return;
 
-    let uploadedCount = 0;
-
-    for (const file of files) {
-      const uploaded = await uploadMedia(file, false, undefined, undefined, false);
-      if (uploaded) uploadedCount += 1;
-    }
+    const uploadedCount = await uploadMediaBatch(files, false);
 
     if (uploadedCount > 0) {
       showSuccess(
@@ -1028,16 +1041,22 @@ export default function PerfilPrestador() {
     }
 
     if (!description) {
+      setPrivateDescriptionError(
+        "Agrega una descripcion breve para que el cliente sepa que desbloquea."
+      );
       setError("Agrega una descripción breve del contenido privado");
+      privateDescriptionRef.current?.focus();
       return;
     }
 
-    let uploadedCount = 0;
+    setPrivateDescriptionError("");
 
-    for (const file of pendingFiles) {
-      const uploaded = await uploadMedia(file, true, priceNum, description, false);
-      if (uploaded) uploadedCount += 1;
-    }
+    const uploadedCount = await uploadMediaBatch(
+      pendingFiles,
+      true,
+      priceNum,
+      description
+    );
 
     if (uploadedCount > 0) {
       showSuccess(
@@ -1047,10 +1066,12 @@ export default function PerfilPrestador() {
       );
     }
 
-    setShowPriceModal(false);
-    setPendingFiles([]);
-    setContentPrice("");
-    setContentDescription("");
+    if (uploadedCount > 0) {
+      setShowPriceModal(false);
+      setPendingFiles([]);
+      setContentPrice("");
+      setContentDescription("");
+    }
   };
 
   const buyExtraVideoTime = async () => {
@@ -2196,6 +2217,7 @@ export default function PerfilPrestador() {
                     setPendingFiles(files);
                     setContentPrice("");
                     setContentDescription("");
+                    setPrivateDescriptionError("");
                     setShowPriceModal(true);
                   }}
                 />
@@ -2333,6 +2355,7 @@ export default function PerfilPrestador() {
             setPendingFiles([]);
             setContentPrice("");
             setContentDescription("");
+            setPrivateDescriptionError("");
           }}
         >
           <div
@@ -2371,16 +2394,37 @@ export default function PerfilPrestador() {
               </label>
               <textarea
                 id="privateDescription"
+                ref={privateDescriptionRef}
                 rows={3}
                 maxLength={80}
                 value={contentDescription}
-                onChange={(e) => setContentDescription(e.target.value)}
+                onChange={(e) => {
+                  setContentDescription(e.target.value);
+                  if (privateDescriptionError) {
+                    setPrivateDescriptionError("");
+                  }
+                }}
                 placeholder="Ej: rostro, baile, contenido exclusivo..."
-                className="w-full resize-none rounded-md border border-white/10 bg-black/25 px-3 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-blue-400/80 focus:ring-2 focus:ring-blue-500/20"
+                className={`w-full resize-none rounded-md border bg-black/25 px-3 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 ${
+                  privateDescriptionError
+                    ? "border-rose-400/70 focus:border-rose-300 focus:ring-2 focus:ring-rose-500/25"
+                    : "border-white/10 focus:border-blue-400/80 focus:ring-2 focus:ring-blue-500/20"
+                }`}
               />
-              <p className="mt-1 text-right text-xs text-neutral-500">
-                {contentDescription.length}/80
-              </p>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <p
+                  className={`text-xs ${
+                    privateDescriptionError
+                      ? "text-rose-300"
+                      : "text-neutral-500"
+                  }`}
+                >
+                  {privateDescriptionError || "Describe brevemente el contenido."}
+                </p>
+                <p className="shrink-0 text-xs text-neutral-500">
+                  {contentDescription.length}/80
+                </p>
+              </div>
             </div>
 
             <div className="mt-4">
@@ -2414,6 +2458,7 @@ export default function PerfilPrestador() {
                   setPendingFiles([]);
                   setContentPrice("");
                   setContentDescription("");
+                  setPrivateDescriptionError("");
                 }}
               >
                 Cancelar
