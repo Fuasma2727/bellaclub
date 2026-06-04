@@ -1,7 +1,10 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
-import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 export const runtime = "nodejs";
 
@@ -26,17 +29,12 @@ const getBaseUrl = (request: Request) => {
 
 export async function POST(request: Request) {
   try {
-    const rateLimit = checkRateLimit(`wompi-checkout:${getClientIp(request)}`, {
+    guardMutationRequest(request, {
+      rateLimitKey: "wompi-checkout",
       limit: 20,
       windowMs: 60 * 1000,
+      maxBodyBytes: 4 * 1024,
     });
-
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Demasiados intentos. Intenta de nuevo en un momento." },
-        { status: 429 }
-      );
-    }
 
     if (!PUBLIC_KEY || !INTEGRITY_SECRET) {
       return NextResponse.json(
@@ -139,6 +137,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: `${WOMPI_URL}?${params.toString()}` });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     console.error("Error generando checkout Wompi:", error);
     return NextResponse.json(
       { error: "Error generando el pago" },

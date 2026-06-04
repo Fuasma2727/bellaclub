@@ -3,8 +3,11 @@ import admin from "firebase-admin";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { calculateCommission } from "@/lib/commission";
 import { setLedgerEntry } from "@/lib/ledger";
-import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 const allowedAmounts = [50000, 100000, 300000, 500000];
 
@@ -15,17 +18,12 @@ const createDepositCode = () => {
 
 export async function POST(req: Request) {
   try {
-    const rateLimit = checkRateLimit(`deposit-service:${getClientIp(req)}`, {
+    guardMutationRequest(req, {
+      rateLimitKey: "deposit-service",
       limit: 30,
       windowMs: 60 * 1000,
+      maxBodyBytes: 8 * 1024,
     });
-
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Demasiados intentos. Intenta de nuevo en un momento." },
-        { status: 429 }
-      );
-    }
 
     const decoded = await requireAuthenticatedUser(req);
     const { sellerId, amount } = await req.json();
@@ -207,6 +205,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, code: depositCode }, { status: 200 });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     if (error instanceof Error && error.message === "INSUFFICIENT_BALANCE") {
       return NextResponse.json(
         { error: "Saldo insuficiente" },

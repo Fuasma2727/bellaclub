@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 export const runtime = "nodejs";
 
@@ -37,6 +41,13 @@ const getSafeFilename = (file: File) => {
 
 export async function POST(request: Request) {
   try {
+    guardMutationRequest(request, {
+      rateLimitKey: "upload-profile-photo",
+      limit: 30,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 90 * 1024 * 1024,
+    });
+
     const decoded = await requireAuthenticatedUser(request);
 
     if (!BUNNY_API_KEY) {
@@ -108,6 +119,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: publicUrl });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     const authError = authRouteError(error);
 
     if (authError.status !== 401 || authError.message !== "No autorizado") {

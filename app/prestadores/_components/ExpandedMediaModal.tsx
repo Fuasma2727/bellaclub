@@ -79,11 +79,30 @@ export default function ExpandedMediaModal({
       void navigator.clipboard?.writeText("");
     };
 
+    const protectOnFocusLoss = () => {
+      showProtectionOverlay();
+    };
+
+    const protectOnVisibilityChange = () => {
+      if (document.hidden) showProtectionOverlay();
+    };
+
+    const protectBeforePrint = (event: Event) => {
+      event.preventDefault();
+      showProtectionOverlay();
+      void navigator.clipboard?.writeText("");
+    };
+
     document.addEventListener("contextmenu", blockEvent);
     document.addEventListener("dragstart", blockEvent);
     document.addEventListener("selectstart", blockEvent);
+    document.addEventListener("copy", blockEvent);
+    document.addEventListener("cut", blockEvent);
+    document.addEventListener("visibilitychange", protectOnVisibilityChange);
     window.addEventListener("keydown", blockKeys, true);
     window.addEventListener("keyup", blockPrintScreenKeyUp, true);
+    window.addEventListener("blur", protectOnFocusLoss);
+    window.addEventListener("beforeprint", protectBeforePrint);
 
     return () => {
       if (overlayTimeout.current) {
@@ -92,8 +111,16 @@ export default function ExpandedMediaModal({
       document.removeEventListener("contextmenu", blockEvent);
       document.removeEventListener("dragstart", blockEvent);
       document.removeEventListener("selectstart", blockEvent);
+      document.removeEventListener("copy", blockEvent);
+      document.removeEventListener("cut", blockEvent);
+      document.removeEventListener(
+        "visibilitychange",
+        protectOnVisibilityChange
+      );
       window.removeEventListener("keydown", blockKeys, true);
       window.removeEventListener("keyup", blockPrintScreenKeyUp, true);
+      window.removeEventListener("blur", protectOnFocusLoss);
+      window.removeEventListener("beforeprint", protectBeforePrint);
     };
   }, [protectedContent]);
 

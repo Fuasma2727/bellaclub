@@ -11,6 +11,7 @@ import {
 type ProviderCardProps = {
   provider: Prestador;
   isOpening?: boolean;
+  imagePriority?: boolean;
   onOpen?: (id: string) => void;
   onOpenDailyVideo?: (provider: Prestador) => void;
   afterContent?: ReactNode;
@@ -113,6 +114,7 @@ function VerificationGem({
 export default function ProviderCard({
   provider,
   isOpening = false,
+  imagePriority = false,
   onOpen,
   onOpenDailyVideo,
   afterContent,
@@ -186,6 +188,7 @@ export default function ProviderCard({
           onContextMenu={(event) => event.preventDefault()}
           className="object-cover transition duration-300 group-hover:scale-105"
           sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
+          priority={imagePriority}
         />
 
         {hasDailyVideo && (

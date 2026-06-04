@@ -8,7 +8,7 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
 export const metadata: Metadata = {
   title: "Escorts en Colombia",
   description:
-    "Encuentra escorts en Medellín, La Ceja, Rionegro y otras ciudades de Colombia. Perfiles aprobados, galerias publicas y contacto por WhatsApp en BelaClub.",
+    "Encuentra escorts en Medellín, La Ceja, Rionegro y otras ciudades de Colombia. Perfiles aprobados, galerías públicas y contacto por WhatsApp en BelaClub.",
   keywords: [
     "escorts en Medellín",
     "escorts Medellín",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Escorts en Colombia | BelaClub",
     description:
-      "Escorts en Medellín, La Ceja y Rionegro con perfiles aprobados, galerias publicas y contacto directo por WhatsApp.",
+      "Escorts en Medellín, La Ceja y Rionegro con perfiles aprobados, galerías públicas y contacto directo por WhatsApp.",
     url: "/escorts",
     images: [
       {
@@ -62,7 +62,7 @@ export default function EscortsPage() {
           "@type": "CollectionPage",
           name: "Escorts en Colombia",
           description:
-            "Perfiles aprobados en BelaClub por ciudad, con galerias publicas y contacto por WhatsApp.",
+            "Perfiles aprobados en BelaClub por ciudad, con galerías públicas y contacto por WhatsApp.",
           url: pageUrl,
           isPartOf: {
             "@type": "WebSite",
@@ -74,8 +74,26 @@ export default function EscortsPage() {
       <PrestadoresPage
         pageTitle="Escorts en Colombia"
         pageEyebrow="Explora por ciudad"
-        pageDescription="Encuentra escorts verificadas en Medellín, La Ceja, Rionegro y otras ciudades. Revisa galerias publicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
-        seoCityLinks={cityLinks}
+        pageDescription="Encuentra escorts verificadas en Medellín, La Ceja, Rionegro y otras ciudades. Revisa galerías públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
+        seoCityLinks={[
+          ...cityLinks,
+          ...targetSeoCities.map((city) => ({
+            href: `/prepagos/${city.slug}`,
+            label: `Prepagos en ${city.city}`,
+          })),
+        ]}
+        seoContent={{
+          heading: "Escorts por ciudad en BelaClub",
+          paragraphs: [
+            "BelaClub organiza perfiles aprobados por ciudad para facilitar búsquedas como escorts Medellín, escorts Rionegro, escorts La Ceja y prepagos en Antioquia.",
+            "Cada página de ciudad permite revisar perfiles, fotos públicas, ubicación, zonas disponibles y contacto directo por WhatsApp.",
+          ],
+          zones: ["Medellín", "Rionegro", "La Ceja", "El Poblado", "Laureles", "San Antonio"],
+          relatedLinks: targetSeoCities.flatMap((city) => [
+            { href: `/escorts/${city.slug}`, label: `Escorts en ${city.city}` },
+            { href: `/prepagos/${city.slug}`, label: `Prepagos en ${city.city}` },
+          ]),
+        }}
       />
     </>
   );

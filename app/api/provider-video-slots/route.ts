@@ -7,11 +7,22 @@ import {
   EXTRA_VIDEO_SECONDS,
   EXTRA_VIDEO_TIME_PRICE,
 } from "@/lib/providerMediaLimits";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    guardMutationRequest(request, {
+      rateLimitKey: "provider-video-slots",
+      limit: 12,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 4 * 1024,
+    });
+
     const decoded = await requireAuthenticatedUser(request);
     const userRef = adminDb.collection("users").doc(decoded.uid);
 
@@ -86,6 +97,9 @@ export async function POST(request: Request) {
       ...result,
     });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     if (error instanceof Error) {
       const messages: Record<string, { message: string; status: number }> = {
         USER_NOT_FOUND: { message: "Usuario no encontrado", status: 404 },

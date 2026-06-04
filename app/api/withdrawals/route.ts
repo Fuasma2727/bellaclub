@@ -3,7 +3,10 @@ import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
 import { calculateCommission } from "@/lib/commission";
 import { setLedgerEntry } from "@/lib/ledger";
-import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 const MIN_WITHDRAWAL_AMOUNT = 50000;
 const MAX_WITHDRAWAL_AMOUNT = 5000000;
@@ -29,17 +32,12 @@ const isAllowedValue = <T extends readonly string[]>(
 
 export async function POST(request: Request) {
   try {
-    const rateLimit = checkRateLimit(`withdrawals:${getClientIp(request)}`, {
+    guardMutationRequest(request, {
+      rateLimitKey: "withdrawals",
       limit: 10,
       windowMs: 60 * 1000,
+      maxBodyBytes: 8 * 1024,
     });
-
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Demasiados intentos. Intenta de nuevo en un momento." },
-        { status: 429 }
-      );
-    }
 
     const decoded = await requireAuthenticatedUser(request);
     const body = (await request.json()) as {
@@ -219,6 +217,9 @@ export async function POST(request: Request) {
       status: "pending_wompi",
     });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     if (error instanceof Error && error.message === "ONLY_PROVIDERS") {
       return NextResponse.json(
         { error: "Solo las escorts pueden retirar saldo" },

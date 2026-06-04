@@ -5,6 +5,8 @@ export type ProviderCitySeo = {
   department: string;
   slug: string;
   count: number;
+  zones?: string[];
+  seoIntro?: string;
 };
 
 export const targetSeoCities: ProviderCitySeo[] = [
@@ -13,18 +15,34 @@ export const targetSeoCities: ProviderCitySeo[] = [
     department: "Antioquia",
     slug: "medellin",
     count: 0,
+    zones: [
+      "El Poblado",
+      "Laureles",
+      "Belén",
+      "Estadio",
+      "Centro",
+      "Ciudad del Río",
+    ],
+    seoIntro:
+      "Medellín es una de las ciudades con mayor movimiento para encontrar perfiles por zonas como El Poblado, Laureles, Belén, Estadio, Centro y Ciudad del Río.",
   },
   {
     city: "La Ceja",
     department: "Antioquia",
     slug: "la-ceja",
     count: 0,
+    zones: ["Centro", "zonas cercanas"],
+    seoIntro:
+      "La Ceja conecta usuarios que buscan perfiles en el oriente antioqueño con opciones cercanas y contacto directo.",
   },
   {
     city: "Rionegro",
     department: "Antioquia",
     slug: "rionegro",
     count: 0,
+    zones: ["San Antonio", "Centro"],
+    seoIntro:
+      "Rionegro concentra busquedas en zonas como San Antonio y Centro, con perfiles visibles y contacto directo por WhatsApp.",
   },
 ];
 

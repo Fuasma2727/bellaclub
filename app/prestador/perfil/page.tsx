@@ -23,6 +23,7 @@ import {
   PROVIDER_PROMOTION_DAYS,
   PROVIDER_PROMOTION_PRICE,
 } from "@/lib/providerPromotion";
+import { getProviderZoneOptions } from "@/lib/providerZones";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
@@ -56,6 +57,7 @@ type ProviderProfile = {
   price?: string | number;
   department?: string;
   city?: string;
+  zone?: string;
   whatsapp?: string;
   photoUrl?: string;
   media?: MediaItem[];
@@ -67,6 +69,9 @@ type ProviderProfile = {
   profileVisible?: boolean;
   profilePaused?: boolean;
   subscriptionStatus?: string | null;
+  subscriptionNextChargeAt?: {
+    toDate?: () => Date;
+  } | string | null;
   videoSecondsExtra?: number;
   promotedUntil?: {
     toDate?: () => Date;
@@ -445,6 +450,9 @@ export default function PerfilPrestador() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
     null
   );
+  const [subscriptionNextChargeAt, setSubscriptionNextChargeAt] = useState<
+    string | null
+  >(null);
 
   const [editMode, setEditMode] = useState(false);
   const [name, setName] = useState("");
@@ -452,6 +460,7 @@ export default function PerfilPrestador() {
   const [price, setPrice] = useState("");
   const [department, setDepartment] = useState("");
   const [city, setCity] = useState("");
+  const [zone, setZone] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -478,6 +487,7 @@ export default function PerfilPrestador() {
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showDailyVideoModal, setShowDailyVideoModal] = useState(false);
+  const [showQuickGuide, setShowQuickGuide] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [contentPrice, setContentPrice] = useState("");
   const [contentDescription, setContentDescription] = useState("");
@@ -518,10 +528,109 @@ export default function PerfilPrestador() {
       []
     );
   }, [department]);
+  const zoneOptions = useMemo(() => getProviderZoneOptions(city), [city]);
 
   const status = statusCopy[verificationStatus];
   const hasProfilePhoto = Boolean(photoUrl);
   const visiblePublicly = profileVisible && hasProfilePhoto;
+  const hasBasicInfo = Boolean(
+    name.trim() &&
+      price &&
+      department &&
+      city &&
+      whatsapp.trim() &&
+      description.trim()
+  );
+  const hasGalleryContent = media.length > 0;
+  const profileReadiness = [
+    hasProfilePhoto,
+    hasBasicInfo,
+    verificationStatus === "approved",
+    hasGalleryContent,
+    visiblePublicly,
+  ].filter(Boolean).length;
+  const subscriptionLabel =
+    subscriptionStatus === "active"
+      ? "Mensualidad activa"
+      : subscriptionStatus === "paused"
+        ? "Mensualidad pausada"
+        : subscriptionStatus === "past_due"
+          ? "Mensualidad pendiente"
+          : subscriptionStatus === "admin_override"
+            ? "Activada por admin"
+            : "Pendiente de activar";
+  const subscriptionTone =
+    subscriptionStatus === "active" || subscriptionStatus === "admin_override"
+      ? "emerald"
+      : subscriptionStatus === "paused"
+        ? "amber"
+        : subscriptionStatus === "past_due"
+          ? "rose"
+          : "blue";
+  const subscriptionStatusClass =
+    subscriptionTone === "emerald"
+      ? "border-emerald-400/20 bg-emerald-400/[0.07] text-emerald-100"
+      : subscriptionTone === "amber"
+        ? "border-amber-400/20 bg-amber-400/[0.07] text-amber-100"
+        : subscriptionTone === "rose"
+          ? "border-rose-400/20 bg-rose-400/[0.07] text-rose-100"
+          : "border-blue-400/20 bg-blue-400/[0.07] text-blue-100";
+  const formatProfileDate = (value: string | null) => {
+    if (!value) return "";
+    return new Date(value).toLocaleDateString("es-CO", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+  const onboardingSteps = [
+    {
+      label: "Foto principal",
+      description: hasProfilePhoto
+        ? "Tu tarjeta ya tiene portada."
+        : "Sube una foto para poder aparecer en escorts.",
+      done: hasProfilePhoto,
+      action: "photo",
+      cta: "Subir foto",
+    },
+    {
+      label: "Datos publicos",
+      description: hasBasicInfo
+        ? "Nombre, ubicacion, precio y WhatsApp completos."
+        : "Completa nombre, ubicacion, precio, WhatsApp y descripcion.",
+      done: hasBasicInfo,
+      action: "profile",
+      cta: "Completar datos",
+    },
+    {
+      label: "Verificacion",
+      description:
+        verificationStatus === "approved"
+          ? "Tu perfil ya fue aprobado."
+          : "Solicita una verificacion para activar tu perfil.",
+      done: verificationStatus === "approved",
+      action: "verification",
+      cta: "Solicitar",
+    },
+    {
+      label: "Galeria",
+      description: hasGalleryContent
+        ? "Ya tienes contenido visible para clientes."
+        : "Sube contenido publico o privado para mejorar tu perfil.",
+      done: hasGalleryContent,
+      action: "gallery",
+      cta: "Ir a galeria",
+    },
+    {
+      label: "Publicacion",
+      description: visiblePublicly
+        ? "Tu perfil esta visible publicamente."
+        : "Cuando todo este listo aparecera en la pagina principal.",
+      done: visiblePublicly,
+      action: "status",
+      cta: "Ver estado",
+    },
+  ];
   const effectiveVerificationBadge = verificationBadge;
   const currentVerificationLevel = effectiveVerificationBadge
     ? badgeLevelByType[effectiveVerificationBadge]
@@ -545,12 +654,45 @@ export default function PerfilPrestador() {
     setError("");
     window.setTimeout(() => setMessage(""), 2500);
   };
+  const scrollToProfileSection = (id: string) => {
+    window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+  };
+  const handleOnboardingAction = (action: string) => {
+    if (action === "profile") {
+      setEditMode(true);
+      scrollToProfileSection("datos-publicos");
+      return;
+    }
+
+    if (action === "verification") {
+      openVerificationRequest();
+      return;
+    }
+
+    if (action === "gallery") {
+      scrollToProfileSection("galeria-perfil");
+      return;
+    }
+
+    scrollToProfileSection("estado-perfil");
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
     }
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (zone && !zoneOptions.includes(zone)) {
+      setZone("");
+    }
+  }, [zone, zoneOptions]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -576,6 +718,7 @@ export default function PerfilPrestador() {
         setPrice(data.price ? String(data.price) : "");
         setDepartment(data.department || "");
         setCity(data.city || "");
+        setZone(data.zone || "");
         setWhatsapp(data.whatsapp || "");
         setPhotoUrl(data.photoUrl || "");
         setMedia(Array.isArray(data.media) ? data.media : []);
@@ -586,6 +729,7 @@ export default function PerfilPrestador() {
         setProfileVisible(Boolean(data.profileVisible));
         setProfilePaused(Boolean(data.profilePaused));
         setSubscriptionStatus(data.subscriptionStatus || null);
+        setSubscriptionNextChargeAt(getDateValue(data.subscriptionNextChargeAt));
         setVideoSecondsExtra(Number(data.videoSecondsExtra || 0));
         setPromotedUntil(getDateValue(data.promotedUntil));
         setDailyVideoUrl(data.dailyVideo?.url || "");
@@ -661,6 +805,7 @@ export default function PerfilPrestador() {
           price: price ? Number(price) : "",
           department,
           city,
+          zone: zoneOptions.length > 0 ? zone.trim() : "",
           whatsapp: whatsapp.trim(),
         },
         { merge: true }
@@ -1222,7 +1367,86 @@ export default function PerfilPrestador() {
           </div>
         )}
 
-        <section className="rounded-lg border border-white/[0.08] bg-[#101012] p-4 shadow-2xl shadow-black/25">
+        {profileReadiness < onboardingSteps.length && (
+          <section className="mb-4 rounded-lg border border-white/[0.08] bg-[#101012] p-3 shadow-xl shadow-black/20">
+            <button
+              type="button"
+              onClick={() => setShowQuickGuide((value) => !value)}
+              className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left transition hover:bg-white/[0.035]"
+            >
+              <span>
+                <span className="block text-sm font-semibold text-white">
+                  Guia rapida para completar perfil
+                </span>
+                <span className="mt-0.5 block text-xs text-neutral-500">
+                  {profileReadiness}/5 pasos listos
+                </span>
+              </span>
+              <span className="rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-100">
+                {Math.round((profileReadiness / onboardingSteps.length) * 100)}%
+              </span>
+            </button>
+
+            {showQuickGuide && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {onboardingSteps.map((step) => (
+                  <div
+                    key={step.label}
+                    className={`rounded-md border p-3 ${
+                      step.done
+                        ? "border-emerald-400/15 bg-emerald-400/[0.05]"
+                        : "border-white/[0.08] bg-black/25"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-bold ${
+                          step.done
+                            ? "border-emerald-300/40 bg-emerald-400/20 text-emerald-100"
+                            : "border-white/10 bg-white/[0.04] text-neutral-500"
+                        }`}
+                      >
+                        {step.done ? "OK" : "-"}
+                      </span>
+                      <p className="text-sm font-semibold text-neutral-100">
+                        {step.label}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-neutral-500">
+                      {step.description}
+                    </p>
+                    {!step.done &&
+                      (step.action === "photo" ? (
+                        <label className="mt-3 inline-flex h-8 cursor-pointer items-center justify-center rounded-md border border-amber-300/25 bg-amber-300/10 px-3 text-xs font-semibold text-amber-100 transition hover:border-amber-200/40 hover:bg-amber-300/15">
+                          {uploadingProfile ? "Subiendo..." : step.cta}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            disabled={uploadingProfile}
+                            onChange={handleProfilePhoto}
+                          />
+                        </label>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOnboardingAction(step.action)}
+                          className="mt-3 inline-flex h-8 items-center justify-center rounded-md border border-blue-300/20 bg-blue-400/10 px-3 text-xs font-semibold text-blue-100 transition hover:border-blue-200/35 hover:bg-blue-400/15"
+                        >
+                          {step.cta}
+                        </button>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        <section
+          id="estado-perfil"
+          className="scroll-mt-24 rounded-lg border border-white/[0.08] bg-[#101012] p-4 shadow-2xl shadow-black/25"
+        >
           <div className="flex flex-col gap-4">
             <aside className="flex flex-col gap-4 lg:flex-row lg:items-start">
               <div className="flex shrink-0 flex-col items-start gap-3 sm:w-40 sm:items-center">
@@ -1265,6 +1489,21 @@ export default function PerfilPrestador() {
                     <span className="text-neutral-300">Aprobado</span>
                   </span>
                 )}
+                <div
+                  className={`w-full rounded-md border px-3 py-2 text-left shadow-lg shadow-black/15 ${subscriptionStatusClass}`}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                    Mensualidad
+                  </p>
+                  <p className="mt-1 text-xs font-semibold">
+                    {subscriptionLabel}
+                  </p>
+                  {subscriptionNextChargeAt && (
+                    <p className="mt-1 text-[11px] opacity-70">
+                      Cobro: {formatProfileDate(subscriptionNextChargeAt)}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="min-w-0 flex-1 pt-1">
@@ -1573,7 +1812,10 @@ export default function PerfilPrestador() {
               )}
 
               {editMode && (
-              <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/25 p-3">
+              <div
+                id="datos-publicos"
+                className="mt-3 scroll-mt-24 rounded-lg border border-white/[0.08] bg-black/25 p-3"
+              >
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="sm:col-span-2">
                 <label
@@ -1611,6 +1853,7 @@ export default function PerfilPrestador() {
                     onChange={(e) => {
                       setDepartment(e.target.value);
                       setCity("");
+                      setZone("");
                     }}
                     className={fieldBaseClass}
                   >
@@ -1639,7 +1882,10 @@ export default function PerfilPrestador() {
                   <select
                     id="city"
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
+                    onChange={(e) => {
+                      setCity(e.target.value);
+                      setZone("");
+                    }}
                     disabled={!department}
                     className={`${fieldBaseClass} disabled:cursor-not-allowed disabled:opacity-50`}
                   >
@@ -1656,6 +1902,30 @@ export default function PerfilPrestador() {
                   </p>
                 )}
               </div>
+
+              {zoneOptions.length > 0 && (
+                <div>
+                  <label
+                    htmlFor="zone"
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                  >
+                    Zona
+                  </label>
+                  <select
+                    id="zone"
+                    value={zone}
+                    onChange={(e) => setZone(e.target.value)}
+                    className={fieldBaseClass}
+                  >
+                    <option value="">Selecciona</option>
+                    {zoneOptions.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label
@@ -1835,7 +2105,10 @@ export default function PerfilPrestador() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-lg border border-white/[0.08] bg-[#101012] p-5 shadow-2xl shadow-black/20">
+        <section
+          id="galeria-perfil"
+          className="mt-4 scroll-mt-24 rounded-lg border border-white/[0.08] bg-[#101012] p-5 shadow-2xl shadow-black/20"
+        >
           <div className="relative flex flex-col gap-4 border-b border-white/[0.08] pb-5 sm:min-h-[92px] sm:block">
             <div className="sm:pr-[470px]">
               <h2 className="text-2xl font-semibold text-neutral-50">Galería</h2>

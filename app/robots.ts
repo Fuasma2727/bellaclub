@@ -16,6 +16,8 @@ export default function robots(): MetadataRoute.Robots {
           "/terminos",
           "/privacidad",
           "/seguridad",
+          "/reembolsos",
+          "/soporte",
         ],
         disallow: [
           "/admin/",

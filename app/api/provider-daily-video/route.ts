@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 export const runtime = "nodejs";
 
@@ -18,6 +22,13 @@ const isValidVideoUrl = (url: unknown) => {
 
 export async function POST(request: Request) {
   try {
+    guardMutationRequest(request, {
+      rateLimitKey: "provider-daily-video",
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 16 * 1024,
+    });
+
     const decoded = await requireAuthenticatedUser(request);
     const body = (await request.json()) as DailyVideoBody;
 
@@ -105,6 +116,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     const authError = authRouteError(error);
 
     if (authError.status !== 401 || authError.message !== "No autorizado") {

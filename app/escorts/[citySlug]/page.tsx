@@ -44,10 +44,10 @@ export async function generateMetadata({
     ? `${city.city}, ${city.department}`
     : city.city;
   const title = `Escorts en ${city.city}`;
-  const description = `Encuentra escorts en ${place}. Revisa perfiles aprobados, galerias publicas y contacta directamente por WhatsApp en BelaClub.`;
+  const description = `Encuentra escorts en ${place}. Revisa perfiles aprobados, galerías públicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
 
   return {
-    title,
+    title: `${title} | Perfiles aprobados en BelaClub`,
     description,
     keywords: [
       `escorts en ${city.city}`,
@@ -107,9 +107,9 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
             "@context": "https://schema.org",
             "@type": "CollectionPage",
             name: title,
-            description: `Perfiles aprobados en ${city.city}${
+            description: `Escorts con perfiles aprobados en ${city.city}${
               city.department ? `, ${city.department}` : ""
-            } dentro de BelaClub.`,
+            }, galerías públicas, zonas disponibles y contacto por WhatsApp dentro de BelaClub.`,
             url: pageUrl,
             isPartOf: {
               "@type": "WebSite",
@@ -141,6 +141,31 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
               },
             ],
           },
+          {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: `Búsquedas relacionadas con escorts en ${city.city}`,
+            itemListElement: [
+              {
+                "@type": "ListItem",
+                position: 1,
+                name: `Escorts en ${city.city}`,
+                url: `${siteUrl}/escorts/${city.slug}`,
+              },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: `Prepagos en ${city.city}`,
+                url: `${siteUrl}/prepagos/${city.slug}`,
+              },
+              {
+                "@type": "ListItem",
+                position: 3,
+                name: `Prestadores en ${city.city}`,
+                url: `${siteUrl}/prestadores/${city.slug}`,
+              },
+            ],
+          },
         ]}
       />
       <PrestadoresPage
@@ -150,11 +175,26 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
         pageEyebrow="Escorts por ciudad"
         pageDescription={`Explora escorts verificadas en ${city.city}${
           city.department ? `, ${city.department}` : ""
-        }. Revisa perfiles aprobados, galerias publicas, video del dia y contacto directo por WhatsApp.`}
+        }. Revisa perfiles aprobados, galerías públicas, video del día y contacto directo por WhatsApp.`}
         seoCityLinks={[
           { href: `/prepagos/${city.slug}`, label: `Prepagos en ${city.city}` },
           ...cityLinks,
         ]}
+        seoContent={{
+          heading: `Escorts en ${city.city}: perfiles por ciudad y zonas`,
+          paragraphs: [
+            city.seoIntro ||
+              `En BelaClub puedes explorar escorts en ${city.city} con perfiles aprobados, galería pública y contacto directo por WhatsApp.`,
+            `Esta página está pensada para búsquedas como escorts ${city.city}, escorts en ${city.city}, prepagos ${city.city} y perfiles verificados en ${city.city}.`,
+            "BelaClub permite revisar fotos públicas, ubicación, precio base, video del día cuando esté disponible y opciones de contenido privado dentro de una experiencia segura.",
+          ],
+          zones: city.zones,
+          relatedLinks: [
+            { href: `/prepagos/${city.slug}`, label: `Prepagos en ${city.city}` },
+            { href: `/prestadores/${city.slug}`, label: `Prestadores en ${city.city}` },
+            ...cityLinks,
+          ],
+        }}
       />
     </>
   );

@@ -108,6 +108,7 @@ export default function PerfilUsuario() {
             alt="perfil"
             fill
             className="rounded-full object-cover border border-neutral-700"
+            priority
           />
 
           {editMode && (

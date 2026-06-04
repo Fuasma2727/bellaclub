@@ -29,6 +29,7 @@ export type Prestador = {
   photoUrl?: string;
   department?: string;
   city?: string;
+  zone?: string;
   whatsapp?: string;
   description?: string;
   media?: MediaItem[];

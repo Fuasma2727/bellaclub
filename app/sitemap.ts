@@ -56,25 +56,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.4,
     },
+    {
+      url: `${baseUrl}/reembolsos`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+    {
+      url: `${baseUrl}/soporte`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
   ];
 
   const cityRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
     url: `${baseUrl}/prestadores/${city.slug}`,
     lastModified: now,
     changeFrequency: "daily",
-    priority: targetCitySlugs.has(city.slug) ? 0.92 : 0.85,
+    priority: targetCitySlugs.has(city.slug) ? 0.9 : 0.75,
   }));
   const prepagosRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
     url: `${baseUrl}/prepagos/${city.slug}`,
     lastModified: now,
     changeFrequency: "daily",
-    priority: targetCitySlugs.has(city.slug) ? 0.95 : 0.8,
+    priority: targetCitySlugs.has(city.slug) ? 0.98 : 0.8,
   }));
   const escortsRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
     url: `${baseUrl}/escorts/${city.slug}`,
     lastModified: now,
     changeFrequency: "daily",
-    priority: targetCitySlugs.has(city.slug) ? 0.95 : 0.8,
+    priority: targetCitySlugs.has(city.slug) ? 0.98 : 0.8,
   }));
 
   return [...staticRoutes, ...cityRoutes, ...prepagosRoutes, ...escortsRoutes];

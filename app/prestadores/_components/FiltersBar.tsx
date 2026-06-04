@@ -1,22 +1,28 @@
 type FiltersBarProps = {
   departmentFilter: string;
   cityFilter: string;
+  zoneFilter: string;
   departments: string[];
   cities: string[];
+  zones: string[];
   resultCount: number;
   onDepartmentChange: (value: string) => void;
   onCityChange: (value: string) => void;
+  onZoneChange: (value: string) => void;
   onReset: () => void;
 };
 
 export default function FiltersBar({
   departmentFilter,
   cityFilter,
+  zoneFilter,
   departments,
   cities,
+  zones,
   resultCount,
   onDepartmentChange,
   onCityChange,
+  onZoneChange,
   onReset,
 }: FiltersBarProps) {
   return (
@@ -50,7 +56,22 @@ export default function FiltersBar({
             ))}
           </select>
 
-          {(departmentFilter || cityFilter) && (
+          {zones.length > 0 && (
+            <select
+              className="h-10 min-w-0 rounded-md border border-white/[0.08] bg-[#101012] px-3 text-sm font-medium text-neutral-100 outline-none transition hover:border-white/15 focus:border-blue-400/80 focus:ring-2 focus:ring-blue-500/20 sm:w-48"
+              value={zoneFilter}
+              onChange={(e) => onZoneChange(e.target.value)}
+            >
+              <option value="">Zona</option>
+              {zones.map((zone) => (
+                <option key={zone} value={zone}>
+                  {zone}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {(departmentFilter || cityFilter || zoneFilter) && (
             <button
               type="button"
               onClick={onReset}

@@ -23,6 +23,7 @@ type ProviderVerification = {
   whatsapp?: string;
   city?: string;
   department?: string;
+  zone?: string;
   photoUrl?: string;
   blocked?: boolean;
   blockedReason?: string | null;
@@ -99,6 +100,7 @@ export async function GET(request: Request) {
           whatsapp: data.whatsapp,
           city: data.city,
           department: data.department,
+          zone: data.zone,
           photoUrl: data.photoUrl,
           blocked: Boolean(data.blocked),
           blockedReason: data.blockedReason || null,
@@ -136,6 +138,7 @@ export async function GET(request: Request) {
             provider.whatsapp,
             provider.city,
             provider.department,
+            provider.zone,
           ]
             .filter(Boolean)
             .join(" ")
@@ -151,6 +154,7 @@ export async function GET(request: Request) {
             provider.whatsapp,
             provider.city,
             provider.department,
+            provider.zone,
           ]
             .filter(Boolean)
             .join(" ")

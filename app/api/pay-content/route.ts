@@ -4,8 +4,11 @@ import admin from "firebase-admin";
 import { calculateCommission } from "@/lib/commission";
 import { setLedgerEntry } from "@/lib/ledger";
 import { createPrivateMediaUrl } from "@/lib/privateMediaAccess";
-import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 type MediaItem = {
   id?: string;
@@ -16,17 +19,12 @@ type MediaItem = {
 
 export async function POST(req: Request) {
   try {
-    const rateLimit = checkRateLimit(`pay-content:${getClientIp(req)}`, {
+    guardMutationRequest(req, {
+      rateLimitKey: "pay-content",
       limit: 30,
       windowMs: 60 * 1000,
+      maxBodyBytes: 8 * 1024,
     });
-
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Demasiados intentos. Intenta de nuevo en un momento." },
-        { status: 429 }
-      );
-    }
 
     const decoded = await requireAuthenticatedUser(req);
     const body = await req.json();
@@ -223,6 +221,9 @@ export async function POST(req: Request) {
       { status: 200 }
     );
   } catch (err) {
+    const securityError = securityErrorResponse(err);
+    if (securityError) return securityError;
+
     if (err instanceof Error && err.message === "INSUFFICIENT_BALANCE") {
       return NextResponse.json(
         { error: "Saldo insuficiente" },

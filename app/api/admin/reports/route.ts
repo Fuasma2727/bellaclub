@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 type ReportStatus = "pending" | "reviewed";
 
@@ -81,6 +85,13 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    guardMutationRequest(request, {
+      rateLimitKey: "admin-reports-action",
+      limit: 60,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 8 * 1024,
+    });
+
     const owner = await requireOwner(request);
     const { reportId, action } = (await request.json()) as {
       reportId?: string;
@@ -122,6 +133,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     const authError = ownerAuthError(error);
 
     return NextResponse.json(

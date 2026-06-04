@@ -5,6 +5,10 @@ import {
   processProviderSubscription,
   PROVIDER_MONTHLY_FEE,
 } from "@/lib/providerSubscription";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 type VerificationAction =
   | "approve"
@@ -39,6 +43,13 @@ type Params = {
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
+    guardMutationRequest(request, {
+      rateLimitKey: "admin-verification-action",
+      limit: 60,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 8 * 1024,
+    });
+
     const owner = await requireOwner(request);
     const { uid } = await params;
     const { action, mediaId } = (await request.json()) as {
@@ -359,6 +370,9 @@ export async function PATCH(request: Request, { params }: Params) {
 
     return NextResponse.json({ success: true, status: "rejected" });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     const authError = ownerAuthError(error);
 
     return NextResponse.json(

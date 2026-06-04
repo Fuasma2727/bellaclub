@@ -29,6 +29,7 @@ type ProviderVerification = {
   whatsapp?: string;
   city?: string;
   department?: string;
+  zone?: string;
   photoUrl?: string;
   blocked?: boolean;
   blockedReason?: string | null;
@@ -98,6 +99,22 @@ type WithdrawalsListResponse = {
   error?: string;
 };
 
+type FinanceSummary = {
+  totalPlatformBalance: number;
+  pendingWithdrawals: number;
+  pendingWithdrawalsCount: number;
+  commissionsEarned: number;
+  pastDueProviders: number;
+  blockedProviders: number;
+  activeVisibleProviders: number;
+  providerCount: number;
+};
+
+type FinanceSummaryResponse = {
+  summary?: FinanceSummary;
+  error?: string;
+};
+
 type VerificationAction =
   | "approve"
   | "reject"
@@ -128,11 +145,18 @@ const badgeLabel: Record<VerificationBadge, string> = {
   platinum: "Diamante",
 };
 
+const money = (value?: number | null) => {
+  return `$${Number(value || 0).toLocaleString("es-CO")}`;
+};
+
 export default function AdminVerificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const [providers, setProviders] = useState<ProviderVerification[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>([]);
+  const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -156,22 +180,33 @@ export default function AdminVerificationsPage() {
     try {
       const token = await user.getIdToken();
       const params = new URLSearchParams();
+      const summaryPromise = fetch("/api/admin/finance-summary", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (search.trim()) params.set("q", search.trim());
 
       if (activeView === "reports") {
         params.set("status", "pending");
         const queryString = params.toString() ? `?${params.toString()}` : "";
-        const res = await fetch(`/api/admin/reports${queryString}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const [res, summaryRes] = await Promise.all([
+          fetch(`/api/admin/reports${queryString}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          summaryPromise,
+        ]);
         const data = (await res.json()) as ReportsListResponse;
+        const summaryData =
+          (await summaryRes.json()) as FinanceSummaryResponse;
 
         if (!res.ok) {
           throw new Error(data.error || "No pudimos cargar los reportes");
         }
+        if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
 
         setReports(data.reports || []);
         setProviders([]);
@@ -182,16 +217,22 @@ export default function AdminVerificationsPage() {
       if (activeView === "withdrawals") {
         params.set("status", "pending_wompi");
         const queryString = params.toString() ? `?${params.toString()}` : "";
-        const res = await fetch(`/api/admin/withdrawals${queryString}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const [res, summaryRes] = await Promise.all([
+          fetch(`/api/admin/withdrawals${queryString}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          summaryPromise,
+        ]);
         const data = (await res.json()) as WithdrawalsListResponse;
+        const summaryData =
+          (await summaryRes.json()) as FinanceSummaryResponse;
 
         if (!res.ok) {
           throw new Error(data.error || "No pudimos cargar los retiros");
         }
+        if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
 
         setWithdrawals(data.withdrawals || []);
         setReports([]);
@@ -202,16 +243,21 @@ export default function AdminVerificationsPage() {
       if (activeView === "blocked") params.set("filter", "blocked");
 
       const queryString = params.toString() ? `?${params.toString()}` : "";
-      const res = await fetch(`/api/admin/verifications${queryString}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const [res, summaryRes] = await Promise.all([
+        fetch(`/api/admin/verifications${queryString}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        summaryPromise,
+      ]);
       const data = (await res.json()) as VerificationListResponse;
+      const summaryData = (await summaryRes.json()) as FinanceSummaryResponse;
 
       if (!res.ok) {
         throw new Error(data.error || "No pudimos cargar las solicitudes");
       }
+      if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
 
       setProviders(data.providers || []);
       setReports([]);
@@ -600,6 +646,7 @@ export default function AdminVerificationsPage() {
     photoUrl: provider.photoUrl,
     department: provider.department,
     city: provider.city,
+    zone: provider.zone,
     whatsapp: provider.whatsapp,
     description: provider.description,
     media: provider.media,
@@ -922,6 +969,59 @@ export default function AdminVerificationsPage() {
 
         {user && (
           <section className="mt-6 rounded-lg border border-white/10 bg-neutral-950 p-4">
+            {financeSummary && (
+              <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/[0.06] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200/80">
+                    Saldo en plataforma
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-white">
+                    {money(financeSummary.totalPlatformBalance)}
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Saldos disponibles de usuarios y prestadores.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-blue-400/15 bg-blue-400/[0.06] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-200/80">
+                    Retiros pendientes
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-white">
+                    {money(financeSummary.pendingWithdrawals)}
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    {financeSummary.pendingWithdrawalsCount} solicitud
+                    {financeSummary.pendingWithdrawalsCount === 1 ? "" : "es"}{" "}
+                    por revisar.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-amber-400/15 bg-amber-400/[0.06] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200/80">
+                    Comisiones BelaClub
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-white">
+                    {money(financeSummary.commissionsEarned)}
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Total registrado por compras, abonos y retiros.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/[0.08] bg-white/[0.035] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
+                    Control de perfiles
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-white">
+                    {financeSummary.activeVisibleProviders}/
+                    {financeSummary.providerCount}
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    {financeSummary.pastDueProviders} vencidos ·{" "}
+                    {financeSummary.blockedProviders} bloqueados.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="mb-3 inline-flex rounded-lg border border-white/10 bg-black/30 p-1">
               <button
                 type="button"

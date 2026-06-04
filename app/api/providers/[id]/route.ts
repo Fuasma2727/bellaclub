@@ -140,6 +140,7 @@ export async function GET(request: Request, { params }: Params) {
         photoUrl: data.photoUrl || "",
         department: data.department || "",
         city: data.city || "",
+        zone: data.zone || "",
         whatsapp: data.whatsapp || "",
         description: data.description || "",
         rating: data.rating || 0,

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { processProviderSubscription } from "@/lib/providerSubscription";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 const MAX_MONTHLY_PAUSES = 6;
 
@@ -15,6 +19,13 @@ const getMonthKey = () => {
 
 export async function POST(request: Request) {
   try {
+    guardMutationRequest(request, {
+      rateLimitKey: "provider-profile-pause",
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 4 * 1024,
+    });
+
     const decoded = await requireAuthenticatedUser(request);
     const { paused } = (await request.json()) as { paused?: boolean };
 
@@ -130,6 +141,9 @@ export async function POST(request: Request) {
       subscriptionResult,
     });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     if (error instanceof Error && error.message === "MONTHLY_PAUSE_LIMIT") {
       return NextResponse.json(
         {

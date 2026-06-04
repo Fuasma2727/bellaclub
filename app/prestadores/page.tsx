@@ -15,6 +15,8 @@ import ProviderCard from "./_components/ProviderCard";
 import ProviderProfileModal from "./_components/ProviderProfileModal";
 import PurchaseModal from "./_components/PurchaseModal";
 import ReportModal from "./_components/ReportModal";
+import ScreenProtection from "./_components/ScreenProtection";
+import { normalizeLocationValue } from "@/lib/providerZones";
 import {
   ApiResponse,
   CitySeoLink,
@@ -30,6 +32,12 @@ type PrestadoresPageProps = {
   pageEyebrow?: string;
   pageDescription?: string;
   seoCityLinks?: CitySeoLink[];
+  seoContent?: {
+    heading: string;
+    paragraphs: string[];
+    zones?: string[];
+    relatedLinks?: CitySeoLink[];
+  };
 };
 
 const citySlugValue = (value: string) => {
@@ -49,6 +57,7 @@ export default function PrestadoresPage({
   pageEyebrow = "Escorts por ciudad",
   pageDescription,
   seoCityLinks = [],
+  seoContent,
 }: PrestadoresPageProps = {}) {
   const { user } = useAuth();
   const router = useRouter();
@@ -74,6 +83,7 @@ export default function PrestadoresPage({
 
   const [departmentFilter, setDepartmentFilter] = useState(initialDepartment);
   const [cityFilter, setCityFilter] = useState(initialCity);
+  const [zoneFilter, setZoneFilter] = useState("");
 
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
@@ -110,6 +120,28 @@ export default function PrestadoresPage({
     ).sort((a, b) => a.localeCompare(b, "es"));
   }, [departmentFilter, prestadores]);
 
+  const zones = useMemo(() => {
+    if (!cityFilter) return [];
+
+    const selectedCity = normalizeLocationValue(cityFilter);
+
+    return Array.from(
+      new Set(
+        prestadores
+          .filter((provider) => {
+            const matchesDepartment =
+              !departmentFilter || provider.department === departmentFilter;
+            const matchesCity =
+              normalizeLocationValue(provider.city || "") === selectedCity;
+
+            return matchesDepartment && matchesCity;
+          })
+          .map((provider) => provider.zone?.trim())
+          .filter((value): value is string => Boolean(value))
+      )
+    ).sort((a, b) => a.localeCompare(b, "es"));
+  }, [cityFilter, departmentFilter, prestadores]);
+
   const filtered = useMemo(() => {
     let results = [...prestadores];
 
@@ -126,8 +158,12 @@ export default function PrestadoresPage({
       );
     }
 
+    if (zoneFilter) {
+      results = results.filter((provider) => provider.zone === zoneFilter);
+    }
+
     return results;
-  }, [departmentFilter, cityFilter, prestadores]);
+  }, [departmentFilter, cityFilter, zoneFilter, prestadores]);
 
   const hasPurchased = useCallback((item: MediaItem) => {
     return !item.private || Boolean(item.url);
@@ -202,13 +238,28 @@ export default function PrestadoresPage({
     if (departmentFilter && !departments.includes(departmentFilter)) {
       setDepartmentFilter("");
       setCityFilter("");
+      setZoneFilter("");
       return;
     }
 
     if (cityFilter && !cities.includes(cityFilter)) {
       setCityFilter("");
+      setZoneFilter("");
+      return;
     }
-  }, [cityFilter, cities, departmentFilter, departments, initialCity]);
+
+    if (zoneFilter && !zones.includes(zoneFilter)) {
+      setZoneFilter("");
+    }
+  }, [
+    cityFilter,
+    cities,
+    departmentFilter,
+    departments,
+    initialCity,
+    zoneFilter,
+    zones,
+  ]);
 
   useEffect(() => {
     if (!expandedMedia || mediaList.length === 0) return;
@@ -319,6 +370,7 @@ export default function PrestadoresPage({
   const resetFilters = () => {
     setDepartmentFilter("");
     setCityFilter("");
+    setZoneFilter("");
   };
 
   const requestAuth = () => {
@@ -542,6 +594,7 @@ export default function PrestadoresPage({
       onContextMenu={(event) => event.preventDefault()}
       onDragStart={(event) => event.preventDefault()}
     >
+      <ScreenProtection active />
       <Header />
 
       <main>
@@ -576,6 +629,52 @@ export default function PrestadoresPage({
                   ))}
                 </nav>
               )}
+              {seoContent && (
+                <section className="mt-5 max-w-4xl rounded-lg border border-white/[0.08] bg-white/[0.025] p-4">
+                  <h2 className="text-base font-semibold text-white">
+                    {seoContent.heading}
+                  </h2>
+                  <div className="mt-3 space-y-2 text-sm leading-6 text-neutral-400">
+                    {seoContent.paragraphs.map((paragraph) => (
+                      <p key={paragraph}>{paragraph}</p>
+                    ))}
+                  </div>
+                  {seoContent.zones && seoContent.zones.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                        Zonas populares
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {seoContent.zones.map((zone) => (
+                          <span
+                            key={zone}
+                            className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200"
+                          >
+                            {zone}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {seoContent.relatedLinks &&
+                    seoContent.relatedLinks.length > 0 && (
+                      <nav
+                        aria-label="Busquedas relacionadas"
+                        className="mt-4 flex flex-wrap gap-2"
+                      >
+                        {seoContent.relatedLinks.map((link) => (
+                          <Link
+                            key={link.href}
+                            href={link.href}
+                            className="rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1.5 text-xs font-semibold text-blue-100 transition hover:border-blue-200/35 hover:bg-blue-400/15"
+                          >
+                            {link.label}
+                          </Link>
+                        ))}
+                      </nav>
+                    )}
+                </section>
+              )}
             </div>
           </section>
         )}
@@ -583,14 +682,21 @@ export default function PrestadoresPage({
         <FiltersBar
           departmentFilter={departmentFilter}
           cityFilter={cityFilter}
+          zoneFilter={zoneFilter}
           departments={departments}
           cities={cities}
+          zones={zones}
           resultCount={filtered.length}
           onDepartmentChange={(value) => {
             setDepartmentFilter(value);
             setCityFilter("");
+            setZoneFilter("");
           }}
-          onCityChange={setCityFilter}
+          onCityChange={(value) => {
+            setCityFilter(value);
+            setZoneFilter("");
+          }}
+          onZoneChange={setZoneFilter}
           onReset={resetFilters}
         />
 
@@ -618,11 +724,12 @@ export default function PrestadoresPage({
 
           {!loading && !pageError && filtered.length > 0 && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3.5 lg:grid-cols-4 xl:grid-cols-5">
-              {filtered.map((provider) => (
+              {filtered.map((provider, index) => (
                 <ProviderCard
                   key={provider.id}
                   provider={provider}
                   isOpening={openingProfileId === provider.id}
+                  imagePriority={index < 6}
                   onOpen={(id) => void openModal(id)}
                   onOpenDailyVideo={setDailyVideoProvider}
                 />
@@ -645,12 +752,12 @@ export default function PrestadoresPage({
             <Link href="/seguridad" className="transition hover:text-white">
               Seguridad
             </Link>
-            <a
-              href="mailto:soporte@bellaclub.com"
-              className="transition hover:text-white"
-            >
+            <Link href="/reembolsos" className="transition hover:text-white">
+              Reembolsos
+            </Link>
+            <Link href="/soporte" className="transition hover:text-white">
               Soporte
-            </a>
+            </Link>
           </nav>
         </div>
       </footer>

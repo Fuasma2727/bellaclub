@@ -15,7 +15,9 @@ export const getDisplayName = (provider: Prestador) => {
 };
 
 export const getLocation = (provider: Prestador) => {
-  return [provider.city, provider.department].filter(Boolean).join(", ");
+  return [provider.zone, provider.city, provider.department]
+    .filter(Boolean)
+    .join(", ");
 };
 
 export const getWhatsAppUrl = (phone?: string) => {

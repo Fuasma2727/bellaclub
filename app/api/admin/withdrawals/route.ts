@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { setLedgerEntry } from "@/lib/ledger";
 import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
+import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
 
 type WithdrawalStatus = "pending_wompi" | "paid" | "rejected";
 
@@ -78,6 +82,13 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    guardMutationRequest(request, {
+      rateLimitKey: "admin-withdrawals-action",
+      limit: 60,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 8 * 1024,
+    });
+
     const owner = await requireOwner(request);
     const { withdrawalId, action } = (await request.json()) as {
       withdrawalId?: string;
@@ -194,6 +205,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     if (error instanceof Error && error.message === "WITHDRAWAL_NOT_FOUND") {
       return NextResponse.json(
         { error: "Retiro no encontrado" },

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
 import {
+  guardMutationRequest,
+  securityErrorResponse,
+} from "@/lib/requestSecurity";
+import {
   getProviderVideoSecondsLimit,
   getProviderVideoSecondsUsed,
   ProviderMediaItem,
@@ -34,6 +38,13 @@ const isValidMediaItem = (item: unknown): item is ProviderMediaItem => {
 
 export async function POST(request: Request) {
   try {
+    guardMutationRequest(request, {
+      rateLimitKey: "provider-media",
+      limit: 80,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 32 * 1024,
+    });
+
     const decoded = await requireAuthenticatedUser(request);
     const body = (await request.json()) as AddMediaBody | DeleteMediaBody;
     const userRef = adminDb.collection("users").doc(decoded.uid);
@@ -115,6 +126,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     if (error instanceof Error) {
       const messages: Record<string, { message: string; status: number }> = {
         USER_NOT_FOUND: { message: "Usuario no encontrado", status: 404 },
