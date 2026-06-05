@@ -308,18 +308,40 @@ const uploadFile = async (file: File, token: string) => {
     throw new Error(`El archivo supera el limite de ${maxSize} MB.`);
   }
 
-  let res = await uploadFileBinary(file, token, contentType);
+  let binaryError: unknown = null;
+  let res: Response | null = null;
 
-  if (!res.ok) {
-    const firstTry = await parseUploadResponse(res);
+  try {
+    res = await uploadFileBinary(file, token, contentType);
+  } catch (error) {
+    binaryError = error;
+  }
 
-    if (res.status === 413 || res.status === 401 || res.status === 403) {
+  if (!res?.ok) {
+    const firstTry = res
+      ? await parseUploadResponse(res)
+      : {
+          error:
+            binaryError instanceof Error
+              ? binaryError.message
+              : "No pudimos conectar con el servidor de subida.",
+        };
+
+    if (res && (res.status === 413 || res.status === 401 || res.status === 403)) {
       throw new Error(
         firstTry.error || firstTry.details || "No pudimos subir el archivo"
       );
     }
 
-    res = await uploadFileMultipart(file, token);
+    try {
+      res = await uploadFileMultipart(file, token);
+    } catch (fallbackError) {
+      throw new Error(
+        fallbackError instanceof Error
+          ? fallbackError.message
+          : firstTry.error || "No pudimos subir el archivo"
+      );
+    }
 
     if (!res.ok) {
       const fallbackData = await parseUploadResponse(res);
@@ -359,15 +381,42 @@ const getVideoDuration = (file: File) => {
   return new Promise<number>((resolve, reject) => {
     const video = document.createElement("video");
     const objectUrl = URL.createObjectURL(file);
+    const timeout = window.setTimeout(() => {
+      URL.revokeObjectURL(objectUrl);
+      reject(
+        new Error(
+          "No pudimos leer la duracion del video. Intenta con un MP4 mas liviano."
+        )
+      );
+    }, 15000);
+
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      URL.revokeObjectURL(objectUrl);
+    };
 
     video.preload = "metadata";
     video.onloadedmetadata = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(Math.ceil(video.duration || 0));
+      cleanup();
+
+      if (!Number.isFinite(video.duration) || video.duration <= 0) {
+        reject(
+          new Error(
+            "No pudimos leer la duracion del video. Intenta con un MP4 mas liviano."
+          )
+        );
+        return;
+      }
+
+      resolve(Math.ceil(video.duration));
     };
     video.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("No pudimos leer la duracion del video"));
+      cleanup();
+      reject(
+        new Error(
+          "No pudimos leer la duracion del video. Intenta con un MP4 mas liviano."
+        )
+      );
     };
     video.src = objectUrl;
   });
