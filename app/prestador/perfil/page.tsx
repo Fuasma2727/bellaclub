@@ -214,7 +214,20 @@ const uploadFile = async (file: File, token: string) => {
     body: file,
   });
 
-  const data = (await res.json()) as UploadResponse;
+  const responseText = await res.text();
+  let data: UploadResponse = {};
+
+  try {
+    data = responseText ? (JSON.parse(responseText) as UploadResponse) : {};
+  } catch {
+    data = {
+      error:
+        res.status === 413
+          ? "El servidor rechazo el archivo por tamano. Debemos aumentar el limite de carga en el servidor."
+          : `El servidor respondio con un formato inesperado (${res.status}). Revisa pm2 logs belaclub o el proxy del servidor.`,
+      details: responseText.slice(0, 300),
+    };
+  }
 
   if (!res.ok || !data.url) {
     throw new Error(
@@ -2480,99 +2493,112 @@ export default function PerfilPrestador() {
 
       {showVerificationModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/85 px-3 py-4 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6"
           onClick={() => {
             setShowVerificationModal(false);
             setVerificationFile(null);
           }}
         >
           <div
-            className="w-full max-w-lg rounded-lg border border-white/[0.08] bg-[#101012] p-6 shadow-2xl shadow-black/40"
+            className="my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#101012] shadow-2xl shadow-black/50"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold">
-              {currentVerificationLevel > 0
-                ? "Subir nivel de verificacion"
-                : "Solicitar verificacion"}
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-neutral-400">
-              {currentVerificationLevel > 0
-                ? `Tu nivel actual es ${effectiveBadgeLabel}. Elige un nivel superior para enviar una nueva solicitud.`
-                : "Elige el nivel de insignia que quieres solicitar. La solicitud llegara al panel de control para revision."}
-            </p>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {availableVerificationOptions.map((option) => (
-                <button
-                  key={option.level}
-                  type="button"
-                  onClick={() => {
-                    setSelectedVerificationLevel(option.level);
-                    setVerificationFile(null);
-                  }}
-                  className={`rounded-lg border p-4 text-left transition ${
-                    selectedVerificationLevel === option.level
-                      ? "border-emerald-300/50 bg-emerald-300/10 text-white"
-                      : "border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
-                  }`}
-                >
-                  <span className="text-sm font-semibold">
-                    Nivel {option.level}
-                  </span>
-                  <span className="mt-1 block text-xl font-semibold">
-                    {option.title}
-                  </span>
-                  <span className="mt-2 block text-xs leading-5 text-neutral-400">
-                    {option.text}
-                  </span>
-                </button>
-              ))}
+            <div className="border-b border-white/[0.08] px-4 py-4 sm:px-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                Verificacion BelaClub
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-white">
+                {currentVerificationLevel > 0
+                  ? "Subir nivel"
+                  : "Solicitar verificacion"}
+              </h3>
+              <p className="mt-1 text-sm leading-5 text-neutral-400">
+                {currentVerificationLevel > 0
+                  ? `Nivel actual: ${effectiveBadgeLabel}. Elige un nivel superior para enviar una nueva solicitud.`
+                  : "Elige el nivel que quieres solicitar. Lo revisaremos desde el panel de control."}
+              </p>
             </div>
 
-            {(selectedVerificationLevel === 1 ||
-              selectedVerificationLevel === 2) && (
-              <div className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-xs leading-5 text-amber-50">
-                {selectedVerificationLevel === 1 ? (
-                  <>
-                    La foto debe mostrarte sosteniendo un papel que diga
-                    BelaClub y la fecha del dia. Debe verse con claridad tu
-                    rostro y cuerpo completo para verificar la veracidad del
-                    perfil.
-                  </>
-                ) : (
-                  <>
-                    En el video debes sostener un papel que diga BelaClub y
-                    la fecha del dia, y decir: soy parte de BelaClub. Debe verse
-                    con claridad tu rostro y cuerpo completo para verificar la
-                    veracidad del perfil.
-                  </>
-                )}
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {availableVerificationOptions.map((option) => (
+                  <button
+                    key={option.level}
+                    type="button"
+                    onClick={() => {
+                      setSelectedVerificationLevel(option.level);
+                      setVerificationFile(null);
+                    }}
+                    className={`rounded-lg border p-3 text-left transition hover:-translate-y-0.5 ${
+                      selectedVerificationLevel === option.level
+                        ? "border-emerald-300/50 bg-emerald-300/10 text-white shadow-lg shadow-emerald-950/25"
+                        : "border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
+                    }`}
+                  >
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                      Nivel {option.level}
+                    </span>
+                    <span className="mt-1 block text-base font-semibold">
+                      {option.title}
+                    </span>
+                    <span className="mt-1.5 block text-xs leading-5 text-neutral-400">
+                      {option.text}
+                    </span>
+                  </button>
+                ))}
               </div>
-            )}
 
-            {(selectedVerificationLevel === 1 ||
-              selectedVerificationLevel === 2) && (
-              <label className="mt-5 block cursor-pointer rounded-lg border border-dashed border-white/15 bg-black/20 p-4 text-center text-sm text-neutral-300 transition hover:bg-white/[0.04]">
-                {verificationFile
-                  ? verificationFile.name
-                  : selectedVerificationLevel === 1
-                    ? "Subir foto de verificacion"
-                    : "Subir video de verificacion"}
-                <input
-                  type="file"
-                  accept={
-                    selectedVerificationLevel === 1 ? "image/*" : "video/*"
-                  }
-                  hidden
-                  onChange={(e) => {
-                    setVerificationFile(e.target.files?.[0] || null);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
+              {(selectedVerificationLevel === 1 ||
+                selectedVerificationLevel === 2) && (
+                <div className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-xs leading-5 text-amber-50">
+                  {selectedVerificationLevel === 1 ? (
+                    <>
+                      Sube una foto sosteniendo un papel que diga BelaClub y la
+                      fecha del dia. Debe verse con claridad tu rostro y cuerpo
+                      completo para verificar la veracidad del perfil.
+                    </>
+                  ) : (
+                    <>
+                      Sube un video sosteniendo un papel que diga BelaClub y la
+                      fecha del dia, y di: soy parte de BelaClub. Debe verse con
+                      claridad tu rostro y cuerpo completo para verificar la
+                      veracidad del perfil.
+                    </>
+                  )}
+                </div>
+              )}
 
-            <div className="mt-5 grid grid-cols-2 gap-3">
+              {(selectedVerificationLevel === 1 ||
+                selectedVerificationLevel === 2) && (
+                <label className="relative mt-4 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-emerald-300/30 bg-emerald-300/[0.06] px-4 py-5 text-center transition hover:border-emerald-200/50 hover:bg-emerald-300/[0.1]">
+                  <span className="text-sm font-semibold text-white">
+                    {verificationFile
+                      ? "Archivo seleccionado"
+                      : selectedVerificationLevel === 1
+                        ? "Subir foto de verificacion"
+                        : "Subir video de verificacion"}
+                  </span>
+                  <span className="mt-1 max-w-full break-words text-xs leading-5 text-neutral-400">
+                    {verificationFile
+                      ? verificationFile.name
+                      : "Toca aqui para elegir desde tu galeria o camara."}
+                  </span>
+                  <input
+                    type="file"
+                    accept={
+                      selectedVerificationLevel === 1 ? "image/*" : "video/*"
+                    }
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    onChange={(e) => {
+                      setVerificationFile(e.target.files?.[0] || null);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 border-t border-white/[0.08] bg-[#101012] px-4 py-4 sm:px-6">
               <button
                 type="button"
                 className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]"

@@ -9,6 +9,28 @@ import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { app } from "@/lib/firebase";
 import Image from "next/image";
 
+type UploadResponse = {
+  url?: string;
+  error?: string;
+  details?: string;
+};
+
+const parseUploadResponse = async (res: Response): Promise<UploadResponse> => {
+  const responseText = await res.text();
+
+  try {
+    return responseText ? (JSON.parse(responseText) as UploadResponse) : {};
+  } catch {
+    return {
+      error:
+        res.status === 413
+          ? "El servidor rechazo el archivo por tamano. Debemos aumentar el limite de carga en el servidor."
+          : `El servidor respondio con un formato inesperado (${res.status}).`,
+      details: responseText.slice(0, 300),
+    };
+  }
+};
+
 export default function PerfilUsuario() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -61,16 +83,18 @@ export default function PerfilUsuario() {
       body: formData,
     });
 
-    const data = await res.json();
+    const data = await parseUploadResponse(res);
     setUploading(false);
 
-    if (data.url) {
+    if (res.ok && data.url) {
       setPhotoUrl(data.url);
       await setDoc(
         doc(db, "users", user.uid),
         { photoUrl: data.url },
         { merge: true }
       );
+    } else {
+      console.error("Upload user photo error:", data.error, data.details);
     }
   };
 
