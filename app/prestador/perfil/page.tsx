@@ -87,6 +87,9 @@ type UploadResponse = {
   details?: string;
 };
 
+const MAX_IMAGE_UPLOAD_MB = 12;
+const MAX_VIDEO_UPLOAD_MB = 80;
+
 type ProviderMediaResponse = {
   media?: MediaItem[];
   error?: string;
@@ -201,26 +204,32 @@ const createMediaId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-const uploadFile = async (file: File, token: string) => {
-  const res = await fetch("/api/upload-profile-photo", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": file.type || "application/octet-stream",
-      "x-file-name": encodeURIComponent(file.name),
-      "x-file-size": file.size.toString(),
-      "x-file-type": file.type || "application/octet-stream",
-    },
-    body: file,
-  });
+const inferUploadContentType = (file: File) => {
+  if (file.type) return file.type;
 
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  const byExtension: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+    m4v: "video/mp4",
+  };
+
+  return extension ? byExtension[extension] || "" : "";
+};
+
+const parseUploadResponse = async (res: Response): Promise<UploadResponse> => {
   const responseText = await res.text();
-  let data: UploadResponse = {};
 
   try {
-    data = responseText ? (JSON.parse(responseText) as UploadResponse) : {};
+    return responseText ? (JSON.parse(responseText) as UploadResponse) : {};
   } catch {
-    data = {
+    return {
       error:
         res.status === 413
           ? "El servidor rechazo el archivo por tamano. Debemos aumentar el limite de carga en el servidor."
@@ -228,10 +237,118 @@ const uploadFile = async (file: File, token: string) => {
       details: responseText.slice(0, 300),
     };
   }
+};
 
-  if (!res.ok || !data.url) {
+const uploadWithTimeout = async (
+  request: () => Promise<Response>,
+  timeoutMs = 5 * 60 * 1000
+) => {
+  const timeout = new Promise<never>((_, reject) => {
+    window.setTimeout(
+      () =>
+        reject(
+          new Error(
+            "La subida tardo demasiado. Intenta con un video mas liviano o revisa la conexion."
+          )
+        ),
+      timeoutMs
+    );
+  });
+
+  return Promise.race([request(), timeout]);
+};
+
+const uploadFileBinary = async (
+  file: File,
+  token: string,
+  contentType: string
+) => {
+  return uploadWithTimeout(() =>
+    fetch("/api/upload-profile-photo", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": contentType || "application/octet-stream",
+        "x-file-name": encodeURIComponent(file.name),
+        "x-file-size": file.size.toString(),
+        "x-file-type": contentType || "application/octet-stream",
+      },
+      body: file,
+    })
+  );
+};
+
+const uploadFileMultipart = async (file: File, token: string) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return uploadWithTimeout(() =>
+    fetch("/api/upload-profile-photo", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    })
+  );
+};
+
+const uploadFile = async (file: File, token: string) => {
+  const contentType = inferUploadContentType(file);
+  const isVideo = contentType.startsWith("video");
+  const maxSize = isVideo ? MAX_VIDEO_UPLOAD_MB : MAX_IMAGE_UPLOAD_MB;
+
+  if (!contentType) {
     throw new Error(
-      data.details || data.error || "No pudimos subir el archivo"
+      "Formato no reconocido. Usa JPG, PNG, WEBP, MP4, WEBM o MOV."
+    );
+  }
+
+  if (file.size > maxSize * 1024 * 1024) {
+    throw new Error(`El archivo supera el limite de ${maxSize} MB.`);
+  }
+
+  let res = await uploadFileBinary(file, token, contentType);
+
+  if (!res.ok) {
+    const firstTry = await parseUploadResponse(res);
+
+    if (res.status === 413 || res.status === 401 || res.status === 403) {
+      throw new Error(
+        firstTry.error || firstTry.details || "No pudimos subir el archivo"
+      );
+    }
+
+    res = await uploadFileMultipart(file, token);
+
+    if (!res.ok) {
+      const fallbackData = await parseUploadResponse(res);
+      throw new Error(
+        fallbackData.error ||
+          fallbackData.details ||
+          firstTry.error ||
+          "No pudimos subir el archivo"
+      );
+    }
+
+    const fallbackData = await parseUploadResponse(res);
+
+    if (!fallbackData.url) {
+      throw new Error(
+        fallbackData.error ||
+          fallbackData.details ||
+          "No pudimos subir el archivo"
+      );
+    }
+
+    return fallbackData.url;
+  }
+
+  const data = await parseUploadResponse(res);
+
+  if (!data.url) {
+    throw new Error(
+      data.error || data.details || "No pudimos subir el archivo"
     );
   }
 
@@ -711,6 +828,24 @@ export default function PerfilPrestador() {
   }, [zone, zoneOptions]);
 
   useEffect(() => {
+    if (!showVerificationModal) return;
+
+    const selectedIsAvailable = availableVerificationOptions.some(
+      (option) => option.level === selectedVerificationLevel
+    );
+    const firstAvailableLevel = availableVerificationOptions[0]?.level;
+
+    if (!selectedIsAvailable && firstAvailableLevel) {
+      setSelectedVerificationLevel(firstAvailableLevel);
+      setVerificationFile(null);
+    }
+  }, [
+    availableVerificationOptions,
+    selectedVerificationLevel,
+    showVerificationModal,
+  ]);
+
+  useEffect(() => {
     const loadData = async () => {
       if (!user) return;
 
@@ -903,7 +1038,8 @@ export default function PerfilPrestador() {
         const token = await user.getIdToken();
         const preparedFiles = await Promise.all(
           files.map(async (file) => {
-            const type: MediaItem["type"] = file.type.startsWith("video")
+            const contentType = inferUploadContentType(file);
+            const type: MediaItem["type"] = contentType.startsWith("video")
               ? "video"
               : "photo";
             const duration =
@@ -934,7 +1070,8 @@ export default function PerfilPrestador() {
         }
 
         const uploadedItems: MediaItem[] = [];
-        const uploadBatchSize = 4;
+        const hasVideos = preparedFiles.some((item) => item.type === "video");
+        const uploadBatchSize = hasVideos ? 1 : 4;
 
         for (let index = 0; index < preparedFiles.length; index += uploadBatchSize) {
           const group = preparedFiles.slice(index, index + uploadBatchSize);
@@ -2570,31 +2707,41 @@ export default function PerfilPrestador() {
 
               {(selectedVerificationLevel === 1 ||
                 selectedVerificationLevel === 2) && (
-                <label className="relative mt-4 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-emerald-300/30 bg-emerald-300/[0.06] px-4 py-5 text-center transition hover:border-emerald-200/50 hover:bg-emerald-300/[0.1]">
-                  <span className="text-sm font-semibold text-white">
-                    {verificationFile
-                      ? "Archivo seleccionado"
-                      : selectedVerificationLevel === 1
-                        ? "Subir foto de verificacion"
-                        : "Subir video de verificacion"}
-                  </span>
-                  <span className="mt-1 max-w-full break-words text-xs leading-5 text-neutral-400">
-                    {verificationFile
-                      ? verificationFile.name
-                      : "Toca aqui para elegir desde tu galeria o camara."}
-                  </span>
-                  <input
-                    type="file"
-                    accept={
-                      selectedVerificationLevel === 1 ? "image/*" : "video/*"
-                    }
-                    className="absolute inset-0 cursor-pointer opacity-0"
-                    onChange={(e) => {
-                      setVerificationFile(e.target.files?.[0] || null);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                <div className="mt-4 rounded-xl border border-white/[0.08] bg-black/20 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                      Archivo requerido
+                    </p>
+                    <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-100">
+                      {selectedVerificationLevel === 1 ? "Foto" : "Video"}
+                    </span>
+                  </div>
+                  <label className="relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-emerald-300/30 bg-emerald-300/[0.06] px-4 py-5 text-center transition hover:border-emerald-200/50 hover:bg-emerald-300/[0.1]">
+                    <span className="text-sm font-semibold text-white">
+                      {verificationFile
+                        ? "Archivo seleccionado"
+                        : selectedVerificationLevel === 1
+                          ? "Subir foto de verificacion"
+                          : "Subir video de verificacion"}
+                    </span>
+                    <span className="mt-1 max-w-full break-words text-xs leading-5 text-neutral-400">
+                      {verificationFile
+                        ? verificationFile.name
+                        : "Toca aqui para elegir desde tu galeria o camara."}
+                    </span>
+                    <input
+                      type="file"
+                      accept={
+                        selectedVerificationLevel === 1 ? "image/*" : "video/*"
+                      }
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      onChange={(e) => {
+                        setVerificationFile(e.target.files?.[0] || null);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
               )}
             </div>
 
