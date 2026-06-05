@@ -90,6 +90,35 @@ type UploadResponse = {
 const MAX_IMAGE_UPLOAD_MB = 12;
 const MAX_VIDEO_UPLOAD_MB = 80;
 
+const uploadContentTypeByExtension: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+  qt: "video/quicktime",
+  m4v: "video/x-m4v",
+  "3gp": "video/3gpp",
+  "3gpp": "video/3gpp",
+  "3g2": "video/3gpp2",
+};
+
+const supportedUploadTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-m4v",
+  "video/3gpp",
+  "video/3gpp2",
+]);
+
 type ProviderMediaResponse = {
   media?: MediaItem[];
   error?: string;
@@ -204,23 +233,47 @@ const createMediaId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
+const normalizeContentType = (value: string) => {
+  return value.split(";")[0]?.trim().toLowerCase() || "";
+};
+
 const inferUploadContentType = (file: File) => {
-  if (file.type) return file.type;
-
+  const browserType = normalizeContentType(file.type);
   const extension = file.name.split(".").pop()?.toLowerCase();
-  const byExtension: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    mp4: "video/mp4",
-    webm: "video/webm",
-    mov: "video/quicktime",
-    m4v: "video/mp4",
-  };
+  const extensionType = extension
+    ? uploadContentTypeByExtension[extension] || ""
+    : "";
 
-  return extension ? byExtension[extension] || "" : "";
+  if (browserType && supportedUploadTypes.has(browserType)) {
+    return browserType;
+  }
+
+  return extensionType || browserType;
+};
+
+const getUploadMediaType = (contentType: string): MediaItem["type"] | null => {
+  if (contentType.startsWith("video/")) return "video";
+  if (contentType.startsWith("image/")) return "photo";
+  return null;
+};
+
+const validateUploadFile = (file: File) => {
+  const contentType = inferUploadContentType(file);
+  const mediaType = getUploadMediaType(contentType);
+
+  if (!mediaType || !supportedUploadTypes.has(contentType)) {
+    throw new Error(
+      `Formato no permitido para "${file.name}". Usa JPG, PNG, WEBP, GIF, MP4, WEBM, MOV, M4V o 3GP.`
+    );
+  }
+
+  const maxSize = mediaType === "video" ? MAX_VIDEO_UPLOAD_MB : MAX_IMAGE_UPLOAD_MB;
+
+  if (file.size > maxSize * 1024 * 1024) {
+    throw new Error(`"${file.name}" supera el limite de ${maxSize} MB.`);
+  }
+
+  return { contentType, mediaType };
 };
 
 const parseUploadResponse = async (res: Response): Promise<UploadResponse> => {
@@ -294,19 +347,7 @@ const uploadFileMultipart = async (file: File, token: string) => {
 };
 
 const uploadFile = async (file: File, token: string) => {
-  const contentType = inferUploadContentType(file);
-  const isVideo = contentType.startsWith("video");
-  const maxSize = isVideo ? MAX_VIDEO_UPLOAD_MB : MAX_IMAGE_UPLOAD_MB;
-
-  if (!contentType) {
-    throw new Error(
-      "Formato no reconocido. Usa JPG, PNG, WEBP, MP4, WEBM o MOV."
-    );
-  }
-
-  if (file.size > maxSize * 1024 * 1024) {
-    throw new Error(`El archivo supera el limite de ${maxSize} MB.`);
-  }
+  const { contentType } = validateUploadFile(file);
 
   let binaryError: unknown = null;
   let res: Response | null = null;
@@ -396,6 +437,8 @@ const getVideoDuration = (file: File) => {
     };
 
     video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
     video.onloadedmetadata = () => {
       cleanup();
 
@@ -419,6 +462,7 @@ const getVideoDuration = (file: File) => {
       );
     };
     video.src = objectUrl;
+    video.load();
   });
 };
 
@@ -658,6 +702,7 @@ export default function PerfilPrestador() {
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [mediaUploadError, setMediaUploadError] = useState("");
 
   const [expandedMedia, setExpandedMedia] = useState<MediaItem | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1082,19 +1127,23 @@ export default function PerfilPrestador() {
 
       setUploadingMedia(true);
       setError("");
+      setMediaUploadError("");
 
       try {
         const token = await user.getIdToken();
         const preparedFiles = await Promise.all(
           files.map(async (file) => {
-            const contentType = inferUploadContentType(file);
-            const type: MediaItem["type"] = contentType.startsWith("video")
-              ? "video"
-              : "photo";
+            const { mediaType } = validateUploadFile(file);
             const duration =
-              type === "video" ? await getVideoDuration(file) : null;
+              mediaType === "video"
+                ? await getVideoDuration(file).catch(() => {
+                    throw new Error(
+                      `No pudimos leer la duracion de "${file.name}". Intenta con un MP4 mas liviano o grabado en H.264.`
+                    );
+                  })
+                : null;
 
-            return { file, type, duration };
+            return { file, type: mediaType, duration };
           })
         );
 
@@ -1107,14 +1156,15 @@ export default function PerfilPrestador() {
           incomingVideoSeconds > 0 &&
           videoSecondsUsed + incomingVideoSeconds > videoSecondsLimit
         ) {
+          const text = `Estos videos suman ${formatVideoTime(
+            incomingVideoSeconds
+          )} y superan tus ${formatVideoTime(
+            videoSecondsLimit
+          )} incluidos. Para subirlos debes comprar tiempo extra.`;
+
           setShowVideoTimePurchase(true);
-          setError(
-            `Estos videos suman ${formatVideoTime(
-              incomingVideoSeconds
-            )} y superan tus ${formatVideoTime(
-              videoSecondsLimit
-            )} incluidos. Para subirlos debes comprar tiempo extra.`
-          );
+          setError(text);
+          setMediaUploadError(text);
           return 0;
         }
 
@@ -1164,6 +1214,7 @@ export default function PerfilPrestador() {
             ? uploadError.message
             : "No pudimos subir el contenido";
         setError(text);
+        setMediaUploadError(text);
         return 0;
       } finally {
         setUploadingMedia(false);
@@ -1236,20 +1287,25 @@ export default function PerfilPrestador() {
     const description = contentDescription.trim();
 
     if (!priceNum || priceNum <= 0) {
-      setError("Ingresa un precio válido para el contenido privado");
+      const text = "Ingresa un precio valido para el contenido privado";
+      setError(text);
+      setMediaUploadError(text);
       return;
     }
 
     if (!description) {
+      const text = "Agrega una descripcion breve del contenido privado";
       setPrivateDescriptionError(
         "Agrega una descripcion breve para que el cliente sepa que desbloquea."
       );
-      setError("Agrega una descripción breve del contenido privado");
+      setError(text);
+      setMediaUploadError(text);
       privateDescriptionRef.current?.focus();
       return;
     }
 
     setPrivateDescriptionError("");
+    setMediaUploadError("");
 
     const uploadedCount = await uploadMediaBatch(
       pendingFiles,
@@ -1271,6 +1327,7 @@ export default function PerfilPrestador() {
       setPendingFiles([]);
       setContentPrice("");
       setContentDescription("");
+      setMediaUploadError("");
     }
   };
 
@@ -1347,7 +1404,9 @@ export default function PerfilPrestador() {
     setError("");
 
     try {
-      if (!file.type.startsWith("video")) {
+      const { mediaType } = validateUploadFile(file);
+
+      if (mediaType !== "video") {
         throw new Error("Selecciona un video para publicar como video del dia");
       }
 
@@ -2418,6 +2477,7 @@ export default function PerfilPrestador() {
                     setContentPrice("");
                     setContentDescription("");
                     setPrivateDescriptionError("");
+                    setMediaUploadError("");
                     setShowPriceModal(true);
                   }}
                 />
@@ -2428,6 +2488,12 @@ export default function PerfilPrestador() {
           {uploadingMedia && (
             <div className="mt-4 rounded-md border border-blue-500/25 bg-blue-500/10 p-3 text-sm text-blue-100">
               Subiendo contenido...
+            </div>
+          )}
+
+          {mediaUploadError && !showPriceModal && (
+            <div className="mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 p-3 text-sm leading-6 text-rose-100">
+              {mediaUploadError}
             </div>
           )}
 
@@ -2556,6 +2622,7 @@ export default function PerfilPrestador() {
             setContentPrice("");
             setContentDescription("");
             setPrivateDescriptionError("");
+            setMediaUploadError("");
           }}
         >
           <div
@@ -2569,7 +2636,10 @@ export default function PerfilPrestador() {
               Define qué hay detrás y cuánto deberá pagar el cliente para
               desbloquearlo.
             </p>
-            {pendingFiles.some((file) => file.type.startsWith("video")) && (
+            {pendingFiles.some(
+              (file) =>
+                getUploadMediaType(inferUploadContentType(file)) === "video"
+            ) && (
               <div className="mt-4 rounded-md border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
                 Los primeros 3 minutos de video estan incluidos. Si alguno de
                 estos videos supera tu tiempo disponible, deberas comprar
@@ -2582,6 +2652,12 @@ export default function PerfilPrestador() {
                 {pendingFiles.length === 1
                   ? pendingFiles[0]?.name
                   : `${pendingFiles.length} archivos seleccionados`}
+              </div>
+            )}
+
+            {mediaUploadError && (
+              <div className="mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm leading-6 text-rose-100">
+                {mediaUploadError}
               </div>
             )}
 
@@ -2659,6 +2735,7 @@ export default function PerfilPrestador() {
                   setContentPrice("");
                   setContentDescription("");
                   setPrivateDescriptionError("");
+                  setMediaUploadError("");
                 }}
               >
                 Cancelar

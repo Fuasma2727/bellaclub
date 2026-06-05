@@ -23,10 +23,41 @@ const allowedTypes = [
   "video/mp4",
   "video/webm",
   "video/quicktime",
+  "video/x-m4v",
+  "video/3gpp",
+  "video/3gpp2",
 ];
+
+const contentTypeByExtension: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+  qt: "video/quicktime",
+  m4v: "video/x-m4v",
+  "3gp": "video/3gpp",
+  "3gpp": "video/3gpp",
+  "3g2": "video/3gpp2",
+};
 
 const getHost = (value: string) => {
   return value.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+};
+
+const normalizeContentType = (value: string) => {
+  return value.split(";")[0]?.trim().toLowerCase() || "";
+};
+
+const inferContentType = (contentType: string, filename: string) => {
+  const normalized = normalizeContentType(contentType);
+  const extension = filename.split(".").pop()?.toLowerCase();
+  const extensionType = extension ? contentTypeByExtension[extension] || "" : "";
+
+  return allowedTypes.includes(normalized) ? normalized : extensionType || normalized;
 };
 
 const getSafeFilename = (filename: string) => {
@@ -114,11 +145,13 @@ export async function POST(request: Request) {
     const requestContentType = request.headers.get("content-type") || "";
 
     if (!requestContentType.startsWith("multipart/form-data")) {
-      const contentType =
-        request.headers.get("x-file-type") || requestContentType;
       const filename =
         decodeURIComponent(request.headers.get("x-file-name") || "") ||
         "upload.bin";
+      const contentType = inferContentType(
+        request.headers.get("x-file-type") || requestContentType,
+        filename
+      );
       const declaredSize = Number(request.headers.get("x-file-size") || 0);
       const contentLength = Number(request.headers.get("content-length") || 0);
       const fileSize = declaredSize || contentLength;
@@ -164,14 +197,16 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!allowedTypes.includes(file.type)) {
+    const contentType = inferContentType(file.type, file.name);
+
+    if (!allowedTypes.includes(contentType)) {
       return NextResponse.json(
         { error: "Formato no permitido. Usa imagen o video compatible." },
         { status: 400 }
       );
     }
 
-    const maxSize = getMaxSizeMb(file.type);
+    const maxSize = getMaxSizeMb(contentType);
 
     if (file.size > maxSize * 1024 * 1024) {
       return NextResponse.json(
@@ -183,7 +218,7 @@ export async function POST(request: Request) {
     return uploadToBunny({
       body: file.stream(),
       contentLength: file.size,
-      contentType: file.type,
+      contentType,
       filename: file.name,
       uid: decoded.uid,
     });
