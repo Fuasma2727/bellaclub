@@ -87,6 +87,19 @@ type UploadResponse = {
   details?: string;
 };
 
+type UploadProgressStatus = "preparing" | "uploading" | "saving" | "complete" | "error";
+
+type MediaUploadProgressItem = {
+  id: string;
+  name: string;
+  type: MediaItem["type"];
+  previewUrl: string;
+  progress: number;
+  private: boolean;
+  status: UploadProgressStatus;
+  error?: string;
+};
+
 const MAX_IMAGE_UPLOAD_MB = 12;
 const MAX_VIDEO_UPLOAD_MB = 80;
 
@@ -276,20 +289,25 @@ const validateUploadFile = (file: File) => {
   return { contentType, mediaType };
 };
 
-const parseUploadResponse = async (res: Response): Promise<UploadResponse> => {
-  const responseText = await res.text();
-
+const parseUploadResponseText = (
+  status: number,
+  responseText: string
+): UploadResponse => {
   try {
     return responseText ? (JSON.parse(responseText) as UploadResponse) : {};
   } catch {
     return {
       error:
-        res.status === 413
+        status === 413
           ? "El servidor rechazo el archivo por tamano. Debemos aumentar el limite de carga en el servidor."
-          : `El servidor respondio con un formato inesperado (${res.status}). Revisa pm2 logs belaclub o el proxy del servidor.`,
+          : `El servidor respondio con un formato inesperado (${status}). Revisa pm2 logs belaclub o el proxy del servidor.`,
       details: responseText.slice(0, 300),
     };
   }
+};
+
+const parseUploadResponse = async (res: Response): Promise<UploadResponse> => {
+  return parseUploadResponseText(res.status, await res.text());
 };
 
 const uploadWithTimeout = async (
@@ -416,6 +434,64 @@ const uploadFile = async (file: File, token: string) => {
   }
 
   return data.url;
+};
+
+const uploadFileWithProgress = (
+  file: File,
+  token: string,
+  onProgress: (progress: number) => void
+) => {
+  const { contentType } = validateUploadFile(file);
+
+  return new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open("POST", "/api/upload-profile-photo");
+    xhr.timeout = 5 * 60 * 1000;
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("Content-Type", contentType || "application/octet-stream");
+    xhr.setRequestHeader("x-file-name", encodeURIComponent(file.name));
+    xhr.setRequestHeader("x-file-size", file.size.toString());
+    xhr.setRequestHeader("x-file-type", contentType || "application/octet-stream");
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || event.total <= 0) {
+        onProgress(5);
+        return;
+      }
+
+      onProgress(Math.min(99, Math.max(1, Math.round((event.loaded / event.total) * 100))));
+    };
+
+    xhr.onload = () => {
+      const data = parseUploadResponseText(xhr.status, xhr.responseText || "");
+
+      if (xhr.status >= 200 && xhr.status < 300 && data.url) {
+        onProgress(100);
+        resolve(data.url);
+        return;
+      }
+
+      reject(
+        new Error(data.error || data.details || "No pudimos subir el archivo")
+      );
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("No pudimos conectar con el servidor de subida."));
+    };
+
+    xhr.ontimeout = () => {
+      reject(
+        new Error(
+          "La subida tardo demasiado. Intenta con un video mas liviano o revisa la conexion."
+        )
+      );
+    };
+
+    onProgress(0);
+    xhr.send(file);
+  });
 };
 
 const getVideoDuration = (file: File) => {
@@ -647,6 +723,82 @@ function ProfileGalleryItem({
   );
 }
 
+function UploadProgressGalleryItem({ item }: { item: MediaUploadProgressItem }) {
+  const safeProgress = Math.max(0, Math.min(100, Math.round(item.progress)));
+  const isError = item.status === "error";
+  const statusLabel =
+    item.status === "preparing"
+      ? "Preparando"
+      : item.status === "saving"
+        ? "Guardando"
+        : item.status === "complete"
+          ? "Completado"
+          : isError
+            ? "Error"
+            : "Subiendo";
+
+  return (
+    <div
+      className={`relative aspect-square overflow-hidden rounded-md border bg-zinc-900 ${
+        isError ? "border-rose-400/40" : "border-blue-300/25"
+      }`}
+    >
+      {item.type === "photo" ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.previewUrl}
+          alt=""
+          draggable={false}
+          className="absolute inset-0 h-full w-full object-cover opacity-80"
+        />
+      ) : (
+        <video
+          src={item.previewUrl}
+          muted
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover opacity-80"
+        />
+      )}
+
+      <div className="absolute inset-0 bg-black/45" />
+      <div className="absolute inset-x-0 bottom-0 p-3">
+        <div className="rounded-md border border-white/10 bg-black/70 p-2.5 backdrop-blur">
+          <div className="flex items-center justify-between gap-2 text-xs font-semibold text-white">
+            <span className="truncate">{statusLabel}</span>
+            <span>{safeProgress}%</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
+            <div
+              className={`h-full rounded-full transition-all duration-200 ${
+                isError ? "bg-rose-400" : "bg-blue-300"
+              }`}
+              style={{ width: `${safeProgress}%` }}
+            />
+          </div>
+          <p className="mt-2 truncate text-[11px] text-neutral-300">
+            {isError ? item.error || "No pudimos subir el archivo" : item.name}
+          </p>
+        </div>
+      </div>
+
+      {item.private && (
+        <span className="absolute left-2 top-2 rounded-full border border-white/10 bg-black/70 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
+          Privado
+        </span>
+      )}
+    </div>
+  );
+}
+
+const revokeMediaUploadPreviews = (items: MediaUploadProgressItem[]) => {
+  for (const item of items) {
+    if (item.previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+  }
+};
+
 const getDateValue = (value: ProviderProfile["promotedUntil"]) => {
   if (!value) return null;
   if (typeof value === "string") return value;
@@ -703,6 +855,10 @@ export default function PerfilPrestador() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [mediaUploadError, setMediaUploadError] = useState("");
+  const [mediaUploadItems, setMediaUploadItems] = useState<
+    MediaUploadProgressItem[]
+  >([]);
+  const mediaUploadItemsRef = useRef<MediaUploadProgressItem[]>([]);
 
   const [expandedMedia, setExpandedMedia] = useState<MediaItem | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -721,6 +877,11 @@ export default function PerfilPrestador() {
   const [selectedVerificationLevel, setSelectedVerificationLevel] =
     useState<BadgeVerificationLevel>(1);
   const [verificationFile, setVerificationFile] = useState<File | null>(null);
+  const [verificationUploadProgress, setVerificationUploadProgress] =
+    useState<MediaUploadProgressItem | null>(null);
+  const verificationUploadProgressRef =
+    useRef<MediaUploadProgressItem | null>(null);
+  const verificationFileAreaRef = useRef<HTMLDivElement | null>(null);
   const [promotedUntil, setPromotedUntil] = useState<string | null>(null);
   const [dailyVideoUrl, setDailyVideoUrl] = useState("");
   const [dailyVideoExpiresAt, setDailyVideoExpiresAt] = useState<string | null>(
@@ -734,6 +895,25 @@ export default function PerfilPrestador() {
       ...media,
     ];
   }, [photoUrl, media]);
+
+  useEffect(() => {
+    mediaUploadItemsRef.current = mediaUploadItems;
+  }, [mediaUploadItems]);
+
+  useEffect(() => {
+    verificationUploadProgressRef.current = verificationUploadProgress;
+  }, [verificationUploadProgress]);
+
+  useEffect(() => {
+    return () => {
+      revokeMediaUploadPreviews(mediaUploadItemsRef.current);
+      const verificationProgress = verificationUploadProgressRef.current;
+
+      if (verificationProgress) {
+        revokeMediaUploadPreviews([verificationProgress]);
+      }
+    };
+  }, []);
 
   const videoSecondsUsed = useMemo(
     () => getProviderVideoSecondsUsed(media),
@@ -881,6 +1061,28 @@ export default function PerfilPrestador() {
     setError("");
     window.setTimeout(() => setMessage(""), 2500);
   };
+  const clearVerificationUploadProgress = useCallback(() => {
+    setVerificationUploadProgress((current) => {
+      if (current) {
+        revokeMediaUploadPreviews([current]);
+      }
+
+      return null;
+    });
+  }, []);
+  const closeVerificationModal = useCallback(() => {
+    setShowVerificationModal(false);
+    setVerificationFile(null);
+    clearVerificationUploadProgress();
+  }, [clearVerificationUploadProgress]);
+  const scrollToVerificationFileArea = () => {
+    window.setTimeout(() => {
+      verificationFileAreaRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 90);
+  };
   const scrollToProfileSection = (id: string) => {
     window.setTimeout(() => {
       document.getElementById(id)?.scrollIntoView({
@@ -932,9 +1134,11 @@ export default function PerfilPrestador() {
     if (!selectedIsAvailable && firstAvailableLevel) {
       setSelectedVerificationLevel(firstAvailableLevel);
       setVerificationFile(null);
+      clearVerificationUploadProgress();
     }
   }, [
     availableVerificationOptions,
+    clearVerificationUploadProgress,
     selectedVerificationLevel,
     showVerificationModal,
   ]);
@@ -1116,6 +1320,70 @@ export default function PerfilPrestador() {
     }
   };
 
+  const updateMediaUploadItem = useCallback(
+    (id: string, changes: Partial<MediaUploadProgressItem>) => {
+      setMediaUploadItems((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, ...changes } : item
+        )
+      );
+    },
+    []
+  );
+
+  const updateMediaUploadItems = useCallback(
+    (ids: string[], changes: Partial<MediaUploadProgressItem>) => {
+      const idSet = new Set(ids);
+
+      setMediaUploadItems((current) =>
+        current.map((item) =>
+          idSet.has(item.id) ? { ...item, ...changes } : item
+        )
+      );
+    },
+    []
+  );
+
+  const removeMediaUploadItems = useCallback((ids: string[], delayMs = 0) => {
+    const remove = () => {
+      const idSet = new Set(ids);
+
+      setMediaUploadItems((current) => {
+        const removed = current.filter((item) => idSet.has(item.id));
+        revokeMediaUploadPreviews(removed);
+        return current.filter((item) => !idSet.has(item.id));
+      });
+    };
+
+    if (delayMs > 0) {
+      window.setTimeout(remove, delayMs);
+      return;
+    }
+
+    remove();
+  }, []);
+
+  const createMediaUploadItems = useCallback(
+    (
+      preparedFiles: { file: File; type: MediaItem["type"] }[],
+      isPrivate: boolean
+    ) => {
+      const items = preparedFiles.map((item) => ({
+        id: createMediaId(),
+        name: item.file.name,
+        type: item.type,
+        previewUrl: URL.createObjectURL(item.file),
+        progress: 0,
+        private: isPrivate,
+        status: "preparing" as UploadProgressStatus,
+      }));
+
+      setMediaUploadItems((current) => [...items, ...current]);
+      return items;
+    },
+    []
+  );
+
   const uploadMediaBatch = useCallback(
     async (
       files: File[],
@@ -1129,23 +1397,32 @@ export default function PerfilPrestador() {
       setError("");
       setMediaUploadError("");
 
+      let progressItems: MediaUploadProgressItem[] = [];
+
       try {
         const token = await user.getIdToken();
+        const initialPreparedFiles = files.map((file) => {
+          const { mediaType } = validateUploadFile(file);
+          return { file, type: mediaType };
+        });
+
+        progressItems = createMediaUploadItems(initialPreparedFiles, isPrivate);
+
         const preparedFiles = await Promise.all(
-          files.map(async (file) => {
-            const { mediaType } = validateUploadFile(file);
+          initialPreparedFiles.map(async (item) => {
             const duration =
-              mediaType === "video"
-                ? await getVideoDuration(file).catch(() => {
+              item.type === "video"
+                ? await getVideoDuration(item.file).catch(() => {
                     throw new Error(
-                      `No pudimos leer la duracion de "${file.name}". Intenta con un MP4 mas liviano o grabado en H.264.`
+                      `No pudimos leer la duracion de "${item.file.name}". Intenta con un MP4 mas liviano o grabado en H.264.`
                     );
                   })
                 : null;
 
-            return { file, type: mediaType, duration };
+            return { ...item, duration };
           })
         );
+        const progressIds = progressItems.map((item) => item.id);
 
         const incomingVideoSeconds = preparedFiles.reduce(
           (total, item) => total + (item.duration || 0),
@@ -1165,6 +1442,10 @@ export default function PerfilPrestador() {
           setShowVideoTimePurchase(true);
           setError(text);
           setMediaUploadError(text);
+          updateMediaUploadItems(progressIds, {
+            error: text,
+            status: "error",
+          });
           return 0;
         }
 
@@ -1174,16 +1455,50 @@ export default function PerfilPrestador() {
 
         for (let index = 0; index < preparedFiles.length; index += uploadBatchSize) {
           const group = preparedFiles.slice(index, index + uploadBatchSize);
+          const groupProgressItems = progressItems.slice(
+            index,
+            index + uploadBatchSize
+          );
           const groupItems = await Promise.all(
-            group.map(async (item) => ({
-              id: createMediaId(),
-              type: item.type,
-              url: await uploadFile(item.file, token),
-              private: isPrivate,
-              price: isPrivate ? forcedPrice || 0 : null,
-              duration: item.duration,
-              description: isPrivate ? privateDescription?.trim() || "" : "",
-            }))
+            group.map(async (item, groupIndex) => {
+              const progressItem = groupProgressItems[groupIndex];
+
+              if (progressItem) {
+                updateMediaUploadItem(progressItem.id, {
+                  progress: 0,
+                  status: "uploading",
+                });
+              }
+
+              const url = await uploadFileWithProgress(
+                item.file,
+                token,
+                (progress) => {
+                  if (!progressItem) return;
+                  updateMediaUploadItem(progressItem.id, {
+                    progress,
+                    status: progress >= 100 ? "saving" : "uploading",
+                  });
+                }
+              );
+
+              if (progressItem) {
+                updateMediaUploadItem(progressItem.id, {
+                  progress: 100,
+                  status: "saving",
+                });
+              }
+
+              return {
+                id: createMediaId(),
+                type: item.type,
+                url,
+                private: isPrivate,
+                price: isPrivate ? forcedPrice || 0 : null,
+                duration: item.duration,
+                description: isPrivate ? privateDescription?.trim() || "" : "",
+              };
+            })
           );
 
           uploadedItems.push(...groupItems);
@@ -1207,6 +1522,11 @@ export default function PerfilPrestador() {
         }
 
         setMedia(data.media);
+        updateMediaUploadItems(progressIds, {
+          progress: 100,
+          status: "complete",
+        });
+        removeMediaUploadItems(progressIds, 900);
         return uploadedItems.length;
       } catch (uploadError) {
         const text =
@@ -1215,12 +1535,29 @@ export default function PerfilPrestador() {
             : "No pudimos subir el contenido";
         setError(text);
         setMediaUploadError(text);
+        if (progressItems.length > 0) {
+          updateMediaUploadItems(
+            progressItems.map((item) => item.id),
+            {
+              error: text,
+              status: "error",
+            }
+          );
+        }
         return 0;
       } finally {
         setUploadingMedia(false);
       }
     },
-    [user, videoSecondsLimit, videoSecondsUsed]
+    [
+      createMediaUploadItems,
+      removeMediaUploadItems,
+      updateMediaUploadItem,
+      updateMediaUploadItems,
+      user,
+      videoSecondsLimit,
+      videoSecondsUsed,
+    ]
   );
 
   const deleteMedia = async (index: number) => {
@@ -1306,9 +1643,14 @@ export default function PerfilPrestador() {
 
     setPrivateDescriptionError("");
     setMediaUploadError("");
+    const files = pendingFiles;
+    setShowPriceModal(false);
+    setPendingFiles([]);
+    setContentPrice("");
+    setContentDescription("");
 
     const uploadedCount = await uploadMediaBatch(
-      pendingFiles,
+      files,
       true,
       priceNum,
       description
@@ -1323,10 +1665,6 @@ export default function PerfilPrestador() {
     }
 
     if (uploadedCount > 0) {
-      setShowPriceModal(false);
-      setPendingFiles([]);
-      setContentPrice("");
-      setContentDescription("");
       setMediaUploadError("");
     }
   };
@@ -1510,7 +1848,12 @@ export default function PerfilPrestador() {
 
     setSelectedVerificationLevel(firstAvailableLevel);
     setVerificationFile(null);
+    clearVerificationUploadProgress();
     setShowVerificationModal(true);
+
+    if (firstAvailableLevel === 1 || firstAvailableLevel === 2) {
+      scrollToVerificationFileArea();
+    }
   };
 
   const requestBadgeVerification = async () => {
@@ -1530,18 +1873,69 @@ export default function PerfilPrestador() {
           ? "Sube una foto sosteniendo un papel que diga BelaClub y la fecha de hoy"
           : "Sube un video sosteniendo un papel que diga BelaClub y la fecha de hoy"
       );
+      scrollToVerificationFileArea();
       return;
     }
 
     setRequestingBadgeVerification(true);
     setError("");
+    clearVerificationUploadProgress();
+
+    let progressItem: MediaUploadProgressItem | null = null;
 
     try {
-      const evidenceUrl =
+      let evidenceUrl: string | null = null;
+
+      if (
         (selectedVerificationLevel === 1 || selectedVerificationLevel === 2) &&
         verificationFile
-          ? await uploadFile(verificationFile, await user.getIdToken())
-          : null;
+      ) {
+        const expectedType =
+          selectedVerificationLevel === 1 ? "photo" : "video";
+        const { mediaType } = validateUploadFile(verificationFile);
+
+        if (mediaType !== expectedType) {
+          throw new Error(
+            selectedVerificationLevel === 1
+              ? "Selecciona una foto para esta verificacion"
+              : "Selecciona un video para esta verificacion"
+          );
+        }
+
+        progressItem = {
+          id: createMediaId(),
+          name: verificationFile.name,
+          type: mediaType,
+          previewUrl: URL.createObjectURL(verificationFile),
+          progress: 0,
+          private: false,
+          status: "preparing",
+        };
+        setVerificationUploadProgress(progressItem);
+        scrollToVerificationFileArea();
+
+        evidenceUrl = await uploadFileWithProgress(
+          verificationFile,
+          await user.getIdToken(),
+          (progress) => {
+            setVerificationUploadProgress((current) =>
+              current && progressItem && current.id === progressItem.id
+                ? {
+                    ...current,
+                    progress,
+                    status: progress >= 100 ? "saving" : "uploading",
+                  }
+                : current
+            );
+          }
+        );
+
+        setVerificationUploadProgress((current) =>
+          current && progressItem && current.id === progressItem.id
+            ? { ...current, progress: 100, status: "saving" }
+            : current
+        );
+      }
 
       await setDoc(
         doc(db, "users", user.uid),
@@ -1550,7 +1944,11 @@ export default function PerfilPrestador() {
           badgeVerificationLevel: selectedVerificationLevel,
           badgeVerificationVideoUrl: evidenceUrl,
           badgeVerificationEvidenceType:
-            selectedVerificationLevel === 1 ? "photo" : "video",
+            selectedVerificationLevel === 1
+              ? "photo"
+              : selectedVerificationLevel === 2
+                ? "video"
+                : null,
           badgeVerificationRequestedAt: serverTimestamp(),
         },
         { merge: true }
@@ -1558,8 +1956,14 @@ export default function PerfilPrestador() {
 
       setBadgeVerificationStatus("pending");
       setBadgeVerificationLevel(selectedVerificationLevel);
-      setShowVerificationModal(false);
-      setVerificationFile(null);
+      setVerificationUploadProgress((current) =>
+        current && progressItem && current.id === progressItem.id
+          ? { ...current, progress: 100, status: "complete" }
+          : current
+      );
+      window.setTimeout(() => {
+        closeVerificationModal();
+      }, progressItem ? 650 : 0);
       showSuccess("Solicitud de verificacion enviada");
     } catch (requestError) {
       const text =
@@ -1567,6 +1971,12 @@ export default function PerfilPrestador() {
           ? requestError.message
           : "No pudimos enviar la solicitud";
       setError(text);
+      setVerificationUploadProgress((current) =>
+        current && progressItem && current.id === progressItem.id
+          ? { ...current, error: text, status: "error" }
+          : current
+      );
+      scrollToVerificationFileArea();
     } finally {
       setRequestingBadgeVerification(false);
     }
@@ -2497,12 +2907,16 @@ export default function PerfilPrestador() {
             </div>
           )}
 
-          {media.length === 0 ? (
+          {mediaUploadItems.length === 0 && media.length === 0 ? (
             <div className="mt-5 rounded-md border border-dashed border-white/[0.08] bg-black/20 p-10 text-center text-sm text-neutral-500">
               Todavía no tienes contenido en tu galería.
             </div>
           ) : (
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {mediaUploadItems.map((item) => (
+                <UploadProgressGalleryItem key={item.id} item={item} />
+              ))}
+
               {media.map((item, index) => (
                 <ProfileGalleryItem
                   key={`${item.url}-${index}`}
@@ -2758,8 +3172,9 @@ export default function PerfilPrestador() {
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/85 px-3 py-4 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6"
           onClick={() => {
-            setShowVerificationModal(false);
-            setVerificationFile(null);
+            if (!requestingBadgeVerification) {
+              closeVerificationModal();
+            }
           }}
         >
           <div
@@ -2788,11 +3203,16 @@ export default function PerfilPrestador() {
                   <button
                     key={option.level}
                     type="button"
+                    disabled={requestingBadgeVerification}
                     onClick={() => {
                       setSelectedVerificationLevel(option.level);
                       setVerificationFile(null);
+                      clearVerificationUploadProgress();
+                      if (option.level === 1 || option.level === 2) {
+                        scrollToVerificationFileArea();
+                      }
                     }}
-                    className={`rounded-lg border p-3 text-left transition hover:-translate-y-0.5 ${
+                    className={`rounded-lg border p-3 text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
                       selectedVerificationLevel === option.level
                         ? "border-emerald-300/50 bg-emerald-300/10 text-white shadow-lg shadow-emerald-950/25"
                         : "border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
@@ -2833,7 +3253,10 @@ export default function PerfilPrestador() {
 
               {(selectedVerificationLevel === 1 ||
                 selectedVerificationLevel === 2) && (
-                <div className="mt-4 rounded-xl border border-white/[0.08] bg-black/20 p-3">
+                <div
+                  ref={verificationFileAreaRef}
+                  className="mt-4 scroll-mt-24 rounded-xl border border-white/[0.08] bg-black/20 p-3"
+                >
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
                       Archivo requerido
@@ -2842,7 +3265,13 @@ export default function PerfilPrestador() {
                       {selectedVerificationLevel === 1 ? "Foto" : "Video"}
                     </span>
                   </div>
-                  <label className="relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-emerald-300/30 bg-emerald-300/[0.06] px-4 py-5 text-center transition hover:border-emerald-200/50 hover:bg-emerald-300/[0.1]">
+                  <label
+                    className={`relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-emerald-300/30 bg-emerald-300/[0.06] px-4 py-5 text-center transition hover:border-emerald-200/50 hover:bg-emerald-300/[0.1] ${
+                      requestingBadgeVerification
+                        ? "cursor-not-allowed opacity-70"
+                        : ""
+                    }`}
+                  >
                     <span className="text-sm font-semibold text-white">
                       {verificationFile
                         ? "Archivo seleccionado"
@@ -2860,13 +3289,88 @@ export default function PerfilPrestador() {
                       accept={
                         selectedVerificationLevel === 1 ? "image/*" : "video/*"
                       }
+                      disabled={requestingBadgeVerification}
                       className="absolute inset-0 cursor-pointer opacity-0"
                       onChange={(e) => {
                         setVerificationFile(e.target.files?.[0] || null);
+                        clearVerificationUploadProgress();
                         e.target.value = "";
                       }}
                     />
                   </label>
+
+                  {verificationUploadProgress && (
+                    <div className="mt-3 overflow-hidden rounded-lg border border-emerald-300/20 bg-emerald-300/[0.06]">
+                      <div className="relative aspect-video max-h-56 bg-black/40">
+                        {verificationUploadProgress.type === "photo" ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={verificationUploadProgress.previewUrl}
+                            alt=""
+                            className="h-full w-full object-cover opacity-80"
+                          />
+                        ) : (
+                          <video
+                            src={verificationUploadProgress.previewUrl}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="h-full w-full object-cover opacity-80"
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-black/35" />
+                      </div>
+                      <div className="p-3">
+                        <div className="flex items-center justify-between gap-3 text-xs font-semibold text-white">
+                          <span className="truncate">
+                            {verificationUploadProgress.status === "preparing"
+                              ? "Preparando archivo"
+                              : verificationUploadProgress.status === "saving"
+                                ? "Guardando solicitud"
+                                : verificationUploadProgress.status === "complete"
+                                  ? "Solicitud enviada"
+                                  : verificationUploadProgress.status === "error"
+                                    ? "Error"
+                                    : "Subiendo verificacion"}
+                          </span>
+                          <span>
+                            {Math.max(
+                              0,
+                              Math.min(
+                                100,
+                                Math.round(verificationUploadProgress.progress)
+                              )
+                            )}
+                            %
+                          </span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className={`h-full rounded-full transition-all duration-200 ${
+                              verificationUploadProgress.status === "error"
+                                ? "bg-rose-400"
+                                : "bg-emerald-300"
+                            }`}
+                            style={{
+                              width: `${Math.max(
+                                0,
+                                Math.min(
+                                  100,
+                                  Math.round(verificationUploadProgress.progress)
+                                )
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <p className="mt-2 truncate text-xs text-neutral-300">
+                          {verificationUploadProgress.status === "error"
+                            ? verificationUploadProgress.error ||
+                              "No pudimos subir el archivo"
+                            : verificationUploadProgress.name}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2875,9 +3379,9 @@ export default function PerfilPrestador() {
               <button
                 type="button"
                 className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]"
+                disabled={requestingBadgeVerification}
                 onClick={() => {
-                  setShowVerificationModal(false);
-                  setVerificationFile(null);
+                  closeVerificationModal();
                 }}
               >
                 Cancelar

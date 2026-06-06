@@ -35,6 +35,14 @@ const badgeByLevel = (level: number) => {
   return null;
 };
 
+const badgeLabelByLevel = (level: number) => {
+  if (level === 1) return "Bronce";
+  if (level === 2) return "Plata";
+  if (level === 3) return "Oro";
+  if (level === 4) return "Diamante";
+  return "verificacion";
+};
+
 type Params = {
   params: Promise<{
     uid: string;
@@ -165,6 +173,18 @@ export async function PATCH(request: Request, { params }: Params) {
       });
 
       const subscriptionResult = await processProviderSubscription(uid);
+      const badgeLabel = badgeLabelByLevel(level);
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "badge_verification_approved",
+        title: "Nivel aprobado",
+        message: `Tu nivel ${badgeLabel} fue aprobado. Ya aparece en tu perfil.`,
+        badge,
+        badgeLevel: level,
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
+      });
 
       return NextResponse.json({
         success: true,
