@@ -826,9 +826,6 @@ export default function PerfilPrestador() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
     null
   );
-  const [subscriptionNextChargeAt, setSubscriptionNextChargeAt] = useState<
-    string | null
-  >(null);
 
   const [editMode, setEditMode] = useState(false);
   const [name, setName] = useState("");
@@ -950,7 +947,6 @@ export default function PerfilPrestador() {
   );
   const hasGalleryContent = media.length > 0;
   const profileReadiness = [
-    hasProfilePhoto,
     hasBasicInfo,
     verificationStatus === "approved",
     hasGalleryContent,
@@ -966,40 +962,11 @@ export default function PerfilPrestador() {
           : subscriptionStatus === "admin_override"
             ? "Activada por admin"
             : "Pendiente de activar";
-  const subscriptionTone =
-    subscriptionStatus === "active" || subscriptionStatus === "admin_override"
-      ? "emerald"
-      : subscriptionStatus === "paused"
-        ? "amber"
-        : subscriptionStatus === "past_due"
-          ? "rose"
-          : "blue";
-  const subscriptionStatusClass =
-    subscriptionTone === "emerald"
-      ? "border-emerald-400/20 bg-emerald-400/[0.07] text-emerald-100"
-      : subscriptionTone === "amber"
-        ? "border-amber-400/20 bg-amber-400/[0.07] text-amber-100"
-        : subscriptionTone === "rose"
-          ? "border-rose-400/20 bg-rose-400/[0.07] text-rose-100"
-          : "border-blue-400/20 bg-blue-400/[0.07] text-blue-100";
-  const formatProfileDate = (value: string | null) => {
-    if (!value) return "";
-    return new Date(value).toLocaleDateString("es-CO", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  const subscriptionIsOk =
+    subscriptionStatus === "active" ||
+    subscriptionStatus === "admin_override" ||
+    subscriptionStatus === "paused";
   const onboardingSteps = [
-    {
-      label: "Foto principal",
-      description: hasProfilePhoto
-        ? "Tu tarjeta ya tiene portada."
-        : "Sube una foto para poder aparecer en escorts.",
-      done: hasProfilePhoto,
-      action: "photo",
-      cta: "Subir foto",
-    },
     {
       label: "Datos publicos",
       description: hasBasicInfo
@@ -1060,6 +1027,13 @@ export default function PerfilPrestador() {
     setMessage(text);
     setError("");
     window.setTimeout(() => setMessage(""), 2500);
+  };
+  const openRechargeBalanceModal = () => {
+    window.dispatchEvent(
+      new CustomEvent("belaclub:open-balance-modal", {
+        detail: { mode: "recharge" },
+      })
+    );
   };
   const clearVerificationUploadProgress = useCallback(() => {
     setVerificationUploadProgress((current) => {
@@ -1178,7 +1152,6 @@ export default function PerfilPrestador() {
         setProfileVisible(Boolean(data.profileVisible));
         setProfilePaused(Boolean(data.profilePaused));
         setSubscriptionStatus(data.subscriptionStatus || null);
-        setSubscriptionNextChargeAt(getDateValue(data.subscriptionNextChargeAt));
         setVideoSecondsExtra(Number(data.videoSecondsExtra || 0));
         setPromotedUntil(getDateValue(data.promotedUntil));
         setDailyVideoUrl(data.dailyVideo?.url || "");
@@ -2031,32 +2004,6 @@ export default function PerfilPrestador() {
           </div>
         )}
 
-        {!hasProfilePhoto && (
-          <div className="mb-4 rounded-lg border border-amber-300/25 bg-amber-300/10 p-4 shadow-lg shadow-black/20">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-amber-100">
-                  Sube una foto de perfil para aparecer en escorts
-                </p>
-                <p className="mt-1 text-xs leading-5 text-amber-50/75">
-                  Tu perfil puede estar aprobado, pero no se mostrara en la
-                  pagina principal hasta que tengas una foto principal.
-                </p>
-              </div>
-              <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-amber-200/30 bg-amber-300/15 px-4 text-xs font-semibold text-amber-50 transition hover:bg-amber-300/20">
-                {uploadingProfile ? "Subiendo..." : "Subir foto"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  disabled={uploadingProfile}
-                  onChange={handleProfilePhoto}
-                />
-              </label>
-            </div>
-          </div>
-        )}
-
         {profileReadiness < onboardingSteps.length && (
           <section className="mb-4 rounded-lg border border-white/[0.08] bg-[#101012] p-3 shadow-xl shadow-black/20">
             <button
@@ -2069,7 +2016,7 @@ export default function PerfilPrestador() {
                   Guia rapida para completar perfil
                 </span>
                 <span className="mt-0.5 block text-xs text-neutral-500">
-                  {profileReadiness}/5 pasos listos
+                  {profileReadiness}/{onboardingSteps.length} pasos listos
                 </span>
               </span>
               <span className="rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-100">
@@ -2105,27 +2052,15 @@ export default function PerfilPrestador() {
                     <p className="mt-2 text-xs leading-5 text-neutral-500">
                       {step.description}
                     </p>
-                    {!step.done &&
-                      (step.action === "photo" ? (
-                        <label className="mt-3 inline-flex h-8 cursor-pointer items-center justify-center rounded-md border border-amber-300/25 bg-amber-300/10 px-3 text-xs font-semibold text-amber-100 transition hover:border-amber-200/40 hover:bg-amber-300/15">
-                          {uploadingProfile ? "Subiendo..." : step.cta}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            hidden
-                            disabled={uploadingProfile}
-                            onChange={handleProfilePhoto}
-                          />
-                        </label>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleOnboardingAction(step.action)}
-                          className="mt-3 inline-flex h-8 items-center justify-center rounded-md border border-blue-300/20 bg-blue-400/10 px-3 text-xs font-semibold text-blue-100 transition hover:border-blue-200/35 hover:bg-blue-400/15"
-                        >
-                          {step.cta}
-                        </button>
-                      ))}
+                    {!step.done && (
+                      <button
+                        type="button"
+                        onClick={() => handleOnboardingAction(step.action)}
+                        className="mt-3 inline-flex h-8 items-center justify-center rounded-md border border-blue-300/20 bg-blue-400/10 px-3 text-xs font-semibold text-blue-100 transition hover:border-blue-200/35 hover:bg-blue-400/15"
+                      >
+                        {step.cta}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2135,193 +2070,256 @@ export default function PerfilPrestador() {
 
         <section
           id="estado-perfil"
-          className="scroll-mt-24 rounded-lg border border-white/[0.08] bg-[#101012] p-4 shadow-2xl shadow-black/25"
+          className="scroll-mt-24 overflow-hidden rounded-lg border border-white/[0.08] bg-[#101012] shadow-2xl shadow-black/25"
         >
-          <div className="flex flex-col gap-4">
-            <aside className="flex flex-col gap-4 lg:flex-row lg:items-start">
-              <div className="flex shrink-0 flex-col items-start gap-3 sm:w-40 sm:items-center">
-                <div
-                  className="relative h-32 w-32 overflow-hidden rounded-full border-2 border-white/80 bg-zinc-900 shadow-xl shadow-black/35 ring-4 ring-white/[0.04] sm:h-36 sm:w-36"
-                  onClick={() => openExpanded(0)}
-                >
-                  <Image
-                    src={photoUrl || "/default-avatar.png"}
-                    alt="Foto principal del perfil"
-                    fill
-                    className="object-cover"
-                    sizes="128px"
-                    priority
-                  />
-                  {uploadingProfile && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-xs">
-                      Subiendo...
-                    </div>
-                  )}
-                </div>
-                {effectiveVerificationBadge && (
-                  <span
-                    className="inline-flex h-7 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2.5 text-[11px] font-semibold text-neutral-100 shadow-lg shadow-black/20"
-                    aria-label={`Nivel ${effectiveBadgeLabel}`}
-                    title={`Nivel ${effectiveBadgeLabel}`}
-                  >
-                    <VerificationGem
-                      badge={effectiveVerificationBadge}
-                      className={
-                        effectiveVerificationBadge === "platinum"
-                          ? "h-4.5 w-4.5 text-white"
-                          : effectiveVerificationBadge === "gold"
-                            ? "h-4 w-4 text-amber-200"
-                            : effectiveVerificationBadge === "silver"
-                              ? "h-4 w-4 text-slate-100"
-                              : "h-4 w-4 text-[#d79263]"
-                      }
-                    />
-                    <span className="text-neutral-300">Aprobado</span>
-                  </span>
-                )}
-                <div
-                  className={`w-full rounded-md border px-3 py-2 text-left shadow-lg shadow-black/15 ${subscriptionStatusClass}`}
-                >
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
-                    Mensualidad
-                  </p>
-                  <p className="mt-1 text-xs font-semibold">
-                    {subscriptionLabel}
-                  </p>
-                  {subscriptionNextChargeAt && (
-                    <p className="mt-1 text-[11px] opacity-70">
-                      Cobro: {formatProfileDate(subscriptionNextChargeAt)}
-                    </p>
-                  )}
-                </div>
-              </div>
+          <div>
+            <div className="flex justify-end px-3 pt-3 sm:px-4">
+              <button
+                type="button"
+                onClick={openRechargeBalanceModal}
+                title={subscriptionLabel}
+                aria-label={`${subscriptionLabel}. Abrir recarga de saldo`}
+                className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+              >
+                <span>Mensualidad</span>
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    subscriptionIsOk
+                      ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
+                      : "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
+                  }`}
+                />
+              </button>
+            </div>
 
-              <div className="min-w-0 flex-1 pt-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-xs font-medium text-neutral-500">Perfil</p>
-                  <span
-                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusPillClass[status.tone]}`}
-                  >
-                    {status.label}
-                  </span>
-                </div>
-                <h1 className="mt-1 truncate text-xl font-semibold text-neutral-50">
-                  {name || "Completa tu perfil"}
-                </h1>
-                <p className="mt-1 text-xs text-neutral-500">
-                  {profilePaused
-                    ? "Pausado por ti"
-                    : visiblePublicly
-                      ? "Visible publicamente"
-                      : hasProfilePhoto
-                        ? "Oculto por verificacion"
-                        : "Oculto: falta foto de perfil"}
-                </p>
-                {/* legacy visibility copy removed */}
-                <p className="hidden" aria-hidden="true">
-                  {visiblePublicly ? "Visible públicamente" : "Oculto"}
-                </p>
-
-                <div className="mt-3 grid max-w-sm gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setEditMode((value) => !value)}
-                    className={`group inline-flex h-7 items-center justify-start gap-2 rounded-md px-2 text-sm font-semibold transition ${
-                      editMode
-                        ? "bg-white/[0.06] text-neutral-100 hover:bg-white/[0.09]"
-                        : "text-neutral-100 hover:bg-blue-500/10 hover:text-blue-100"
-                    }`}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4 text-blue-300"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </svg>
-                    {editMode ? "Cerrar edicion" : "Editar perfil"}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={updatingPause || verificationStatus !== "approved"}
-                    onClick={() => setShowPauseModal(true)}
-                    className={`inline-flex h-7 items-center justify-start gap-2 rounded-md px-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                      profilePaused
-                        ? "text-emerald-100 hover:bg-emerald-400/10"
-                        : "text-neutral-100 hover:bg-amber-400/10 hover:text-amber-100"
-                    }`}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className={`h-4 w-4 ${
-                        profilePaused ? "text-emerald-300" : "text-amber-300"
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      {profilePaused ? (
-                        <path d="m5 3 14 9-14 9V3Z" />
+            <div className="px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <div className="flex shrink-0 flex-col items-center gap-2.5 sm:w-44">
+                    <div className="flex w-full flex-col items-center gap-2.5 rounded-lg border border-white/[0.08] bg-black/20 px-3 py-3">
+                      {hasProfilePhoto ? (
+                        <button
+                          type="button"
+                          className="relative h-28 w-28 overflow-hidden rounded-full border-2 border-white/80 bg-zinc-900 shadow-xl shadow-black/35 ring-4 ring-white/[0.04] transition hover:border-white sm:h-32 sm:w-32"
+                          onClick={() => openExpanded(0)}
+                          aria-label="Ver foto principal"
+                        >
+                          <Image
+                            src={photoUrl}
+                            alt="Foto principal del perfil"
+                            fill
+                            className="object-cover"
+                            sizes="128px"
+                            priority
+                          />
+                          {uploadingProfile && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-xs">
+                              Subiendo...
+                            </div>
+                          )}
+                        </button>
                       ) : (
-                        <>
-                          <path d="M10 4H6v16h4V4Z" />
-                          <path d="M18 4h-4v16h4V4Z" />
-                        </>
+                        <label className="group relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-amber-200/80 bg-amber-300/10 shadow-[0_0_34px_rgba(251,191,36,0.34)] ring-4 ring-amber-300/25 transition hover:border-amber-100 hover:bg-amber-300/15 hover:shadow-[0_0_42px_rgba(251,191,36,0.48)] sm:h-32 sm:w-32">
+                          <Image
+                            src="/default-avatar.png"
+                            alt="Foto principal del perfil"
+                            fill
+                            className="object-cover opacity-35 transition group-hover:opacity-45"
+                            sizes="128px"
+                            priority
+                          />
+                          <span className="absolute inset-0 bg-amber-300/10" />
+                          <span className="relative rounded-full border border-amber-100/30 bg-black/55 px-3 py-1.5 text-xs font-semibold text-amber-50 shadow-lg shadow-black/30 backdrop-blur">
+                            {uploadingProfile ? "Subiendo..." : "Subir foto"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            disabled={uploadingProfile}
+                            onChange={handleProfilePhoto}
+                          />
+                        </label>
                       )}
-                    </svg>
-                    {profilePaused ? "Reactivar perfil" : "Pausar perfil"}
-                  </button>
 
-                  <button
-                    type="button"
-                    disabled={
-                      buyingPromotion ||
-                      verificationStatus !== "approved" ||
-                      !hasProfilePhoto
-                    }
-                    onClick={() => setShowPromotionModal(true)}
-                    className="inline-flex h-7 items-center justify-start gap-2 rounded-md px-2 text-sm font-semibold text-neutral-100 transition hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4 text-cyan-300"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 3v18" />
-                      <path d="m6 9 6-6 6 6" />
-                      <path d="M5 21h14" />
-                    </svg>
-                    {promotionActive ? "Extender promocion" : "Promocionar perfil"}
-                  </button>
-                </div>
+                      {editMode && hasProfilePhoto && (
+                        <label className="inline-flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-3 text-xs font-semibold text-neutral-100 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4 text-neutral-300"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                          </svg>
+                          Cambiar foto
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            disabled={uploadingProfile}
+                            onChange={handleProfilePhoto}
+                          />
+                        </label>
+                      )}
+                    </div>
 
-                {(
-                  <div className="mt-3 max-w-sm rounded-lg border border-white/[0.08] bg-black/20 p-1.5">
-                    {effectiveVerificationBadge ? (
-                      <div className="grid gap-1.5">
-                        {badgeVerificationStatus === "pending" && (
-                          <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-amber-400/25 bg-amber-400/10 px-3 text-xs font-semibold text-amber-200">
+                    {effectiveVerificationBadge && (
+                      <span
+                        className="inline-flex h-7 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2.5 text-[11px] font-semibold text-neutral-100 shadow-lg shadow-black/20"
+                        aria-label={`Nivel ${effectiveBadgeLabel}`}
+                        title={`Nivel ${effectiveBadgeLabel}`}
+                      >
+                        <VerificationGem
+                          badge={effectiveVerificationBadge}
+                          className={
+                            effectiveVerificationBadge === "platinum"
+                              ? "h-4.5 w-4.5 text-white"
+                              : effectiveVerificationBadge === "gold"
+                                ? "h-4 w-4 text-amber-200"
+                                : effectiveVerificationBadge === "silver"
+                                  ? "h-4 w-4 text-slate-100"
+                                  : "h-4 w-4 text-[#d79263]"
+                          }
+                        />
+                        <span className="text-neutral-300">
+                          {effectiveBadgeLabel}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1 pt-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-medium text-neutral-500">
+                        Perfil
+                      </p>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusPillClass[status.tone]}`}
+                      >
+                        {status.label}
+                      </span>
+                    </div>
+                    <h1 className="mt-1 break-words text-2xl font-semibold text-neutral-50">
+                      {name || "Completa tu perfil"}
+                    </h1>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      {profilePaused
+                        ? "Pausado por ti"
+                        : visiblePublicly
+                          ? "Visible publicamente"
+                          : hasProfilePhoto
+                            ? "Oculto por verificacion"
+                            : "Oculto: falta foto de perfil"}
+                    </p>
+                    {/* legacy visibility copy removed */}
+                    <p className="hidden" aria-hidden="true">
+                      {visiblePublicly ? "Visible públicamente" : "Oculto"}
+                    </p>
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditMode((value) => !value)}
+                        className={`group inline-flex h-10 items-center justify-start gap-3 rounded-md border px-3 text-sm font-semibold transition ${
+                          editMode
+                            ? "border-white/15 bg-white/[0.06] text-neutral-100 hover:bg-white/[0.09]"
+                            : "border-blue-300/15 bg-blue-400/[0.06] text-neutral-100 hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100"
+                        }`}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4 text-blue-300"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                        </svg>
+                        {editMode ? "Cerrar edicion" : "Editar perfil"}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={
+                          updatingPause || verificationStatus !== "approved"
+                        }
+                        onClick={() => setShowPauseModal(true)}
+                        className={`inline-flex h-10 items-center justify-start gap-3 rounded-md border px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                          profilePaused
+                            ? "border-emerald-300/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/12"
+                            : "border-amber-300/15 bg-amber-400/[0.06] text-neutral-100 hover:border-amber-300/30 hover:bg-amber-400/10 hover:text-amber-100"
+                        }`}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className={`h-4 w-4 ${
+                            profilePaused ? "text-emerald-300" : "text-amber-300"
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          {profilePaused ? (
+                            <path d="m5 3 14 9-14 9V3Z" />
+                          ) : (
+                            <>
+                              <path d="M10 4H6v16h4V4Z" />
+                              <path d="M18 4h-4v16h4V4Z" />
+                            </>
+                          )}
+                        </svg>
+                        {profilePaused ? "Reactivar perfil" : "Pausar perfil"}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={
+                          buyingPromotion ||
+                          verificationStatus !== "approved" ||
+                          !hasProfilePhoto
+                        }
+                        onClick={() => setShowPromotionModal(true)}
+                        className="inline-flex h-10 items-center justify-start gap-3 rounded-md border border-cyan-300/15 bg-cyan-400/[0.06] px-3 text-sm font-semibold text-neutral-100 transition hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4 text-cyan-300"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M12 3v18" />
+                          <path d="m6 9 6-6 6 6" />
+                          <path d="M5 21h14" />
+                        </svg>
+                        {promotionActive
+                          ? "Extender promocion"
+                          : "Promocionar perfil"}
+                      </button>
+
+                      {effectiveVerificationBadge ? (
+                        badgeVerificationStatus === "pending" ? (
+                          <span className="inline-flex h-10 items-center justify-start rounded-md border border-amber-400/25 bg-amber-400/10 px-3 text-sm font-semibold text-amber-200">
                             Nivel {badgeVerificationLevel || ""} en revision
                           </span>
-                        )}
-                        {canUpgradeVerification && (
+                        ) : canUpgradeVerification ? (
                           <button
                             type="button"
                             onClick={openVerificationRequest}
                             disabled={requestingBadgeVerification}
-                            className="group inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-3 text-xs font-semibold text-neutral-100 transition hover:border-blue-300/35 hover:bg-blue-500/10 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex h-10 items-center justify-start gap-3 rounded-md border border-blue-300/15 bg-blue-400/[0.06] px-3 text-sm font-semibold text-neutral-100 transition hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <svg
                               viewBox="0 0 24 24"
@@ -2337,144 +2335,34 @@ export default function PerfilPrestador() {
                             </svg>
                             Subir de nivel
                           </button>
-                        )}
-                      </div>
-                    ) : badgeVerificationStatus === "pending" ? (
-                      <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-amber-400/25 bg-amber-400/10 px-3 text-xs font-semibold text-amber-200">
-                        Nivel {badgeVerificationLevel || ""} en revision
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                      onClick={openVerificationRequest}
-                      disabled={requestingBadgeVerification}
-                        className="group inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-emerald-400/25 bg-emerald-400/10 px-3 text-xs font-semibold text-emerald-100 transition hover:border-emerald-300/45 hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 transition group-hover:scale-125 group-hover:bg-emerald-200" />
-                        Solicitar verificacion
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {editMode && (
-                <label className="mt-2 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-3 text-xs font-semibold text-neutral-100 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4 text-neutral-300"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                  Editar foto
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={handleProfilePhoto}
-                  />
-                </label>
-                )}
-              </div>
-
-              <div
-                id="video-del-dia"
-                className="scroll-mt-24 rounded-lg border border-sky-300/12 bg-[linear-gradient(135deg,rgba(14,165,233,0.08),rgba(10,10,11,0.96)_42%,rgba(10,10,11,1))] p-4 shadow-xl shadow-black/20 lg:ml-auto lg:min-h-[190px] lg:flex-1"
-              >
-                <div className="flex h-full flex-col justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-sky-300/20 bg-sky-400/10 text-sky-200">
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="h-4 w-4"
-                          fill="currentColor"
+                        ) : (
+                          <span className="inline-flex h-10 items-center justify-start rounded-md border border-emerald-400/15 bg-emerald-400/[0.06] px-3 text-sm font-semibold text-emerald-100">
+                            Nivel {effectiveBadgeLabel} activo
+                          </span>
+                        )
+                      ) : badgeVerificationStatus === "pending" ? (
+                        <span className="inline-flex h-10 items-center justify-start rounded-md border border-amber-400/25 bg-amber-400/10 px-3 text-sm font-semibold text-amber-200">
+                          Nivel {badgeVerificationLevel || ""} en revision
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={openVerificationRequest}
+                          disabled={requestingBadgeVerification}
+                          className="inline-flex h-10 items-center justify-start gap-3 rounded-md border border-emerald-400/20 bg-emerald-400/[0.07] px-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-300/40 hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
-                        </svg>
-                      </span>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">
-                          Video del dia
-                        </p>
-                        <p className="mt-0.5 text-xs text-neutral-400">
-                          Activo por 4 horas en tu tarjeta.
-                        </p>
-                      </div>
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                          Solicitar verificacion
+                        </button>
+                      )}
                     </div>
-
-                    {dailyVideoActive && dailyVideoExpiresAt ? (
-                      <p className="mt-3 rounded-md border border-emerald-300/15 bg-emerald-300/10 px-3 py-2 text-xs font-semibold text-emerald-100">
-                        Activo hasta{" "}
-                        {new Date(dailyVideoExpiresAt).toLocaleString("es-CO")}
-                      </p>
-                    ) : (
-                      <p className="mt-3 max-w-md text-xs leading-5 text-neutral-500">
-                        Sube un video corto de maximo{" "}
-                        {DAILY_VIDEO_MAX_SECONDS} segundos para destacar tu
-                        perfil.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    {dailyVideoActive && dailyVideoUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setShowDailyVideoModal(true)}
-                        className="inline-flex h-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-neutral-200 transition hover:bg-white/[0.08] hover:text-white"
-                      >
-                        Ver activo
-                      </button>
-                    )}
-                    <label
-                      className={`inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold text-white shadow-lg shadow-sky-950/20 transition ${
-                        uploadingDailyVideo ||
-                        verificationStatus !== "approved" ||
-                        !hasProfilePhoto
-                          ? "cursor-not-allowed bg-sky-700/60 opacity-60"
-                          : "bg-sky-600 hover:bg-sky-500"
-                      }`}
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4"
-                        fill="currentColor"
-                      >
-                        <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
-                      </svg>
-                      {uploadingDailyVideo
-                        ? "Subiendo..."
-                        : dailyVideoActive
-                          ? "Reemplazar video"
-                          : "Subir video"}
-                      <input
-                        type="file"
-                        accept="video/*"
-                        hidden
-                        disabled={
-                          uploadingDailyVideo ||
-                          verificationStatus !== "approved" ||
-                          !hasProfilePhoto
-                        }
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          e.target.value = "";
-                          if (file) void uploadDailyVideo(file);
-                        }}
-                      />
-                    </label>
                   </div>
                 </div>
               </div>
-            </aside>
 
-            <div>
+            </div>
+
+            <div className="px-4 pb-4 sm:px-5 sm:pb-5">
               {editMode && (
                 <div className="rounded-lg border border-white/[0.08] bg-black/25 p-2">
                   <button
@@ -2799,8 +2687,8 @@ export default function PerfilPrestador() {
           id="galeria-perfil"
           className="mt-4 scroll-mt-24 rounded-lg border border-white/[0.08] bg-[#101012] p-5 shadow-2xl shadow-black/20"
         >
-          <div className="relative flex flex-col gap-4 border-b border-white/[0.08] pb-5 sm:min-h-[92px] sm:block">
-            <div className="sm:pr-[470px]">
+          <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
               <h2 className="text-2xl font-semibold text-neutral-50">Galería</h2>
               <p className="mt-1 text-sm text-neutral-500">
                 Tiempo de video: {formatVideoTime(videoSecondsUsed)} /{" "}
@@ -2809,8 +2697,10 @@ export default function PerfilPrestador() {
             </div>
 
             <div
-              className={`grid w-full gap-2 sm:absolute sm:right-0 sm:top-0 sm:w-auto sm:grid-cols-2 ${
-                showVideoTimeAction ? "sm:min-w-[420px] lg:grid-cols-3" : "sm:min-w-[310px]"
+              className={`grid w-full gap-2 sm:w-auto ${
+                showVideoTimeAction
+                  ? "sm:grid-cols-2 xl:grid-cols-4"
+                  : "sm:grid-cols-3"
               }`}
             >
               {showVideoTimeAction && (
@@ -2827,6 +2717,54 @@ export default function PerfilPrestador() {
                       )}`}
                 </button>
               )}
+
+              <label
+                id="video-del-dia"
+                className={`group flex h-12 scroll-mt-24 items-center justify-center gap-2 rounded-md border px-4 text-center text-xs font-semibold transition ${
+                  uploadingDailyVideo ||
+                  verificationStatus !== "approved" ||
+                  !hasProfilePhoto
+                    ? "cursor-not-allowed border-sky-300/15 bg-sky-700/20 text-sky-100/60 opacity-70"
+                    : "cursor-pointer border-sky-300/25 bg-sky-500/12 text-sky-100 hover:border-sky-200/45 hover:bg-sky-500/18"
+                }`}
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-sky-200/20 bg-sky-400/10 text-sky-200 transition group-hover:border-sky-200/35 group-hover:text-sky-100">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="currentColor"
+                  >
+                    <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
+                  </svg>
+                </span>
+                <span className="flex flex-col items-start leading-tight">
+                  <span>
+                    {uploadingDailyVideo
+                      ? "Subiendo..."
+                      : dailyVideoActive
+                        ? "Reemplazar video"
+                        : "Video del dia"}
+                  </span>
+                  <span className="text-[10px] font-medium text-sky-100/60">
+                    {dailyVideoActive ? "Activo 4 horas" : "Max 30 segundos"}
+                  </span>
+                </span>
+                <input
+                  type="file"
+                  accept="video/*"
+                  hidden
+                  disabled={
+                    uploadingDailyVideo ||
+                    verificationStatus !== "approved" ||
+                    !hasProfilePhoto
+                  }
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void uploadDailyVideo(file);
+                  }}
+                />
+              </label>
 
               <label className="group flex h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.035] px-4 text-center text-xs font-semibold text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition group-hover:border-white/20 group-hover:text-white">

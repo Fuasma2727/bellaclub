@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   collection,
   doc,
@@ -148,7 +148,7 @@ export default function Header() {
     return () => unsubscribe();
   }, [user, db]);
 
-  const resetBalanceModal = () => {
+  const resetBalanceModal = useCallback(() => {
     setSelectedRechargeAmount(null);
     setWithdrawalAmount("");
     setWithdrawalHolder("");
@@ -157,7 +157,33 @@ export default function Header() {
     setWithdrawalAccountType("");
     setBalanceMessage("");
     setBalanceSubmitting(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    const handleOpenBalanceModal = (event: Event) => {
+      const mode =
+        (event as CustomEvent<{ mode?: "recharge" | "withdraw" }>).detail
+          ?.mode === "withdraw"
+          ? "withdraw"
+          : "recharge";
+
+      resetBalanceModal();
+      setBalanceMode(mode);
+      setModalOpen(true);
+    };
+
+    window.addEventListener(
+      "belaclub:open-balance-modal",
+      handleOpenBalanceModal
+    );
+
+    return () => {
+      window.removeEventListener(
+        "belaclub:open-balance-modal",
+        handleOpenBalanceModal
+      );
+    };
+  }, [resetBalanceModal]);
 
   const closeBalanceModal = () => {
     resetBalanceModal();
