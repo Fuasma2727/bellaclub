@@ -123,6 +123,7 @@ type VerificationAction =
   | "block"
   | "unblock"
   | "deleteMedia"
+  | "deleteProvider"
   | "disableSubscription"
   | "enableSubscription";
 
@@ -283,6 +284,7 @@ export default function AdminVerificationsPage() {
     mediaId?: string
   ) => {
     if (!user) return;
+    let confirmText: string | undefined;
 
     if (action === "reject" || action === "block") {
       const confirmed = window.confirm(
@@ -300,6 +302,20 @@ export default function AdminVerificationsPage() {
       );
 
       if (!confirmed) return;
+    }
+
+    if (action === "deleteProvider") {
+      const confirmed = window.confirm(
+        "Esta accion elimina por completo el perfil, sus fotos, registros y cuenta de acceso. No se puede deshacer. Quieres continuar?"
+      );
+
+      if (!confirmed) return;
+
+      confirmText =
+        window.prompt("Escribe ELIMINAR para confirmar el borrado total.") ||
+        "";
+
+      if (confirmText !== "ELIMINAR") return;
     }
 
     if (
@@ -331,7 +347,7 @@ export default function AdminVerificationsPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ action, mediaId }),
+        body: JSON.stringify({ action, mediaId, confirmText }),
       });
       const data = (await res.json()) as { error?: string };
 
@@ -340,6 +356,10 @@ export default function AdminVerificationsPage() {
       }
 
       setProviders((current) => {
+        if (action === "deleteProvider") {
+          return current.filter((item) => item.id !== provider.id);
+        }
+
         if (action === "deleteMedia" && mediaId) {
           return current.map((item) => {
             if (item.id !== provider.id) return item;
@@ -399,6 +419,10 @@ export default function AdminVerificationsPage() {
 
         return current.filter((item) => item.id !== provider.id);
       });
+
+      if (action === "deleteProvider") {
+        setSelectedProviderId(null);
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -842,6 +866,29 @@ export default function AdminVerificationsPage() {
               : "Bloquear perfil"}
         </button>
 
+        <div className="rounded-lg border border-red-500/25 bg-red-500/[0.06] p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-200/80">
+            Zona peligrosa
+          </p>
+          <p className="mt-1 text-xs leading-5 text-red-100/75">
+            Elimina el perfil completo, borra fotos de Bunny, registros
+            asociados y la cuenta de acceso.
+          </p>
+          <button
+            type="button"
+            disabled={actionId === provider.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleAction(provider, "deleteProvider");
+            }}
+            className="mt-3 w-full rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {actionId === provider.id
+              ? "Eliminando..."
+              : "Eliminar perfil completo"}
+          </button>
+        </div>
+
         {isBlockedView ? (
           <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">
             {provider.blockedReason === "subscription_unpaid"
@@ -1263,7 +1310,7 @@ export default function AdminVerificationsPage() {
         {user && !isLoading && activeView === "reports" && reports.length > 0 && (
           <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {reports.map((report) => {
-              const whatsappUrl = getWhatsAppUrl(report.providerWhatsapp);
+              const whatsappUrl = getWhatsAppUrl(report.providerWhatsapp, "");
 
               return (
                 <article

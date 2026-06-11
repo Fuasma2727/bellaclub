@@ -20,7 +20,10 @@ export const getLocation = (provider: Prestador) => {
     .join(", ");
 };
 
-export const getWhatsAppUrl = (phone?: string) => {
+export const getWhatsAppUrl = (
+  phone?: string,
+  message = "Hola, te vi en BelaClub"
+) => {
   const rawDigits = phone?.replace(/\D/g, "") || "";
   const digits = rawDigits.startsWith("00") ? rawDigits.slice(2) : rawDigits;
   const colombianMobile =
@@ -28,5 +31,8 @@ export const getWhatsAppUrl = (phone?: string) => {
 
   if (colombianMobile.length < 10) return "";
 
-  return `https://wa.me/${colombianMobile}`;
+  const text = message.trim();
+  const query = text ? `?text=${encodeURIComponent(text)}` : "";
+
+  return `https://wa.me/${colombianMobile}${query}`;
 };

@@ -48,8 +48,6 @@ type DailyVideo = {
   } | string | null;
 };
 
-type StatusTone = "approved" | "pending" | "rejected";
-
 type ProviderProfile = {
   role?: string;
   name?: string;
@@ -165,36 +163,6 @@ type DailyVideoResponse = {
 };
 
 const DAILY_VIDEO_MAX_SECONDS = 30;
-
-const statusCopy: Record<
-  VerificationStatus,
-  { label: string; description: string; tone: StatusTone }
-> = {
-  pending: {
-    label: "Pendiente de verificación",
-    description:
-      "Puedes completar tu perfil mientras revisamos tu solicitud. Aún no aparece públicamente.",
-    tone: "pending",
-  },
-  approved: {
-    label: "Perfil aprobado",
-    description:
-      "Tu perfil puede aparecer en la pagina publica de escorts.",
-    tone: "approved",
-  },
-  rejected: {
-    label: "Verificación rechazada",
-    description:
-      "Tu perfil no aparece públicamente. Contacta soporte o vuelve a solicitar revisión.",
-    tone: "rejected",
-  },
-};
-
-const statusPillClass: Record<StatusTone, string> = {
-  approved: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
-  pending: "border-amber-400/25 bg-amber-400/10 text-amber-200",
-  rejected: "border-rose-400/25 bg-rose-400/10 text-rose-200",
-};
 
 const fieldBaseClass =
   "w-full rounded-lg border border-white/10 bg-[#09090a] px-3 py-2 text-[13px] text-neutral-100 outline-none transition placeholder:text-neutral-600 focus:border-blue-400/70 focus:ring-2 focus:ring-blue-500/15";
@@ -934,7 +902,6 @@ export default function PerfilPrestador() {
   }, [department]);
   const zoneOptions = useMemo(() => getProviderZoneOptions(city), [city]);
 
-  const status = statusCopy[verificationStatus];
   const hasProfilePhoto = Boolean(photoUrl);
   const visiblePublicly = profileVisible && hasProfilePhoto;
   const hasBasicInfo = Boolean(
@@ -966,6 +933,53 @@ export default function PerfilPrestador() {
     subscriptionStatus === "active" ||
     subscriptionStatus === "admin_override" ||
     subscriptionStatus === "paused";
+  const profileIndicatorIsOk = visiblePublicly && !profilePaused;
+  const profileIndicatorLabel = profileIndicatorIsOk
+    ? "Perfil visible"
+    : profilePaused
+      ? "Perfil pausado"
+      : !hasProfilePhoto
+        ? "Falta foto de perfil"
+        : verificationStatus === "rejected"
+          ? "Verificacion rechazada"
+          : verificationStatus === "pending"
+            ? "Verificacion pendiente"
+            : "Perfil oculto";
+  const profileIndicatorText = profileIndicatorIsOk
+    ? "Perfil"
+    : profilePaused
+      ? "Pausado"
+      : !hasProfilePhoto
+        ? "Falta foto"
+        : verificationStatus === "rejected"
+          ? "Rechazado"
+          : verificationStatus === "pending"
+            ? "Pendiente"
+            : "Oculto";
+  const profileIndicatorTone = profileIndicatorIsOk
+    ? "ok"
+    : verificationStatus === "rejected"
+      ? "error"
+      : "warning";
+  const publicMediaCount = media.filter((item) => !item.private).length;
+  const privateMediaCount = media.filter((item) => item.private).length;
+  const videoMediaCount = media.filter((item) => item.type === "video").length;
+  const profilePriceNumber = Number(price);
+  const profilePriceLabel =
+    price && Number.isFinite(profilePriceNumber)
+      ? `$${profilePriceNumber.toLocaleString("es-CO")}`
+      : "";
+  const profileLocationLabel = [zone, city || department]
+    .filter(Boolean)
+    .join(", ");
+  const profileMetaLabel =
+    [profileLocationLabel, profilePriceLabel].filter(Boolean).join(" · ") ||
+    "Datos por completar";
+  const profileStats = [
+    { label: "Público", value: publicMediaCount },
+    { label: "Videos", value: videoMediaCount },
+    { label: "Privado", value: privateMediaCount },
+  ];
   const onboardingSteps = [
     {
       label: "Datos publicos",
@@ -2073,293 +2087,315 @@ export default function PerfilPrestador() {
           className="scroll-mt-24 overflow-hidden rounded-lg border border-white/[0.08] bg-[#101012] shadow-2xl shadow-black/25"
         >
           <div>
-            <div className="flex justify-end px-3 pt-3 sm:px-4">
-              <button
-                type="button"
-                onClick={openRechargeBalanceModal}
-                title={subscriptionLabel}
-                aria-label={`${subscriptionLabel}. Abrir recarga de saldo`}
-                className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
-              >
-                <span>Mensualidad</span>
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    subscriptionIsOk
-                      ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
-                      : "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
-                  }`}
-                />
-              </button>
-            </div>
+            <div className="px-3 py-3 sm:px-4 sm:py-4">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="flex shrink-0 flex-col items-center gap-1.5">
+                  {hasProfilePhoto ? (
+                    <button
+                      type="button"
+                      className="relative h-24 w-24 overflow-hidden rounded-full border-2 border-white/80 bg-zinc-900 shadow-xl shadow-black/35 ring-4 ring-white/[0.04] transition hover:border-white sm:h-28 sm:w-28"
+                      onClick={() => openExpanded(0)}
+                      aria-label="Ver foto principal"
+                    >
+                      <Image
+                        src={photoUrl}
+                        alt="Foto principal del perfil"
+                        fill
+                        className="object-cover"
+                        sizes="112px"
+                        priority
+                      />
+                      {uploadingProfile && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-xs">
+                          Subiendo...
+                        </div>
+                      )}
+                    </button>
+                  ) : (
+                    <label className="group relative flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-amber-200/80 bg-amber-300/10 shadow-[0_0_34px_rgba(251,191,36,0.34)] ring-4 ring-amber-300/25 transition hover:border-amber-100 hover:bg-amber-300/15 hover:shadow-[0_0_42px_rgba(251,191,36,0.48)] sm:h-28 sm:w-28">
+                      <Image
+                        src="/default-avatar.png"
+                        alt="Foto principal del perfil"
+                        fill
+                        className="object-cover opacity-35 transition group-hover:opacity-45"
+                        sizes="112px"
+                        priority
+                      />
+                      <span className="absolute inset-0 bg-amber-300/10" />
+                      <span className="relative rounded-full border border-amber-100/30 bg-black/55 px-3 py-1.5 text-xs font-semibold text-amber-50 shadow-lg shadow-black/30 backdrop-blur">
+                        {uploadingProfile ? "Subiendo..." : "Subir foto"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        disabled={uploadingProfile}
+                        onChange={handleProfilePhoto}
+                      />
+                    </label>
+                  )}
 
-            <div className="px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div className="flex shrink-0 flex-col items-center gap-2.5 sm:w-44">
-                    <div className="flex w-full flex-col items-center gap-2.5 rounded-lg border border-white/[0.08] bg-black/20 px-3 py-3">
-                      {hasProfilePhoto ? (
+                  {effectiveVerificationBadge && (
+                    <span
+                      className="inline-flex h-6 max-w-24 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold text-neutral-200 shadow-lg shadow-black/15 sm:max-w-28"
+                      aria-label={`Nivel ${effectiveBadgeLabel}`}
+                      title={`Nivel ${effectiveBadgeLabel}`}
+                    >
+                      <VerificationGem
+                        badge={effectiveVerificationBadge}
+                        className={
+                          effectiveVerificationBadge === "platinum"
+                            ? "h-3.5 w-3.5 shrink-0 text-white"
+                            : effectiveVerificationBadge === "gold"
+                              ? "h-3.5 w-3.5 shrink-0 text-amber-200"
+                              : effectiveVerificationBadge === "silver"
+                                ? "h-3.5 w-3.5 shrink-0 text-slate-100"
+                                : "h-3.5 w-3.5 shrink-0 text-[#d79263]"
+                        }
+                      />
+                      <span className="truncate">{effectiveBadgeLabel}</span>
+                    </span>
+                  )}
+
+                  {editMode && hasProfilePhoto && (
+                    <label className="inline-flex h-7 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.035] px-2 text-[11px] font-semibold text-neutral-100 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white sm:w-28">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-3.5 w-3.5 text-neutral-300"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                      Cambiar
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        disabled={uploadingProfile}
+                        onChange={handleProfilePhoto}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 self-stretch">
+                  <div className="flex min-h-24 flex-col justify-between gap-3 sm:min-h-28">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 pr-1">
+                        <h1 className="truncate text-base font-semibold text-neutral-50 sm:text-lg">
+                          {name || "Tu perfil"}
+                        </h1>
+                        <p className="mt-1 truncate text-xs text-neutral-500">
+                          {profileMetaLabel}
+                        </p>
+                      </div>
+
+                      <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                         <button
                           type="button"
-                          className="relative h-28 w-28 overflow-hidden rounded-full border-2 border-white/80 bg-zinc-900 shadow-xl shadow-black/35 ring-4 ring-white/[0.04] transition hover:border-white sm:h-32 sm:w-32"
-                          onClick={() => openExpanded(0)}
-                          aria-label="Ver foto principal"
+                          onClick={openRechargeBalanceModal}
+                          title={subscriptionLabel}
+                          aria-label={`${subscriptionLabel}. Abrir recarga de saldo`}
+                          className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
                         >
-                          <Image
-                            src={photoUrl}
-                            alt="Foto principal del perfil"
-                            fill
-                            className="object-cover"
-                            sizes="128px"
-                            priority
+                          <span>Mensualidad</span>
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full ${
+                              subscriptionIsOk
+                                ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
+                                : "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
+                            }`}
                           />
-                          {uploadingProfile && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-xs">
-                              Subiendo...
-                            </div>
-                          )}
                         </button>
-                      ) : (
-                        <label className="group relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-amber-200/80 bg-amber-300/10 shadow-[0_0_34px_rgba(251,191,36,0.34)] ring-4 ring-amber-300/25 transition hover:border-amber-100 hover:bg-amber-300/15 hover:shadow-[0_0_42px_rgba(251,191,36,0.48)] sm:h-32 sm:w-32">
-                          <Image
-                            src="/default-avatar.png"
-                            alt="Foto principal del perfil"
-                            fill
-                            className="object-cover opacity-35 transition group-hover:opacity-45"
-                            sizes="128px"
-                            priority
-                          />
-                          <span className="absolute inset-0 bg-amber-300/10" />
-                          <span className="relative rounded-full border border-amber-100/30 bg-black/55 px-3 py-1.5 text-xs font-semibold text-amber-50 shadow-lg shadow-black/30 backdrop-blur">
-                            {uploadingProfile ? "Subiendo..." : "Subir foto"}
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            hidden
-                            disabled={uploadingProfile}
-                            onChange={handleProfilePhoto}
-                          />
-                        </label>
-                      )}
 
-                      {editMode && hasProfilePhoto && (
-                        <label className="inline-flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-3 text-xs font-semibold text-neutral-100 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="h-4 w-4 text-neutral-300"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M12 20h9" />
-                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                          </svg>
-                          Cambiar foto
-                          <input
-                            type="file"
-                            accept="image/*"
-                            hidden
-                            disabled={uploadingProfile}
-                            onChange={handleProfilePhoto}
+                        <span
+                          title={profileIndicatorLabel}
+                          aria-label={profileIndicatorLabel}
+                          className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15"
+                        >
+                          <span>{profileIndicatorText}</span>
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full ${
+                              profileIndicatorTone === "ok"
+                                ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
+                                : profileIndicatorTone === "error"
+                                  ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
+                                  : "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.68)]"
+                            }`}
                           />
-                        </label>
-                      )}
-                    </div>
-
-                    {effectiveVerificationBadge && (
-                      <span
-                        className="inline-flex h-7 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2.5 text-[11px] font-semibold text-neutral-100 shadow-lg shadow-black/20"
-                        aria-label={`Nivel ${effectiveBadgeLabel}`}
-                        title={`Nivel ${effectiveBadgeLabel}`}
-                      >
-                        <VerificationGem
-                          badge={effectiveVerificationBadge}
-                          className={
-                            effectiveVerificationBadge === "platinum"
-                              ? "h-4.5 w-4.5 text-white"
-                              : effectiveVerificationBadge === "gold"
-                                ? "h-4 w-4 text-amber-200"
-                                : effectiveVerificationBadge === "silver"
-                                  ? "h-4 w-4 text-slate-100"
-                                  : "h-4 w-4 text-[#d79263]"
-                          }
-                        />
-                        <span className="text-neutral-300">
-                          {effectiveBadgeLabel}
                         </span>
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1 pt-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-xs font-medium text-neutral-500">
-                        Perfil
-                      </p>
-                      <span
-                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusPillClass[status.tone]}`}
-                      >
-                        {status.label}
-                      </span>
+                      </div>
                     </div>
-                    <h1 className="mt-1 break-words text-2xl font-semibold text-neutral-50">
-                      {name || "Completa tu perfil"}
-                    </h1>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      {profilePaused
-                        ? "Pausado por ti"
-                        : visiblePublicly
-                          ? "Visible publicamente"
-                          : hasProfilePhoto
-                            ? "Oculto por verificacion"
-                            : "Oculto: falta foto de perfil"}
-                    </p>
-                    {/* legacy visibility copy removed */}
+
+                    <div className="grid max-w-sm grid-cols-3 border-y border-white/[0.08] py-2 sm:max-w-md">
+                      {profileStats.map((item) => (
+                        <div
+                          key={item.label}
+                          className="min-w-0 text-center first:text-left last:text-right"
+                        >
+                          <span className="block text-sm font-semibold text-neutral-50">
+                            {item.value}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[10px] font-medium uppercase text-neutral-500">
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
                     <p className="hidden" aria-hidden="true">
                       {visiblePublicly ? "Visible públicamente" : "Oculto"}
                     </p>
-
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditMode((value) => !value)}
-                        className={`group inline-flex h-10 items-center justify-start gap-3 rounded-md border px-3 text-sm font-semibold transition ${
-                          editMode
-                            ? "border-white/15 bg-white/[0.06] text-neutral-100 hover:bg-white/[0.09]"
-                            : "border-blue-300/15 bg-blue-400/[0.06] text-neutral-100 hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100"
-                        }`}
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="h-4 w-4 text-blue-300"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M12 20h9" />
-                          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                        </svg>
-                        {editMode ? "Cerrar edicion" : "Editar perfil"}
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={
-                          updatingPause || verificationStatus !== "approved"
-                        }
-                        onClick={() => setShowPauseModal(true)}
-                        className={`inline-flex h-10 items-center justify-start gap-3 rounded-md border px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                          profilePaused
-                            ? "border-emerald-300/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/12"
-                            : "border-amber-300/15 bg-amber-400/[0.06] text-neutral-100 hover:border-amber-300/30 hover:bg-amber-400/10 hover:text-amber-100"
-                        }`}
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className={`h-4 w-4 ${
-                            profilePaused ? "text-emerald-300" : "text-amber-300"
-                          }`}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          {profilePaused ? (
-                            <path d="m5 3 14 9-14 9V3Z" />
-                          ) : (
-                            <>
-                              <path d="M10 4H6v16h4V4Z" />
-                              <path d="M18 4h-4v16h4V4Z" />
-                            </>
-                          )}
-                        </svg>
-                        {profilePaused ? "Reactivar perfil" : "Pausar perfil"}
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={
-                          buyingPromotion ||
-                          verificationStatus !== "approved" ||
-                          !hasProfilePhoto
-                        }
-                        onClick={() => setShowPromotionModal(true)}
-                        className="inline-flex h-10 items-center justify-start gap-3 rounded-md border border-cyan-300/15 bg-cyan-400/[0.06] px-3 text-sm font-semibold text-neutral-100 transition hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="h-4 w-4 text-cyan-300"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M12 3v18" />
-                          <path d="m6 9 6-6 6 6" />
-                          <path d="M5 21h14" />
-                        </svg>
-                        {promotionActive
-                          ? "Extender promocion"
-                          : "Promocionar perfil"}
-                      </button>
-
-                      {effectiveVerificationBadge ? (
-                        badgeVerificationStatus === "pending" ? (
-                          <span className="inline-flex h-10 items-center justify-start rounded-md border border-amber-400/25 bg-amber-400/10 px-3 text-sm font-semibold text-amber-200">
-                            Nivel {badgeVerificationLevel || ""} en revision
-                          </span>
-                        ) : canUpgradeVerification ? (
-                          <button
-                            type="button"
-                            onClick={openVerificationRequest}
-                            disabled={requestingBadgeVerification}
-                            className="inline-flex h-10 items-center justify-start gap-3 rounded-md border border-blue-300/15 bg-blue-400/[0.06] px-3 text-sm font-semibold text-neutral-100 transition hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="h-4 w-4 text-blue-300"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M12 3v18" />
-                              <path d="m6 9 6-6 6 6" />
-                            </svg>
-                            Subir de nivel
-                          </button>
-                        ) : (
-                          <span className="inline-flex h-10 items-center justify-start rounded-md border border-emerald-400/15 bg-emerald-400/[0.06] px-3 text-sm font-semibold text-emerald-100">
-                            Nivel {effectiveBadgeLabel} activo
-                          </span>
-                        )
-                      ) : badgeVerificationStatus === "pending" ? (
-                        <span className="inline-flex h-10 items-center justify-start rounded-md border border-amber-400/25 bg-amber-400/10 px-3 text-sm font-semibold text-amber-200">
-                          Nivel {badgeVerificationLevel || ""} en revision
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={openVerificationRequest}
-                          disabled={requestingBadgeVerification}
-                          className="inline-flex h-10 items-center justify-start gap-3 rounded-md border border-emerald-400/20 bg-emerald-400/[0.07] px-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-300/40 hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                          Solicitar verificacion
-                        </button>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
 
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditMode((value) => !value)}
+                  className={`group inline-flex h-8 items-center justify-center gap-2 rounded-md border px-2.5 text-xs font-semibold transition sm:px-3 ${
+                    editMode
+                      ? "border-white/15 bg-white/[0.06] text-neutral-100 hover:bg-white/[0.09]"
+                      : "border-blue-300/15 bg-blue-400/[0.06] text-neutral-100 hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100"
+                  }`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-3.5 w-3.5 text-blue-300"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                  {editMode ? "Cerrar" : "Editar"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={updatingPause || verificationStatus !== "approved"}
+                  onClick={() => setShowPauseModal(true)}
+                  className={`inline-flex h-8 items-center justify-center gap-2 rounded-md border px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 ${
+                    profilePaused
+                      ? "border-emerald-300/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/12"
+                      : "border-amber-300/15 bg-amber-400/[0.06] text-neutral-100 hover:border-amber-300/30 hover:bg-amber-400/10 hover:text-amber-100"
+                  }`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className={`h-3.5 w-3.5 ${
+                      profilePaused ? "text-emerald-300" : "text-amber-300"
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {profilePaused ? (
+                      <path d="m5 3 14 9-14 9V3Z" />
+                    ) : (
+                      <>
+                        <path d="M10 4H6v16h4V4Z" />
+                        <path d="M18 4h-4v16h4V4Z" />
+                      </>
+                    )}
+                  </svg>
+                  {profilePaused ? "Reactivar" : "Pausar"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={
+                    buyingPromotion ||
+                    verificationStatus !== "approved" ||
+                    !hasProfilePhoto
+                  }
+                  onClick={() => setShowPromotionModal(true)}
+                  className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-cyan-300/15 bg-cyan-400/[0.06] px-2.5 text-xs font-semibold text-neutral-100 transition hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-3.5 w-3.5 text-cyan-300"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 3v18" />
+                    <path d="m6 9 6-6 6 6" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  {promotionActive ? "Extender" : "Promocionar"}
+                </button>
+
+                {effectiveVerificationBadge ? (
+                  badgeVerificationStatus === "pending" ? (
+                    <span
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-amber-400/25 bg-amber-400/10 px-2.5 text-xs font-semibold text-amber-200 sm:px-3"
+                      title="Nivel en revision"
+                    >
+                      {badgeVerificationLevel
+                        ? `Nivel ${badgeVerificationLevel}`
+                        : "En revision"}
+                    </span>
+                  ) : canUpgradeVerification ? (
+                    <button
+                      type="button"
+                      onClick={openVerificationRequest}
+                      disabled={requestingBadgeVerification}
+                      className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-blue-300/15 bg-blue-400/[0.06] px-2.5 text-xs font-semibold text-neutral-100 transition hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-60 sm:px-3"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-3.5 w-3.5 text-blue-300"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 3v18" />
+                        <path d="m6 9 6-6 6 6" />
+                      </svg>
+                      {requestingBadgeVerification ? "Procesando..." : "Subir Nivel"}
+                    </button>
+                  ) : (
+                    <span className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 text-xs font-semibold text-emerald-100 sm:px-3">
+                      Nivel activo
+                    </span>
+                  )
+                ) : badgeVerificationStatus === "pending" ? (
+                  <span
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-amber-400/25 bg-amber-400/10 px-2.5 text-xs font-semibold text-amber-200 sm:px-3"
+                    title="Nivel en revision"
+                  >
+                    {badgeVerificationLevel
+                      ? `Nivel ${badgeVerificationLevel}`
+                      : "En revision"}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openVerificationRequest}
+                    disabled={requestingBadgeVerification}
+                    className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-emerald-400/20 bg-emerald-400/[0.07] px-2.5 text-xs font-semibold text-emerald-100 transition hover:border-emerald-300/40 hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-60 sm:px-3"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                    {requestingBadgeVerification ? "Procesando..." : "Subir Nivel"}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="px-4 pb-4 sm:px-5 sm:pb-5">
