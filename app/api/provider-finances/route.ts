@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const [ledgerSnap, withdrawalsSnap] = await Promise.all([
+    const [ledgerSnap, withdrawalsSnap, privateSalesSnap] = await Promise.all([
       adminDb
         .collection("ledger")
         .where("userId", "==", decoded.uid)
@@ -46,6 +46,10 @@ export async function GET(request: Request) {
         .collection("withdrawals")
         .where("providerId", "==", decoded.uid)
         .limit(60)
+        .get(),
+      adminDb
+        .collection("contentPurchases")
+        .where("sellerId", "==", decoded.uid)
         .get(),
     ]);
 
@@ -111,6 +115,10 @@ export async function GET(request: Request) {
     const pendingWithdrawals = withdrawals
       .filter((withdrawal) => withdrawal.status === "pending_wompi")
       .reduce((total, withdrawal) => total + withdrawal.releasedAmount, 0);
+    const privateContentIncome = privateSalesSnap.docs.reduce((total, doc) => {
+      const data = doc.data();
+      return total + Number(data.releasedAmount || 0);
+    }, 0);
 
     return NextResponse.json({
       balance: Number(user.balance || 0),
@@ -120,6 +128,7 @@ export async function GET(request: Request) {
       summary: {
         ...summary,
         pendingWithdrawals,
+        privateContentIncome,
       },
       ledger,
       withdrawals,

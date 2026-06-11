@@ -59,6 +59,7 @@ type ProviderProfile = {
   whatsapp?: string;
   photoUrl?: string;
   media?: MediaItem[];
+  profileViews?: number;
   dailyVideo?: DailyVideo | null;
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
@@ -74,6 +75,12 @@ type ProviderProfile = {
   promotedUntil?: {
     toDate?: () => Date;
   } | string | null;
+};
+
+type ProviderFinanceResponse = {
+  summary?: {
+    privateContentIncome?: number;
+  };
 };
 
 
@@ -805,6 +812,8 @@ export default function PerfilPrestador() {
   const [whatsapp, setWhatsapp] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [profileViews, setProfileViews] = useState(0);
+  const [privateContentIncome, setPrivateContentIncome] = useState(0);
   const [videoSecondsExtra, setVideoSecondsExtra] = useState(0);
 
   const [saving, setSaving] = useState(false);
@@ -961,9 +970,6 @@ export default function PerfilPrestador() {
     : verificationStatus === "rejected"
       ? "error"
       : "warning";
-  const publicMediaCount = media.filter((item) => !item.private).length;
-  const privateMediaCount = media.filter((item) => item.private).length;
-  const videoMediaCount = media.filter((item) => item.type === "video").length;
   const profilePriceNumber = Number(price);
   const profilePriceLabel =
     price && Number.isFinite(profilePriceNumber)
@@ -976,9 +982,16 @@ export default function PerfilPrestador() {
     [profileLocationLabel, profilePriceLabel].filter(Boolean).join(" · ") ||
     "Datos por completar";
   const profileStats = [
-    { label: "Público", value: publicMediaCount },
-    { label: "Videos", value: videoMediaCount },
-    { label: "Privado", value: privateMediaCount },
+    {
+      label: "Vistas del perfil",
+      value: profileViews.toLocaleString("es-CO"),
+      helper: "Aperturas",
+    },
+    {
+      label: "Ganado privado",
+      value: `$${privateContentIncome.toLocaleString("es-CO")}`,
+      helper: "Contenido",
+    },
   ];
   const onboardingSteps = [
     {
@@ -1159,6 +1172,7 @@ export default function PerfilPrestador() {
         setWhatsapp(data.whatsapp || "");
         setPhotoUrl(data.photoUrl || "");
         setMedia(Array.isArray(data.media) ? data.media : []);
+        setProfileViews(Number(data.profileViews || 0));
         setVerificationStatus(data.verificationStatus || "pending");
         setVerificationBadge(data.verificationBadge || null);
         setBadgeVerificationStatus(data.badgeVerificationStatus || "none");
@@ -1170,6 +1184,24 @@ export default function PerfilPrestador() {
         setPromotedUntil(getDateValue(data.promotedUntil));
         setDailyVideoUrl(data.dailyVideo?.url || "");
         setDailyVideoExpiresAt(getDateValue(data.dailyVideo?.expiresAt));
+
+        try {
+          const financeRes = await fetch("/api/provider-finances", {
+            headers: {
+              Authorization: `Bearer ${await user.getIdToken()}`,
+            },
+          });
+
+          if (financeRes.ok) {
+            const financeData =
+              (await financeRes.json()) as ProviderFinanceResponse;
+            setPrivateContentIncome(
+              Number(financeData.summary?.privateContentIncome || 0)
+            );
+          }
+        } catch {
+          setPrivateContentIncome(0);
+        }
       } catch (loadError) {
         const text =
           loadError instanceof Error
@@ -2135,27 +2167,51 @@ export default function PerfilPrestador() {
                     </label>
                   )}
 
-                  {effectiveVerificationBadge && (
-                    <span
-                      className="inline-flex h-6 max-w-24 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold text-neutral-200 shadow-lg shadow-black/15 sm:max-w-28"
-                      aria-label={`Nivel ${effectiveBadgeLabel}`}
-                      title={`Nivel ${effectiveBadgeLabel}`}
-                    >
-                      <VerificationGem
-                        badge={effectiveVerificationBadge}
-                        className={
-                          effectiveVerificationBadge === "platinum"
-                            ? "h-3.5 w-3.5 shrink-0 text-white"
-                            : effectiveVerificationBadge === "gold"
-                              ? "h-3.5 w-3.5 shrink-0 text-amber-200"
-                              : effectiveVerificationBadge === "silver"
-                                ? "h-3.5 w-3.5 shrink-0 text-slate-100"
-                                : "h-3.5 w-3.5 shrink-0 text-[#d79263]"
-                        }
-                      />
-                      <span className="truncate">{effectiveBadgeLabel}</span>
-                    </span>
-                  )}
+                  {effectiveVerificationBadge &&
+                    (canUpgradeVerification ? (
+                      <button
+                        type="button"
+                        onClick={openVerificationRequest}
+                        disabled={requestingBadgeVerification}
+                        className="inline-flex h-6 max-w-24 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-28"
+                        aria-label={`Nivel ${effectiveBadgeLabel}. Subir de nivel`}
+                        title={`Nivel ${effectiveBadgeLabel}. Subir de nivel`}
+                      >
+                        <VerificationGem
+                          badge={effectiveVerificationBadge}
+                          className={
+                            effectiveVerificationBadge === "platinum"
+                              ? "h-3.5 w-3.5 shrink-0 text-white"
+                              : effectiveVerificationBadge === "gold"
+                                ? "h-3.5 w-3.5 shrink-0 text-amber-200"
+                                : effectiveVerificationBadge === "silver"
+                                  ? "h-3.5 w-3.5 shrink-0 text-slate-100"
+                                  : "h-3.5 w-3.5 shrink-0 text-[#d79263]"
+                          }
+                        />
+                        <span className="truncate">{effectiveBadgeLabel}</span>
+                      </button>
+                    ) : (
+                      <span
+                        className="inline-flex h-6 max-w-24 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold text-neutral-200 shadow-lg shadow-black/15 sm:max-w-28"
+                        aria-label={`Nivel ${effectiveBadgeLabel}`}
+                        title={`Nivel ${effectiveBadgeLabel}`}
+                      >
+                        <VerificationGem
+                          badge={effectiveVerificationBadge}
+                          className={
+                            effectiveVerificationBadge === "platinum"
+                              ? "h-3.5 w-3.5 shrink-0 text-white"
+                              : effectiveVerificationBadge === "gold"
+                                ? "h-3.5 w-3.5 shrink-0 text-amber-200"
+                                : effectiveVerificationBadge === "silver"
+                                  ? "h-3.5 w-3.5 shrink-0 text-slate-100"
+                                  : "h-3.5 w-3.5 shrink-0 text-[#d79263]"
+                          }
+                        />
+                        <span className="truncate">{effectiveBadgeLabel}</span>
+                      </span>
+                    ))}
 
                   {editMode && hasProfilePhoto && (
                     <label className="inline-flex h-7 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.035] px-2 text-[11px] font-semibold text-neutral-100 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white sm:w-28">
@@ -2232,17 +2288,20 @@ export default function PerfilPrestador() {
                       </div>
                     </div>
 
-                    <div className="grid max-w-sm grid-cols-3 border-y border-white/[0.08] py-2 sm:max-w-md">
+                    <div className="grid w-full max-w-xs grid-cols-2 divide-x divide-white/[0.08] rounded-md border border-white/[0.08] bg-white/[0.025] px-1.5 py-1.5 sm:max-w-sm">
                       {profileStats.map((item) => (
                         <div
                           key={item.label}
-                          className="min-w-0 text-center first:text-left last:text-right"
+                          className="min-w-0 px-1.5 text-left last:text-right sm:px-2"
                         >
-                          <span className="block text-sm font-semibold text-neutral-50">
+                          <span className="block truncate text-[10px] font-medium uppercase text-neutral-500">
+                            {item.label}
+                          </span>
+                          <span className="mt-0.5 block truncate text-sm font-semibold text-neutral-100">
                             {item.value}
                           </span>
-                          <span className="mt-0.5 block truncate text-[10px] font-medium uppercase text-neutral-500">
-                            {item.label}
+                          <span className="mt-0.5 block truncate text-[10px] text-neutral-600">
+                            {item.helper}
                           </span>
                         </div>
                       ))}
@@ -2354,6 +2413,7 @@ export default function PerfilPrestador() {
                       type="button"
                       onClick={openVerificationRequest}
                       disabled={requestingBadgeVerification}
+                      title={`Nivel ${effectiveBadgeLabel}. Subir de nivel`}
                       className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-blue-300/15 bg-blue-400/[0.06] px-2.5 text-xs font-semibold text-neutral-100 transition hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-60 sm:px-3"
                     >
                       <svg
@@ -2368,11 +2428,13 @@ export default function PerfilPrestador() {
                         <path d="M12 3v18" />
                         <path d="m6 9 6-6 6 6" />
                       </svg>
-                      {requestingBadgeVerification ? "Procesando..." : "Subir Nivel"}
+                      {requestingBadgeVerification
+                        ? "Procesando..."
+                        : `Nivel ${effectiveBadgeLabel}`}
                     </button>
                   ) : (
                     <span className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 text-xs font-semibold text-emerald-100 sm:px-3">
-                      Nivel activo
+                      Nivel {effectiveBadgeLabel}
                     </span>
                   )
                 ) : badgeVerificationStatus === "pending" ? (

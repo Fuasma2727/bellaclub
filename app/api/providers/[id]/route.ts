@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
+import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { createPrivateMediaUrl } from "@/lib/privateMediaAccess";
 
 type MediaItem = {
@@ -81,7 +81,8 @@ export async function GET(request: Request, { params }: Params) {
   try {
     const { id } = await params;
     const requesterId = await getRequesterId(request);
-    const providerSnap = await adminDb.collection("users").doc(id).get();
+    const providerRef = adminDb.collection("users").doc(id);
+    const providerSnap = await providerRef.get();
 
     if (!providerSnap.exists) {
       return NextResponse.json(
@@ -108,6 +109,13 @@ export async function GET(request: Request, { params }: Params) {
     const purchased = await userPurchased(requesterId, id);
     const purchasedIds = new Set(purchased.map((item) => item.mediaId));
     const media = Array.isArray(data.media) ? (data.media as MediaItem[]) : [];
+
+    if (requesterId !== id) {
+      await providerRef.update({
+        profileViews: adminFieldValue.increment(1),
+        profileLastViewedAt: adminFieldValue.serverTimestamp(),
+      });
+    }
 
     const safeMedia = media.map((item, index) => {
       const mediaId = item.id || `legacy-${index}`;
