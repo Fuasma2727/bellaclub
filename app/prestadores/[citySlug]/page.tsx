@@ -6,8 +6,9 @@ import {
   findProviderCityBySlug,
   getPublicProviderCities,
 } from "@/lib/providerCitySeo";
+import { getPublicProviderCards } from "@/lib/publicProviders";
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://";
 
 type CityPageProps = {
   params: Promise<{
@@ -83,6 +84,9 @@ export default async function PrestadoresCityPage({ params }: CityPageProps) {
 
   const title = `Escorts en ${city.city}`;
   const pageUrl = `${siteUrl}/prestadores/${city.slug}`;
+  const initialProviders = await getPublicProviderCards({
+    citySlug: city.slug,
+  });
 
   return (
     <>
@@ -131,6 +135,7 @@ export default async function PrestadoresCityPage({ params }: CityPageProps) {
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
+        initialProviders={initialProviders}
       />
     </>
   );

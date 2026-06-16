@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Prestador } from "./types";
 import {
   formatMoney,
@@ -14,6 +15,7 @@ type ProviderCardProps = {
   imagePriority?: boolean;
   onOpen?: (id: string) => void;
   onOpenDailyVideo?: (provider: Prestador) => void;
+  profileHref?: string;
   afterContent?: ReactNode;
 };
 
@@ -117,6 +119,7 @@ export default function ProviderCard({
   imagePriority = false,
   onOpen,
   onOpenDailyVideo,
+  profileHref,
   afterContent,
 }: ProviderCardProps) {
   const [showBadgeInfo, setShowBadgeInfo] = useState(false);
@@ -175,9 +178,18 @@ export default function ProviderCard({
   return (
     <article
       className={`group overflow-hidden rounded-md border border-white/[0.08] bg-[#101012] shadow-lg shadow-black/15 transition duration-300 hover:border-white/20 hover:bg-[#141416] hover:shadow-black/35 ${
-        onOpen ? "cursor-pointer hover:-translate-y-0.5" : ""
+        onOpen || profileHref ? "cursor-pointer hover:-translate-y-0.5" : ""
       }`}
-      onClick={() => onOpen?.(provider.id)}
+      onClick={() => {
+        if (onOpen) {
+          onOpen(provider.id);
+          return;
+        }
+
+        if (profileHref) {
+          window.location.href = profileHref;
+        }
+      }}
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-zinc-900">
         <Image
@@ -232,9 +244,19 @@ export default function ProviderCard({
 
       <div className="px-2.5 pb-2 pt-1.5 sm:px-3 sm:pb-2.5 sm:pt-2">
         <div className="min-w-0">
-          <h2 className="truncate text-[13px] font-semibold leading-[15px] text-neutral-50 sm:text-sm">
-            {name}
-          </h2>
+          {profileHref ? (
+            <Link
+              href={profileHref}
+              onClick={(event) => event.stopPropagation()}
+              className="block truncate text-[13px] font-semibold leading-[15px] text-neutral-50 transition hover:text-blue-100 sm:text-sm"
+            >
+              {name}
+            </Link>
+          ) : (
+            <h2 className="truncate text-[13px] font-semibold leading-[15px] text-neutral-50 sm:text-sm">
+              {name}
+            </h2>
+          )}
           <p className="truncate text-[11px] leading-[15px] text-neutral-500 sm:text-xs">
             {location || "Ubicacion por confirmar"}
           </p>

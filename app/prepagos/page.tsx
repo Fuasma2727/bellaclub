@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import PrestadoresPage from "@/app/prestadores/page";
 import JsonLd from "@/components/JsonLd";
 import { targetSeoCities } from "@/lib/providerCitySeo";
+import { getPublicProviderCards } from "@/lib/publicProviders";
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
 export const metadata: Metadata = {
   title: "Prepagos en Colombia",
@@ -50,8 +51,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function PrepagosPage() {
+export default async function PrepagosPage() {
   const pageUrl = `${siteUrl}/prepagos`;
+  const initialProviders = await getPublicProviderCards({ limit: 60 });
   const cityLinks = targetSeoCities.map((city) => ({
     href: `/prepagos/${city.slug}`,
     label: `Prepagos en ${city.city}`,
@@ -78,6 +80,7 @@ export default function PrepagosPage() {
         pageTitle="Prepagos en Colombia"
         pageEyebrow="Explora por ciudad"
         pageDescription="Encuentra prepagos verificadas en Medellín, La Ceja, Rionegro y otras ciudades. Revisa galerías públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
+        initialProviders={initialProviders}
         seoCityLinks={[
           ...cityLinks,
           ...targetSeoCities.map((city) => ({

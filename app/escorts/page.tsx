@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import PrestadoresPage from "@/app/prestadores/page";
 import JsonLd from "@/components/JsonLd";
 import { targetSeoCities } from "@/lib/providerCitySeo";
+import { getPublicProviderCards } from "@/lib/publicProviders";
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
 export const metadata: Metadata = {
   title: "Escorts en Colombia",
@@ -52,8 +53,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function EscortsPage() {
+export default async function EscortsPage() {
   const pageUrl = `${siteUrl}/escorts`;
+  const initialProviders = await getPublicProviderCards({ limit: 60 });
   const cityLinks = targetSeoCities.map((city) => ({
     href: `/escorts/${city.slug}`,
     label: `Escorts en ${city.city}`,
@@ -80,6 +82,7 @@ export default function EscortsPage() {
         pageTitle="Escorts en Colombia"
         pageEyebrow="Explora por ciudad"
         pageDescription="Encuentra escorts verificadas en Medellín, La Ceja, Rionegro y otras ciudades. Revisa galerías públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
+        initialProviders={initialProviders}
         seoCityLinks={[
           ...cityLinks,
           ...targetSeoCities.map((city) => ({

@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import ExpandedMediaModal from "@/app/prestadores/_components/ExpandedMediaModal";
 import ProviderCard from "@/app/prestadores/_components/ProviderCard";
-import type { Prestador } from "@/app/prestadores/_components/types";
+import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
 import { getWhatsAppUrl } from "@/app/prestadores/_components/utils";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
@@ -123,6 +124,7 @@ type VerificationAction =
   | "block"
   | "unblock"
   | "deleteMedia"
+  | "setProfilePhoto"
   | "deleteProvider"
   | "disableSubscription"
   | "enableSubscription";
@@ -168,6 +170,8 @@ export default function AdminVerificationsPage() {
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     null
   );
+  const [expandedMedia, setExpandedMedia] = useState<MediaItem | null>(null);
+  const [mediaList, setMediaList] = useState<MediaItem[]>([]);
 
   const loadProviders = useCallback(async () => {
     if (!user) {
@@ -278,6 +282,100 @@ export default function AdminVerificationsPage() {
     }
   }, [authLoading, loadProviders]);
 
+  useEffect(() => {
+    document.body.style.overflow =
+      selectedProviderId || expandedMedia ? "hidden" : "auto";
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [expandedMedia, selectedProviderId]);
+
+  const buildAdminMediaList = useCallback((provider: ProviderVerification) => {
+    const items: MediaItem[] = [];
+
+    if (provider.photoUrl) {
+      items.push({
+        id: "profile-photo",
+        type: "photo",
+        url: provider.photoUrl,
+        description: "Foto principal",
+      });
+    }
+
+    (provider.media || []).forEach((item) => {
+      if (!item.url) return;
+
+      items.push({
+        id: item.id,
+        type: item.type,
+        url: item.url,
+        private: item.private,
+        description: item.description,
+      });
+    });
+
+    return items;
+  }, []);
+
+  const openAdminMedia = useCallback(
+    (provider: ProviderVerification, mediaId: string) => {
+      const nextMediaList = buildAdminMediaList(provider);
+      const nextIndex = nextMediaList.findIndex((item) => item.id === mediaId);
+
+      if (nextIndex < 0) return;
+
+      setMediaList(nextMediaList);
+      setExpandedMedia(nextMediaList[nextIndex]);
+    },
+    [buildAdminMediaList]
+  );
+
+  const openVerificationEvidence = useCallback(
+    (url: string, type: MediaItem["type"], description: string) => {
+      const evidenceItem: MediaItem = {
+        id: "verification-evidence",
+        type,
+        url,
+        private: true,
+        description,
+      };
+
+      setMediaList([evidenceItem]);
+      setExpandedMedia(evidenceItem);
+    },
+    []
+  );
+
+  const moveExpandedMedia = useCallback(
+    (direction: 1 | -1) => {
+      if (mediaList.length === 0) return;
+
+      const currentMediaIndex = mediaList.findIndex(
+        (item) => item.id === expandedMedia?.id
+      );
+      const safeIndex = currentMediaIndex >= 0 ? currentMediaIndex : 0;
+      const nextIndex =
+        (safeIndex + direction + mediaList.length) % mediaList.length;
+
+      setExpandedMedia(mediaList[nextIndex]);
+    },
+    [expandedMedia?.id, mediaList]
+  );
+
+  useEffect(() => {
+    if (!expandedMedia || mediaList.length === 0) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowRight") moveExpandedMedia(1);
+      if (event.key === "ArrowLeft") moveExpandedMedia(-1);
+      if (event.key === "Escape") setExpandedMedia(null);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [expandedMedia, mediaList.length, moveExpandedMedia]);
+
   const handleAction = async (
     provider: ProviderVerification,
     action: VerificationAction,
@@ -334,6 +432,8 @@ export default function AdminVerificationsPage() {
     const currentActionId =
       action === "deleteMedia" && mediaId
         ? `${provider.id}:${mediaId}`
+        : action === "setProfilePhoto" && mediaId
+          ? `${provider.id}:set-profile-photo:${mediaId}`
         : provider.id;
 
     setActionId(currentActionId);
@@ -349,7 +449,11 @@ export default function AdminVerificationsPage() {
         },
         body: JSON.stringify({ action, mediaId, confirmText }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as {
+        error?: string;
+        photoUrl?: string;
+        profileVisible?: boolean;
+      };
 
       if (!res.ok) {
         throw new Error(data.error || "No pudimos actualizar la solicitud");
@@ -373,6 +477,22 @@ export default function AdminVerificationsPage() {
               media: (item.media || []).filter((media) => media.id !== mediaId),
             };
           });
+        }
+
+        if (action === "setProfilePhoto" && mediaId) {
+          const selectedMedia = (provider.media || []).find(
+            (media) => media.id === mediaId
+          );
+          const photoUrl = data.photoUrl || selectedMedia?.url || "";
+
+          return current.map((item) =>
+            item.id === provider.id
+              ? {
+                  ...item,
+                  photoUrl,
+                }
+              : item
+          );
         }
 
         if (action === "unblock" && activeView === "blocked") {
@@ -576,15 +696,23 @@ export default function AdminVerificationsPage() {
           <div className="grid grid-cols-2 gap-3">
             {provider.photoUrl && (
               <div className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
-                <div className="relative aspect-square">
+                <button
+                  type="button"
+                  onClick={() => openAdminMedia(provider, "profile-photo")}
+                  className="group/media relative block aspect-square w-full overflow-hidden text-left"
+                  aria-label="Ampliar foto principal"
+                >
                   <Image
                     src={provider.photoUrl}
                     alt="Foto principal"
                     fill
-                    className="object-cover"
+                    className="object-cover transition duration-300 group-hover/media:scale-105"
                     sizes="180px"
                   />
-                </div>
+                  <span className="absolute inset-x-2 bottom-2 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-center text-[11px] font-semibold text-white opacity-0 backdrop-blur transition group-hover/media:opacity-100">
+                    Ampliar
+                  </span>
+                </button>
                 <div className="p-2">
                   <p className="mb-2 truncate text-xs text-neutral-400">
                     Foto principal
@@ -607,56 +735,102 @@ export default function AdminVerificationsPage() {
               </div>
             )}
 
-            {(provider.media || []).map((media) => (
-              <div
-                key={media.id}
-                className="overflow-hidden rounded-lg border border-white/10 bg-black/30"
-              >
-                <div className="relative aspect-square">
-                  {media.type === "video" ? (
-                    <video
-                      src={media.url}
-                      className="h-full w-full object-cover"
-                      controls
-                      muted
-                    />
-                  ) : (
-                    <Image
-                      src={media.url || "/default-avatar.png"}
-                      alt={media.description || "Contenido del perfil"}
-                      fill
-                      className="object-cover"
-                      sizes="180px"
-                    />
-                  )}
-                  {media.private && (
-                    <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
-                      Privada
-                    </span>
-                  )}
+            {(provider.media || []).map((media) => {
+              const setProfilePhotoActionId = `${provider.id}:set-profile-photo:${media.id}`;
+              const canUseAsProfilePhoto =
+                media.type === "photo" &&
+                Boolean(media.url) &&
+                !media.private &&
+                media.url !== provider.photoUrl;
+
+              return (
+                <div
+                  key={media.id}
+                  className="overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                >
+                  <div className="relative aspect-square">
+                    {media.type === "video" ? (
+                      <>
+                        <video
+                          src={media.url}
+                          className="h-full w-full object-cover"
+                          controls
+                          muted
+                        />
+                        {media.url && (
+                          <button
+                            type="button"
+                            onClick={() => openAdminMedia(provider, media.id)}
+                            className="absolute bottom-2 left-2 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/10"
+                          >
+                            Ampliar
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openAdminMedia(provider, media.id)}
+                        className="group/media relative block h-full w-full overflow-hidden text-left"
+                        aria-label="Ampliar contenido del perfil"
+                      >
+                        <Image
+                          src={media.url || "/default-avatar.png"}
+                          alt={media.description || "Contenido del perfil"}
+                          fill
+                          className="object-cover transition duration-300 group-hover/media:scale-105"
+                          sizes="180px"
+                        />
+                        <span className="absolute inset-x-2 bottom-2 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-center text-[11px] font-semibold text-white opacity-0 backdrop-blur transition group-hover/media:opacity-100">
+                          Ampliar
+                        </span>
+                      </button>
+                    )}
+                    {media.private && (
+                      <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
+                        Privada
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2 p-2">
+                    <p className="truncate text-xs text-neutral-400">
+                      {media.description ||
+                        (media.private
+                          ? "Contenido privado"
+                          : "Contenido publico")}
+                    </p>
+                    {canUseAsProfilePhoto && (
+                      <button
+                        type="button"
+                        disabled={actionId === setProfilePhotoActionId}
+                        onClick={() =>
+                          handleAction(provider, "setProfilePhoto", media.id)
+                        }
+                        className="w-full rounded-md border border-blue-400/35 bg-blue-400/10 px-2 py-2 text-xs font-semibold text-blue-100 transition hover:bg-blue-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {actionId === setProfilePhotoActionId
+                          ? "Guardando..."
+                          : "Usar como principal"}
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        disabled={actionId === `${provider.id}:${media.id}`}
+                        onClick={() =>
+                          handleAction(provider, "deleteMedia", media.id)
+                        }
+                        className="w-full rounded-md border border-red-500/35 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {actionId === `${provider.id}:${media.id}`
+                          ? "Eliminando..."
+                          : "Eliminar"}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="p-2">
-                  <p className="mb-2 truncate text-xs text-neutral-400">
-                    {media.description ||
-                      (media.private ? "Contenido privado" : "Contenido publico")}
-                  </p>
-                  {canDelete && (
-                    <button
-                      type="button"
-                      disabled={actionId === `${provider.id}:${media.id}`}
-                      onClick={() =>
-                        handleAction(provider, "deleteMedia", media.id)
-                      }
-                      className="w-full rounded-md border border-red-500/35 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {actionId === `${provider.id}:${media.id}`
-                        ? "Eliminando..."
-                        : "Eliminar"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -798,23 +972,44 @@ export default function AdminVerificationsPage() {
               administrador y no se muestra publicamente.
             </p>
             {evidenceUrl && evidenceType === "video" ? (
-              <video
-                src={evidenceUrl}
-                controls
-                className="mt-3 aspect-video w-full rounded-md bg-black object-contain"
-              />
+              <div className="relative mt-3 overflow-hidden rounded-md bg-black">
+                <video
+                  src={evidenceUrl}
+                  controls
+                  className="aspect-video w-full object-contain"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    openVerificationEvidence(evidenceUrl, "video", evidenceLabel)
+                  }
+                  className="absolute bottom-2 left-2 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/10"
+                >
+                  Ampliar
+                </button>
+              </div>
             ) : evidenceUrl ? (
-              <div className="relative mt-3 aspect-video overflow-hidden rounded-md bg-black">
+              <button
+                type="button"
+                onClick={() =>
+                  openVerificationEvidence(evidenceUrl, "photo", evidenceLabel)
+                }
+                className="group/media relative mt-3 block aspect-video w-full overflow-hidden rounded-md bg-black text-left"
+                aria-label="Ampliar evidencia de verificacion"
+              >
                 <Image
                   src={evidenceUrl}
                   alt={`Evidencia de verificacion de ${
                     provider.email || "prestador"
                   }`}
                   fill
-                  className="object-contain"
+                  className="object-contain transition duration-300 group-hover/media:scale-[1.02]"
                   sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
                 />
-              </div>
+                <span className="absolute inset-x-2 bottom-2 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-center text-[11px] font-semibold text-white opacity-0 backdrop-blur transition group-hover/media:opacity-100">
+                  Ampliar
+                </span>
+              </button>
             ) : (
               <p className="mt-2 text-sm text-neutral-400">
                 Esta solicitud no requiere archivo. Revisa el perfil completo
@@ -1480,6 +1675,17 @@ export default function AdminVerificationsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {expandedMedia && (
+          <ExpandedMediaModal
+            item={expandedMedia}
+            canGoNext={mediaList.length > 1}
+            canGoPrevious={mediaList.length > 1}
+            onNext={() => moveExpandedMedia(1)}
+            onPrevious={() => moveExpandedMedia(-1)}
+            onClose={() => setExpandedMedia(null)}
+          />
         )}
       </div>
     </main>

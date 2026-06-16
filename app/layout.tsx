@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

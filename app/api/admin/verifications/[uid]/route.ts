@@ -18,6 +18,7 @@ type VerificationAction =
   | "block"
   | "unblock"
   | "deleteMedia"
+  | "setProfilePhoto"
   | "deleteProvider"
   | "disableSubscription"
   | "enableSubscription";
@@ -26,6 +27,7 @@ type MediaItem = {
   id?: string;
   url?: string;
   type?: "photo" | "video";
+  private?: boolean;
 };
 
 const BUNNY_STORAGE_ZONE =
@@ -267,6 +269,7 @@ export async function PATCH(request: Request, { params }: Params) {
       "block",
       "unblock",
       "deleteMedia",
+      "setProfilePhoto",
       "deleteProvider",
       "disableSubscription",
       "enableSubscription",
@@ -513,6 +516,71 @@ export async function PATCH(request: Request, { params }: Params) {
         success: true,
         subscriptionManualOverride: false,
         subscriptionResult,
+      });
+    }
+
+    if (action === "setProfilePhoto") {
+      if (!mediaId) {
+        return NextResponse.json(
+          { error: "Foto requerida" },
+          { status: 400 }
+        );
+      }
+
+      const media = Array.isArray(userData.media)
+        ? (userData.media as MediaItem[])
+        : [];
+      const selectedMedia = media.find(
+        (item, index) => (item.id || `legacy-${index}`) === mediaId
+      );
+
+      if (!selectedMedia?.url) {
+        return NextResponse.json(
+          { error: "Foto no encontrada" },
+          { status: 404 }
+        );
+      }
+
+      if (selectedMedia.type === "video") {
+        return NextResponse.json(
+          { error: "Selecciona una foto, no un video" },
+          { status: 400 }
+        );
+      }
+
+      if (selectedMedia.private) {
+        return NextResponse.json(
+          { error: "No puedes usar contenido privado como foto principal" },
+          { status: 400 }
+        );
+      }
+
+      const profileVisible =
+        userData.verificationStatus === "approved" &&
+        !userData.blocked &&
+        !userData.profilePaused;
+
+      await userRef.update({
+        photoUrl: selectedMedia.url,
+        profileVisible,
+        profilePhotoUpdatedAt: adminFieldValue.serverTimestamp(),
+        profilePhotoUpdatedBy: owner.uid,
+      });
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "provider_profile_photo_set",
+        title: "Foto principal actualizada",
+        message:
+          "El administrador eligio una foto de tu galeria como foto principal.",
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        photoUrl: selectedMedia.url,
+        profileVisible,
       });
     }
 

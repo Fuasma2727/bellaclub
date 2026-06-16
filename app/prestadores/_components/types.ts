@@ -41,6 +41,8 @@ export type Prestador = {
   badgeVerificationLevel?: 1 | 2 | 3 | 4 | number | string | null;
   promotedUntil?: string | null;
   dailyVideo?: DailyVideo | null;
+  profileSlug?: string;
+  profilePath?: string;
 };
 
 export type PurchasedContentItem = {

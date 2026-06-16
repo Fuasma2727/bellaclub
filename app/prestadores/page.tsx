@@ -33,6 +33,7 @@ type PrestadoresPageProps = {
   pageDescription?: string;
   seoCityLinks?: CitySeoLink[];
   showPageIntro?: boolean;
+  initialProviders?: Prestador[];
   seoContent?: {
     heading: string;
     paragraphs: string[];
@@ -59,13 +60,16 @@ export default function PrestadoresPage({
   pageDescription,
   seoCityLinks = [],
   showPageIntro = true,
+  initialProviders,
   seoContent,
 }: PrestadoresPageProps = {}) {
   const { user } = useAuth();
   const router = useRouter();
 
-  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [prestadores, setPrestadores] = useState<Prestador[]>(
+    initialProviders || []
+  );
+  const [loading, setLoading] = useState(!initialProviders);
   const [pageError, setPageError] = useState("");
 
   const [modalData, setModalData] = useState<Prestador | null>(null);
@@ -285,6 +289,8 @@ export default function PrestadoresPage({
   }, [expandedMedia, mediaList.length, moveExpandedMedia]);
 
   useEffect(() => {
+    if (initialProviders) return;
+
     const fetchPrestadores = async () => {
       setLoading(true);
       setPageError("");
@@ -313,7 +319,7 @@ export default function PrestadoresPage({
     };
 
     void fetchPrestadores();
-  }, []);
+  }, [initialProviders]);
 
   const openModal = async (id: string) => {
     setOpeningProfileId(id);
@@ -732,6 +738,7 @@ export default function PrestadoresPage({
                   provider={provider}
                   isOpening={openingProfileId === provider.id}
                   imagePriority={index < 6}
+                  profileHref={provider.profilePath}
                   onOpen={(id) => void openModal(id)}
                   onOpenDailyVideo={setDailyVideoProvider}
                 />

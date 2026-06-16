@@ -6,8 +6,9 @@ import {
   findProviderCityBySlug,
   getPublicProviderCities,
 } from "@/lib/providerCitySeo";
+import { getPublicProviderCards } from "@/lib/publicProviders";
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
 type CityPageProps = {
   params: Promise<{
@@ -97,6 +98,9 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
   const title = `Prepagos en ${city.city}`;
   const pageUrl = `${siteUrl}/prepagos/${city.slug}`;
   const keywords = getPrepagosCityKeywords(city.city);
+  const initialProviders = await getPublicProviderCards({
+    citySlug: city.slug,
+  });
 
   return (
     <>
@@ -170,11 +174,25 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
               },
             ],
           },
+          {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: `Perfiles de prepagos en ${city.city}`,
+            itemListElement: initialProviders
+              .slice(0, 30)
+              .map((provider, index) => ({
+                "@type": "ListItem",
+                position: index + 1,
+                name: provider.name || `Perfil en ${city.city}`,
+                url: `${siteUrl}${provider.profilePath}`,
+              })),
+          },
         ]}
       />
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
+        initialProviders={initialProviders}
         showPageIntro={false}
       />
     </>
