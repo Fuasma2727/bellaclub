@@ -829,6 +829,7 @@ export default function PerfilPrestador() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [mediaUploadError, setMediaUploadError] = useState("");
+  const [promotionError, setPromotionError] = useState("");
   const [mediaUploadItems, setMediaUploadItems] = useState<
     MediaUploadProgressItem[]
   >([]);
@@ -1726,6 +1727,7 @@ export default function PerfilPrestador() {
 
     setBuyingPromotion(true);
     setError("");
+    setPromotionError("");
 
     try {
       const res = await fetch("/api/provider-promotion", {
@@ -1742,13 +1744,14 @@ export default function PerfilPrestador() {
 
       setPromotedUntil(data.promotedUntil);
       setShowPromotionModal(false);
+      setPromotionError("");
       showSuccess("Perfil promocionado por 3 dias");
-    } catch (promotionError) {
+    } catch (promotionPurchaseError) {
       const text =
-        promotionError instanceof Error
-          ? promotionError.message
+        promotionPurchaseError instanceof Error
+          ? promotionPurchaseError.message
           : "No pudimos promocionar el perfil";
-      setError(text);
+      setPromotionError(text);
     } finally {
       setBuyingPromotion(false);
     }
@@ -2269,22 +2272,43 @@ export default function PerfilPrestador() {
                           />
                         </button>
 
-                        <span
-                          title={profileIndicatorLabel}
-                          aria-label={profileIndicatorLabel}
-                          className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15"
-                        >
-                          <span>{profileIndicatorText}</span>
+                        {profilePaused ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowPauseModal(true)}
+                            title="Perfil pausado. Reactivar perfil"
+                            aria-label="Perfil pausado. Abrir modal para reactivar perfil"
+                            className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+                          >
+                            <span>{profileIndicatorText}</span>
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${
+                                profileIndicatorTone === "ok"
+                                  ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
+                                  : profileIndicatorTone === "error"
+                                    ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
+                                    : "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.68)]"
+                              }`}
+                            />
+                          </button>
+                        ) : (
                           <span
-                            className={`h-2.5 w-2.5 rounded-full ${
-                              profileIndicatorTone === "ok"
-                                ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
-                                : profileIndicatorTone === "error"
-                                  ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
-                                  : "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.68)]"
-                            }`}
-                          />
-                        </span>
+                            title={profileIndicatorLabel}
+                            aria-label={profileIndicatorLabel}
+                            className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15"
+                          >
+                            <span>{profileIndicatorText}</span>
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${
+                                profileIndicatorTone === "ok"
+                                  ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
+                                  : profileIndicatorTone === "error"
+                                    ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
+                                    : "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.68)]"
+                              }`}
+                            />
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -2379,7 +2403,10 @@ export default function PerfilPrestador() {
                     verificationStatus !== "approved" ||
                     !hasProfilePhoto
                   }
-                  onClick={() => setShowPromotionModal(true)}
+                  onClick={() => {
+                    setPromotionError("");
+                    setShowPromotionModal(true);
+                  }}
                   className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-cyan-300/15 bg-cyan-400/[0.06] px-2.5 text-xs font-semibold text-neutral-100 transition hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
                 >
                   <svg
@@ -3019,7 +3046,10 @@ export default function PerfilPrestador() {
         {showPromotionModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
-          onClick={() => setShowPromotionModal(false)}
+          onClick={() => {
+            setShowPromotionModal(false);
+            setPromotionError("");
+          }}
         >
           <div
             className="w-full max-w-md rounded-lg border border-white/[0.08] bg-[#101012] p-6 shadow-2xl shadow-black/40"
@@ -3042,10 +3072,21 @@ export default function PerfilPrestador() {
                 {new Date(promotedUntil).toLocaleString("es-CO")}
               </p>
             )}
+            {promotionError && (
+              <div
+                role="alert"
+                className="mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm leading-6 text-rose-100"
+              >
+                {promotionError}
+              </div>
+            )}
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setShowPromotionModal(false)}
+                onClick={() => {
+                  setShowPromotionModal(false);
+                  setPromotionError("");
+                }}
                 className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07]"
               >
                 Cancelar

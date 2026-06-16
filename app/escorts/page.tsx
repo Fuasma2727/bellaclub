@@ -8,7 +8,7 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
 export const metadata: Metadata = {
   title: "Escorts en Colombia",
   description:
-    "Encuentra escorts en Medellín, La Ceja, Rionegro y otras ciudades de Colombia. Perfiles aprobados, galerías públicas y contacto por WhatsApp en BelaClub.",
+    "Encuentra escorts, prepagos, acompañantes y damas de compañía en Medellín, La Ceja, Rionegro y otras ciudades de Colombia. Perfiles aprobados, galerías públicas y contacto por WhatsApp en BelaClub.",
   keywords: [
     "escorts en Medellín",
     "escorts Medellín",
@@ -18,6 +18,11 @@ export const metadata: Metadata = {
     "escorts Rionegro",
     "escots Medellín",
     "escots Rionegro",
+    "prepagos Medellín",
+    "acompañantes Medellín",
+    "acompanantes Medellín",
+    "damas de compañía Medellín",
+    "damas de compania Medellín",
   ],
   alternates: {
     canonical: "/escorts",
@@ -25,7 +30,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Escorts en Colombia | BelaClub",
     description:
-      "Escorts en Medellín, La Ceja y Rionegro con perfiles aprobados, galerías públicas y contacto directo por WhatsApp.",
+      "Escorts, prepagos y acompañantes en Medellín, La Ceja y Rionegro con perfiles aprobados y contacto directo por WhatsApp.",
     url: "/escorts",
     images: [
       {
@@ -42,7 +47,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Escorts en Colombia | BelaClub",
     description:
-      "Explora escorts por ciudad y contacta directamente por WhatsApp.",
+      "Explora escorts, prepagos y acompañantes por ciudad.",
     images: ["/og-image.png"],
   },
 };

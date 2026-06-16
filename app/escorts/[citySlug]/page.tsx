@@ -5,7 +5,6 @@ import JsonLd from "@/components/JsonLd";
 import {
   findProviderCityBySlug,
   getPublicProviderCities,
-  targetSeoCities,
 } from "@/lib/providerCitySeo";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.com";
@@ -15,6 +14,20 @@ type CityPageProps = {
     citySlug: string;
   }>;
 };
+
+const getEscortsCityKeywords = (city: string) => [
+  `escorts en ${city}`,
+  `escorts ${city}`,
+  `escots en ${city}`,
+  `escots ${city}`,
+  `prepagos en ${city}`,
+  `prepagos ${city}`,
+  `acompañantes en ${city}`,
+  `acompanantes ${city}`,
+  `damas de compañía en ${city}`,
+  `damas de compania ${city}`,
+  `BelaClub ${city}`,
+];
 
 export async function generateStaticParams() {
   const cities = await getPublicProviderCities();
@@ -44,19 +57,12 @@ export async function generateMetadata({
     ? `${city.city}, ${city.department}`
     : city.city;
   const title = `Escorts en ${city.city}`;
-  const description = `Encuentra escorts en ${place}. Revisa perfiles aprobados, galerías públicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
+  const description = `Encuentra escorts, prepagos, acompañantes y damas de compañía en ${place}. Revisa perfiles aprobados, galerías públicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
 
   return {
     title: `${title} | Perfiles aprobados en BelaClub`,
     description,
-    keywords: [
-      `escorts en ${city.city}`,
-      `escorts ${city.city}`,
-      `escots en ${city.city}`,
-      `escots ${city.city}`,
-      `prepagos en ${city.city}`,
-      `BelaClub ${city.city}`,
-    ],
+    keywords: getEscortsCityKeywords(city.city),
     alternates: {
       canonical: `/escorts/${city.slug}`,
     },
@@ -92,12 +98,7 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
 
   const title = `Escorts en ${city.city}`;
   const pageUrl = `${siteUrl}/escorts/${city.slug}`;
-  const cityLinks = targetSeoCities
-    .filter((item) => item.slug !== city.slug)
-    .map((item) => ({
-      href: `/escorts/${item.slug}`,
-      label: `Escorts en ${item.city}`,
-    }));
+  const keywords = getEscortsCityKeywords(city.city);
 
   return (
     <>
@@ -111,6 +112,11 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
               city.department ? `, ${city.department}` : ""
             }, galerías públicas, zonas disponibles y contacto por WhatsApp dentro de BelaClub.`,
             url: pageUrl,
+            keywords: keywords.join(", "),
+            about: keywords.map((keyword) => ({
+              "@type": "Thing",
+              name: keyword,
+            })),
             isPartOf: {
               "@type": "WebSite",
               name: "BelaClub",
@@ -171,30 +177,7 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
-        pageTitle={`Escorts en ${city.city}`}
-        pageEyebrow="Escorts por ciudad"
-        pageDescription={`Explora escorts verificadas en ${city.city}${
-          city.department ? `, ${city.department}` : ""
-        }. Revisa perfiles aprobados, galerías públicas, video del día y contacto directo por WhatsApp.`}
-        seoCityLinks={[
-          { href: `/prepagos/${city.slug}`, label: `Prepagos en ${city.city}` },
-          ...cityLinks,
-        ]}
-        seoContent={{
-          heading: `Escorts en ${city.city}: perfiles por ciudad y zonas`,
-          paragraphs: [
-            city.seoIntro ||
-              `En BelaClub puedes explorar escorts en ${city.city} con perfiles aprobados, galería pública y contacto directo por WhatsApp.`,
-            `Esta página está pensada para búsquedas como escorts ${city.city}, escorts en ${city.city}, prepagos ${city.city} y perfiles verificados en ${city.city}.`,
-            "BelaClub permite revisar fotos públicas, ubicación, precio base, video del día cuando esté disponible y opciones de contenido privado dentro de una experiencia segura.",
-          ],
-          zones: city.zones,
-          relatedLinks: [
-            { href: `/prepagos/${city.slug}`, label: `Prepagos en ${city.city}` },
-            { href: `/prestadores/${city.slug}`, label: `Prestadores en ${city.city}` },
-            ...cityLinks,
-          ],
-        }}
+        showPageIntro={false}
       />
     </>
   );

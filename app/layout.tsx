@@ -25,11 +25,14 @@ export const metadata: Metadata = {
     template: "%s | BelaClub",
   },
   description:
-    "Plataforma privada para conectar clientes con escorts verificadas, contenido seguro y abonos dentro de BelaClub.",
+    "Plataforma privada para conectar clientes con escorts verificadas, prepagos, acompañantes y damas de compañía, contenido seguro y abonos dentro de BelaClub.",
   applicationName: "BelaClub",
   keywords: [
     "BelaClub",
     "escorts verificadas",
+    "prepagos",
+    "acompañantes",
+    "damas de compañía",
     "servicios privados",
     "contenido privado",
     "abonos seguros",
@@ -44,7 +47,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "BelaClub",
     description:
-      "Conecta con escorts verificadas y gestiona contenido privado de forma segura.",
+      "Conecta con escorts verificadas, prepagos y acompañantes de forma segura.",
     url: "/prestadores",
     siteName: "BelaClub",
     images: [
@@ -62,7 +65,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BelaClub",
     description:
-      "Conecta con escorts verificadas y gestiona contenido privado de forma segura.",
+      "Conecta con escorts verificadas, prepagos y acompañantes de forma segura.",
     images: ["/og-image.png"],
   },
   robots: {

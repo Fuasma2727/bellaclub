@@ -32,6 +32,7 @@ type PrestadoresPageProps = {
   pageEyebrow?: string;
   pageDescription?: string;
   seoCityLinks?: CitySeoLink[];
+  showPageIntro?: boolean;
   seoContent?: {
     heading: string;
     paragraphs: string[];
@@ -57,6 +58,7 @@ export default function PrestadoresPage({
   pageEyebrow = "Escorts por ciudad",
   pageDescription,
   seoCityLinks = [],
+  showPageIntro = true,
   seoContent,
 }: PrestadoresPageProps = {}) {
   const { user } = useAuth();
@@ -598,7 +600,7 @@ export default function PrestadoresPage({
       <Header />
 
       <main>
-        {(initialCity || pageTitle) && (
+        {showPageIntro && (initialCity || pageTitle) && (
           <section className="border-b border-white/[0.08] bg-[#080809]">
             <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">

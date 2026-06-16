@@ -3,14 +3,24 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Escorts verificadas",
   description:
-    "Explora escorts verificadas en BelaClub, revisa galerias publicas, desbloquea contenido privado y contacta por WhatsApp.",
+    "Explora escorts verificadas, prepagos, acompañantes y damas de compañía en BelaClub. Revisa galerias publicas, desbloquea contenido privado y contacta por WhatsApp.",
+  keywords: [
+    "escorts verificadas",
+    "prepagos",
+    "acompañantes",
+    "acompanantes",
+    "damas de compañía",
+    "damas de compania",
+    "escorts Medellín",
+    "prepagos Medellín",
+  ],
   alternates: {
     canonical: "/prestadores",
   },
   openGraph: {
     title: "Escorts verificadas | BelaClub",
     description:
-      "Escorts verificadas, galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
+      "Escorts verificadas, prepagos y acompañantes con galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
     url: "/prestadores",
     images: [
       {
@@ -26,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Escorts verificadas | BelaClub",
     description:
-      "Escorts verificadas, galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
+      "Escorts verificadas, prepagos y acompañantes con galerias publicas y contacto directo dentro de BelaClub.",
     images: ["/og-image.png"],
   },
 };
