@@ -119,6 +119,7 @@ type FinanceSummaryResponse = {
 type VerificationAction =
   | "approve"
   | "reject"
+  | "rejectBadgeVerification"
   | "verifyVisit"
   | "removeVisit"
   | "block"
@@ -384,10 +385,16 @@ export default function AdminVerificationsPage() {
     if (!user) return;
     let confirmText: string | undefined;
 
-    if (action === "reject" || action === "block") {
+    if (
+      action === "reject" ||
+      action === "rejectBadgeVerification" ||
+      action === "block"
+    ) {
       const confirmed = window.confirm(
         action === "block"
           ? "Seguro que quieres bloquear este perfil?"
+          : action === "rejectBadgeVerification"
+            ? "Seguro que quieres no aprobar esta evidencia de verificacion?"
           : "Seguro que quieres rechazar esta solicitud?"
       );
 
@@ -1116,17 +1123,30 @@ export default function AdminVerificationsPage() {
             </button>
           </div>
         ) : isBadgeRequest ? (
-          <button
-            type="button"
-            disabled={actionId === provider.id}
-            onClick={(event) => {
-              event.stopPropagation();
-              handleAction(provider, "verifyVisit");
-            }}
-            className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {actionId === provider.id ? "Procesando..." : "Aprobar verificacion"}
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              disabled={actionId === provider.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleAction(provider, "verifyVisit");
+              }}
+              className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {actionId === provider.id ? "Procesando..." : "Aprobar"}
+            </button>
+            <button
+              type="button"
+              disabled={actionId === provider.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleAction(provider, "rejectBadgeVerification");
+              }}
+              className="rounded-lg border border-red-500/40 px-4 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              No aprobar
+            </button>
+          </div>
         ) : (
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm text-neutral-400">
             Sin acciones pendientes

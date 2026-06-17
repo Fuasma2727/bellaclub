@@ -6,9 +6,11 @@ type MediaItem = {
   id?: string;
   type?: "photo" | "video";
   url?: string;
+  previewUrl?: string;
   private?: boolean;
   price?: number | string | null;
   description?: string;
+  duration?: number | string | null;
 };
 
 type PurchasedItem = {
@@ -137,6 +139,9 @@ export async function GET(request: Request, { params }: Params) {
         private: Boolean(item.private),
         price: item.private ? item.price || 0 : null,
         description: item.private ? item.description || "" : "",
+        previewUrl: item.private ? item.previewUrl || item.url || "" : "",
+        duration:
+          item.type === "video" ? Number(item.duration || 0) || null : null,
       };
     });
 

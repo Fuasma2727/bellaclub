@@ -43,6 +43,71 @@ function WhatsAppIcon() {
   );
 }
 
+function LockIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="6" y="10" width="12" height="10" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+function PhotoIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="10" r="1.5" />
+      <path d="m21 15-4.5-4.5L11 16l-2-2-4 4" />
+    </svg>
+  );
+}
+
+function VideoIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M15 10.5 21 7v10l-6-3.5V17H3V7h12v3.5Z" />
+    </svg>
+  );
+}
+
+const formatDuration = (seconds?: number | null) => {
+  const safeSeconds = Math.max(0, Math.ceil(Number(seconds || 0)));
+
+  if (!safeSeconds) return "";
+
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+};
+
 export default function ProviderProfileModal({
   provider,
   mediaList,
@@ -200,50 +265,70 @@ export default function ProviderProfileModal({
                       const isPrivate = Boolean(
                         item.private && !alreadyUnlocked
                       );
+                      const previewUrl = isPrivate
+                        ? item.previewUrl || item.url || ""
+                        : item.url || "";
+                      const durationLabel =
+                        item.type === "video"
+                          ? formatDuration(item.duration)
+                          : "";
 
                       return (
                         <button
                           key={`${item.id || item.url || "media"}-${index}`}
                           type="button"
+                          aria-label={
+                            isPrivate
+                              ? "Desbloquear contenido privado"
+                              : "Ampliar contenido"
+                          }
                           className="group relative aspect-square overflow-hidden rounded-md border border-white/[0.08] bg-zinc-900"
                           onClick={() => onMediaClick(item, realIndex)}
                           onContextMenu={(event) => event.preventDefault()}
                         >
-                          {item.url &&
+                          {previewUrl &&
                           item.type === "photo" &&
-                          isPrivateMediaUrl(item.url) ? (
+                          (isPrivate || isPrivateMediaUrl(previewUrl)) ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={item.url}
+                              src={previewUrl}
                               alt="Contenido"
                               draggable={false}
                               onContextMenu={(event) => event.preventDefault()}
                               className={`absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105 ${
-                                isPrivate ? "scale-110 blur-md" : ""
+                                isPrivate
+                                  ? "scale-105 opacity-45 blur-[2px] saturate-75"
+                                  : ""
                               }`}
                             />
-                          ) : item.url && item.type === "photo" ? (
+                          ) : previewUrl && item.type === "photo" ? (
                             <Image
-                              src={item.url}
+                              src={previewUrl}
                               alt="Contenido"
                               fill
                               draggable={false}
                               onContextMenu={(event) => event.preventDefault()}
                               className={`object-cover transition duration-300 group-hover:scale-105 ${
-                                isPrivate ? "scale-110 blur-md" : ""
+                                isPrivate
+                                  ? "scale-105 opacity-45 blur-[2px] saturate-75"
+                                  : ""
                               }`}
                               sizes="(min-width: 1024px) 220px, 33vw"
                             />
-                          ) : item.url ? (
+                          ) : previewUrl ? (
                             <video
-                              src={item.url}
+                              src={previewUrl}
                               muted
+                              playsInline
+                              preload="metadata"
                               draggable={false}
                               controlsList="nodownload noplaybackrate"
                               disablePictureInPicture
                               onContextMenu={(event) => event.preventDefault()}
                               className={`absolute inset-0 h-full w-full object-cover ${
-                                isPrivate ? "scale-110 blur-md" : ""
+                                isPrivate
+                                  ? "scale-105 opacity-45 blur-[2px] saturate-75"
+                                  : ""
                               }`}
                             />
                           ) : (
@@ -251,37 +336,32 @@ export default function ProviderProfileModal({
                           )}
 
                           {isPrivate && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/65 px-2 text-center">
+                            <>
+                              <div className="absolute inset-0 bg-black/35 transition group-hover:bg-black/25" />
                               <span
                                 aria-label="Contenido bloqueado"
-                                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white backdrop-blur"
+                                className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white shadow-lg shadow-black/40 backdrop-blur"
                               >
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  className="h-4 w-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                >
-                                  <rect
-                                    x="6"
-                                    y="10"
-                                    width="12"
-                                    height="10"
-                                    rx="2"
-                                  />
-                                  <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-                                </svg>
+                                <LockIcon />
                               </span>
-                              {item.description && (
-                                <span className="mt-2 line-clamp-2 max-w-[90%] text-xs leading-4 text-neutral-200">
-                                  {item.description}
+                              <span className="absolute left-1/2 top-1/2 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/45 text-white shadow-xl shadow-black/40 backdrop-blur transition group-hover:scale-105 sm:h-14 sm:w-14">
+                                {item.type === "video" ? (
+                                  <VideoIcon />
+                                ) : (
+                                  <PhotoIcon />
+                                )}
+                              </span>
+                              {formatMoney(item.price) && (
+                                <span className="absolute bottom-2 left-2 z-10 max-w-[calc(100%-64px)] truncate rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[11px] font-semibold text-white shadow-lg shadow-black/30 backdrop-blur">
+                                  {formatMoney(item.price)}
                                 </span>
                               )}
-                              <span className="mt-2 text-sm font-semibold text-white">
-                                {formatMoney(item.price)}
-                              </span>
-                            </div>
+                              {item.type === "video" && durationLabel && (
+                                <span className="absolute bottom-2 right-2 z-10 rounded-full border border-white/10 bg-black/65 px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-lg shadow-black/30 backdrop-blur">
+                                  {durationLabel}
+                                </span>
+                              )}
+                            </>
                           )}
                         </button>
                       );

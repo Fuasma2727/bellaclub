@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { doc, getDoc } from "firebase/firestore";
@@ -65,6 +65,7 @@ export default function PrestadoresPage({
 }: PrestadoresPageProps = {}) {
   const { user } = useAuth();
   const router = useRouter();
+  const profileModalHistoryRef = useRef(false);
 
   const [prestadores, setPrestadores] = useState<Prestador[]>(
     initialProviders || []
@@ -215,8 +216,77 @@ export default function PrestadoresPage({
     [getNextViewableIndex, mediaList]
   );
 
+  const resetModalState = useCallback(() => {
+    setModalData(null);
+    setExpandedMedia(null);
+    setShowDepositModal(false);
+    setSelectedAmount(null);
+    setDepositMessage("");
+    setPendingPurchase(null);
+    setPurchaseError("");
+    setReportMessage("");
+    setShowReportModal(false);
+    setReportReason("");
+    setReportBalance(null);
+  }, []);
+
+  const pushProfileModalHistory = useCallback((providerId: string) => {
+    if (typeof window === "undefined" || profileModalHistoryRef.current) {
+      return;
+    }
+
+    const currentState =
+      window.history.state && typeof window.history.state === "object"
+        ? window.history.state
+        : {};
+
+    window.history.pushState(
+      {
+        ...currentState,
+        belaclubModal: "provider-profile",
+        providerId,
+      },
+      "",
+      window.location.href
+    );
+    profileModalHistoryRef.current = true;
+  }, []);
+
+  const closeModal = useCallback(() => {
+    const shouldStepBack =
+      typeof window !== "undefined" && profileModalHistoryRef.current;
+
+    profileModalHistoryRef.current = false;
+    resetModalState();
+
+    if (shouldStepBack) {
+      window.history.back();
+    }
+  }, [resetModalState]);
+
+  const closeModalForNavigation = useCallback(() => {
+    profileModalHistoryRef.current = false;
+    resetModalState();
+  }, [resetModalState]);
+
+  useEffect(() => {
+    const closeProfileModalOnBack = () => {
+      if (!profileModalHistoryRef.current) return;
+
+      profileModalHistoryRef.current = false;
+      resetModalState();
+    };
+
+    window.addEventListener("popstate", closeProfileModalOnBack);
+
+    return () => {
+      window.removeEventListener("popstate", closeProfileModalOnBack);
+    };
+  }, [resetModalState]);
+
   useEffect(() => {
     const isAnyModalOpen =
+      !!modalData ||
       !!expandedMedia ||
       !!showDepositModal ||
       !!showAuthRequiredModal ||
@@ -230,6 +300,7 @@ export default function PrestadoresPage({
       document.body.style.overflow = "auto";
     };
   }, [
+    modalData,
     expandedMedia,
     showDepositModal,
     showAuthRequiredModal,
@@ -347,6 +418,7 @@ export default function PrestadoresPage({
         ...(Array.isArray(data.media) ? data.media : []),
       ];
 
+      pushProfileModalHistory(data.id);
       setModalData(data);
       setMediaList(allMedia);
     } finally {
@@ -359,20 +431,6 @@ export default function PrestadoresPage({
 
     setCurrentIndex(index);
     setExpandedMedia(mediaList[index]);
-  };
-
-  const closeModal = () => {
-    setModalData(null);
-    setExpandedMedia(null);
-    setShowDepositModal(false);
-    setSelectedAmount(null);
-    setDepositMessage("");
-    setPendingPurchase(null);
-    setPurchaseError("");
-    setReportMessage("");
-    setShowReportModal(false);
-    setReportReason("");
-    setReportBalance(null);
   };
 
   const resetFilters = () => {
@@ -687,6 +745,18 @@ export default function PrestadoresPage({
           </section>
         )}
 
+        {!showPageIntro && (initialCity || pageTitle) && (
+          <section className="sr-only" aria-label="Informacion de la pagina">
+            <h1>{pageTitle || `Escorts en ${initialCity}`}</h1>
+            <p>
+              {pageDescription ||
+                `Perfiles aprobados en ${initialCity}${
+                  initialDepartment ? `, ${initialDepartment}` : ""
+                }, con galerias publicas y contacto directo por WhatsApp.`}
+            </p>
+          </section>
+        )}
+
         <FiltersBar
           departmentFilter={departmentFilter}
           cityFilter={cityFilter}
@@ -848,12 +918,12 @@ export default function PrestadoresPage({
           onClose={() => setShowAuthRequiredModal(false)}
           onLogin={() => {
             setShowAuthRequiredModal(false);
-            closeModal();
+            closeModalForNavigation();
             router.push("/login");
           }}
           onRegister={() => {
             setShowAuthRequiredModal(false);
-            closeModal();
+            closeModalForNavigation();
             router.push("/register");
           }}
         />

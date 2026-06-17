@@ -13,6 +13,7 @@ import {
 type VerificationAction =
   | "approve"
   | "reject"
+  | "rejectBadgeVerification"
   | "verifyVisit"
   | "removeVisit"
   | "block"
@@ -264,6 +265,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const validActions: VerificationAction[] = [
       "approve",
       "reject",
+      "rejectBadgeVerification",
       "verifyVisit",
       "removeVisit",
       "block",
@@ -441,6 +443,43 @@ export async function PATCH(request: Request, { params }: Params) {
       });
 
       return NextResponse.json({ success: true, visitVerified: false });
+    }
+
+    if (action === "rejectBadgeVerification") {
+      const level = Number(userData.badgeVerificationLevel || 0);
+
+      if (userData.badgeVerificationStatus !== "pending") {
+        return NextResponse.json(
+          { error: "El prestador no tiene una solicitud de insignia pendiente" },
+          { status: 400 }
+        );
+      }
+
+      await userRef.update({
+        badgeVerificationStatus: "rejected",
+        badgeVerificationVideoUrl: adminFieldValue.delete(),
+        badgeVerificationEvidenceType: adminFieldValue.delete(),
+        badgeVerificationRequestedAt: adminFieldValue.delete(),
+        badgeVerificationRejectedAt: adminFieldValue.serverTimestamp(),
+        badgeVerificationRejectedBy: owner.uid,
+      });
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "badge_verification_rejected",
+        title: "Verificacion no aprobada",
+        message: `Tu evidencia para nivel ${badgeLabelByLevel(
+          level
+        )} no fue aprobada. Puedes enviar una nueva foto o video desde tu perfil.`,
+        badgeLevel: level || null,
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        badgeVerificationStatus: "rejected",
+      });
     }
 
     if (action === "block") {
@@ -681,6 +720,7 @@ export async function PATCH(request: Request, { params }: Params) {
       isVerified: false,
       profileVisible: false,
       verificationStatus: "rejected",
+      verificationPhotoUrl: adminFieldValue.delete(),
       blocked: false,
       visitVerified: false,
       visitVerificationStatus: "none",
@@ -688,6 +728,16 @@ export async function PATCH(request: Request, { params }: Params) {
       badgeVerificationStatus: "none",
       rejectedAt: adminFieldValue.serverTimestamp(),
       rejectedBy: owner.uid,
+    });
+
+    await adminDb.collection("notifications").doc().set({
+      userId: uid,
+      type: "provider_verification_rejected",
+      title: "Verificacion no aprobada",
+      message:
+        "Tu foto de verificacion no fue aprobada. Puedes enviar una nueva solicitud desde tu perfil con una foto o video mas claro.",
+      read: false,
+      createdAt: adminFieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({ success: true, status: "rejected" });

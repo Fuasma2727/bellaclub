@@ -10,9 +10,11 @@ export type MediaItem = {
   id?: string;
   type: "photo" | "video";
   url?: string;
+  previewUrl?: string;
   private?: boolean;
   price?: number | string | null;
   description?: string;
+  duration?: number | null;
 };
 
 export type DailyVideo = {
