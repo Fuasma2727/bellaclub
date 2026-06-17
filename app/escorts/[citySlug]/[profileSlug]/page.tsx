@@ -16,6 +16,50 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 export const revalidate = 300;
 export const dynamicParams = true;
 
+const getPhoneSeoValues = (value?: string) => {
+  const raw = value?.trim() || "";
+  const digits = raw.replace(/\D/g, "");
+  const localDigits =
+    digits.length === 12 && digits.startsWith("57")
+      ? digits.slice(2)
+      : digits.length === 10 && digits.startsWith("3")
+        ? digits
+        : "";
+  const internationalDigits = localDigits
+    ? `57${localDigits}`
+    : digits.length >= 10
+      ? digits
+      : "";
+  const formattedLocal =
+    localDigits.length === 10
+      ? `${localDigits.slice(0, 3)} ${localDigits.slice(3, 6)} ${localDigits.slice(6)}`
+      : "";
+  const formattedInternational = formattedLocal
+    ? `+57 ${formattedLocal}`
+    : raw;
+
+  return {
+    raw,
+    digits,
+    localDigits,
+    internationalDigits,
+    formattedLocal,
+    formattedInternational,
+    variants: Array.from(
+      new Set(
+        [
+          raw,
+          digits,
+          localDigits,
+          internationalDigits,
+          formattedLocal,
+          formattedInternational,
+        ].filter(Boolean)
+      )
+    ),
+  };
+};
+
 type ProfilePageProps = {
   params: Promise<{
     citySlug: string;
@@ -53,8 +97,12 @@ export async function generateMetadata({
     .filter(Boolean)
     .join(", ");
   const title = `${name} en ${provider.city || "Colombia"}`;
-  const description = `${name} en ${place || "BelaClub"}. Revisa perfil aprobado, fotos públicas, precio base y contacto directo por WhatsApp en BelaClub.`;
-  const phoneLabel = provider.whatsapp?.trim() || "";
+  const phoneSeo = getPhoneSeoValues(provider.whatsapp);
+  const description = `${name} en ${place || "BelaClub"}. Revisa perfil aprobado, fotos públicas, precio base y contacto directo por WhatsApp${
+    phoneSeo.formattedInternational
+      ? ` ${phoneSeo.formattedInternational}`
+      : ""
+  } en BelaClub.`;
 
   return {
     title: `${title} | BelaClub`,
@@ -66,8 +114,7 @@ export async function generateMetadata({
       `prepagos ${provider.city || "Colombia"}`,
       `acompañantes ${provider.city || "Colombia"}`,
       `damas de compañía ${provider.city || "Colombia"}`,
-      phoneLabel,
-      phoneLabel.replace(/\D/g, ""),
+      ...phoneSeo.variants,
     ].filter(Boolean),
     alternates: {
       canonical: provider.profilePath,
@@ -110,8 +157,7 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
     provider.whatsapp,
     `Hola, vi tu perfil en BelaClub: ${name}`
   );
-  const phoneLabel = provider.whatsapp?.trim() || "";
-  const phoneDigits = phoneLabel.replace(/\D/g, "");
+  const phoneSeo = getPhoneSeoValues(provider.whatsapp);
   const gallery = [
     {
       id: "profile-photo",
@@ -139,8 +185,19 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
               "@type": "Person",
               name,
               image: provider.photoUrl,
-              telephone: phoneLabel || undefined,
+              telephone:
+                phoneSeo.formattedInternational ||
+                phoneSeo.raw ||
+                undefined,
               description: provider.description || undefined,
+              contactPoint: phoneSeo.internationalDigits
+                ? {
+                    "@type": "ContactPoint",
+                    telephone: `+${phoneSeo.internationalDigits}`,
+                    contactType: "WhatsApp",
+                    availableLanguage: "es",
+                  }
+                : undefined,
               address: {
                 "@type": "PostalAddress",
                 addressLocality: provider.city || undefined,
@@ -220,16 +277,25 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
               <p className="mt-2 text-sm text-neutral-400">
                 {location || "Ubicacion por confirmar"}
               </p>
-              {phoneLabel && (
-                <p className="mt-1 text-sm text-neutral-500">
-                  WhatsApp:{" "}
-                  <span className="font-medium text-neutral-300">
-                    {phoneLabel}
-                  </span>
-                  {phoneDigits && phoneDigits !== phoneLabel && (
-                    <span className="sr-only"> {phoneDigits}</span>
-                  )}
-                </p>
+              {phoneSeo.variants.length > 0 && (
+                <div className="mt-3 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                    WhatsApp
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-neutral-300">
+                    {[
+                      phoneSeo.formattedInternational,
+                      phoneSeo.localDigits,
+                      phoneSeo.internationalDigits,
+                    ]
+                      .filter(Boolean)
+                      .map((phone) => (
+                        <span key={phone} className="font-medium">
+                          {phone}
+                        </span>
+                      ))}
+                  </div>
+                </div>
               )}
 
               <div className="mt-4 flex flex-wrap gap-2">
