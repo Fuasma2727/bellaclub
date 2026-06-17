@@ -6,6 +6,8 @@ import { getPublicProviderCards } from "@/lib/publicProviders";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title: "Escorts en Colombia",
   description:

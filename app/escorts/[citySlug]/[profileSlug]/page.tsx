@@ -13,6 +13,9 @@ import { formatMoney, getWhatsAppUrl } from "@/app/prestadores/_components/utils
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
+export const revalidate = 300;
+export const dynamicParams = true;
+
 type ProfilePageProps = {
   params: Promise<{
     citySlug: string;
@@ -51,6 +54,7 @@ export async function generateMetadata({
     .join(", ");
   const title = `${name} en ${provider.city || "Colombia"}`;
   const description = `${name} en ${place || "BelaClub"}. Revisa perfil aprobado, fotos públicas, precio base y contacto directo por WhatsApp en BelaClub.`;
+  const phoneLabel = provider.whatsapp?.trim() || "";
 
   return {
     title: `${title} | BelaClub`,
@@ -62,7 +66,9 @@ export async function generateMetadata({
       `prepagos ${provider.city || "Colombia"}`,
       `acompañantes ${provider.city || "Colombia"}`,
       `damas de compañía ${provider.city || "Colombia"}`,
-    ],
+      phoneLabel,
+      phoneLabel.replace(/\D/g, ""),
+    ].filter(Boolean),
     alternates: {
       canonical: provider.profilePath,
     },
@@ -104,6 +110,8 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
     provider.whatsapp,
     `Hola, vi tu perfil en BelaClub: ${name}`
   );
+  const phoneLabel = provider.whatsapp?.trim() || "";
+  const phoneDigits = phoneLabel.replace(/\D/g, "");
   const gallery = [
     {
       id: "profile-photo",
@@ -131,6 +139,7 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
               "@type": "Person",
               name,
               image: provider.photoUrl,
+              telephone: phoneLabel || undefined,
               description: provider.description || undefined,
               address: {
                 "@type": "PostalAddress",
@@ -211,6 +220,17 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
               <p className="mt-2 text-sm text-neutral-400">
                 {location || "Ubicacion por confirmar"}
               </p>
+              {phoneLabel && (
+                <p className="mt-1 text-sm text-neutral-500">
+                  WhatsApp:{" "}
+                  <span className="font-medium text-neutral-300">
+                    {phoneLabel}
+                  </span>
+                  {phoneDigits && phoneDigits !== phoneLabel && (
+                    <span className="sr-only"> {phoneDigits}</span>
+                  )}
+                </p>
+              )}
 
               <div className="mt-4 flex flex-wrap gap-2">
                 {provider.price && (

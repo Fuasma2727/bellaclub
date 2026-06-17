@@ -5,13 +5,18 @@ import JsonLd from "@/components/JsonLd";
 import {
   findProviderCityBySlug,
   getPublicProviderCities,
+  targetSeoCities,
 } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
+import {
+  getProviderSearchKeywords,
+  providerSearchRoutesByKey,
+  type ProviderSearchRouteKey,
+} from "@/lib/providerSearchRoutes";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
-export const revalidate = 300;
-export const dynamicParams = true;
+export const PROVIDER_SEARCH_REVALIDATE_SECONDS = 300;
 
 type CityPageProps = {
   params: Promise<{
@@ -19,21 +24,7 @@ type CityPageProps = {
   }>;
 };
 
-const getPrepagosCityKeywords = (city: string) => [
-  `prepagos en ${city}`,
-  `prepagos ${city}`,
-  `escorts en ${city}`,
-  `escorts ${city}`,
-  `acompañantes en ${city}`,
-  `acompanantes ${city}`,
-  `damas de compañía en ${city}`,
-  `damas de compania ${city}`,
-  `chicas en ${city}`,
-  `chicas ${city}`,
-  `BelaClub ${city}`,
-];
-
-export async function generateStaticParams() {
+export async function generateProviderCityStaticParams() {
   const cities = await getPublicProviderCities();
 
   return cities.map((city) => ({
@@ -41,15 +32,17 @@ export async function generateStaticParams() {
   }));
 }
 
-export async function generateMetadata({
-  params,
-}: CityPageProps): Promise<Metadata> {
+export async function generateProviderCityMetadata(
+  routeKey: ProviderSearchRouteKey,
+  { params }: CityPageProps
+): Promise<Metadata> {
+  const route = providerSearchRoutesByKey[routeKey];
   const { citySlug } = await params;
   const city = await findProviderCityBySlug(citySlug);
 
   if (!city) {
     return {
-      title: "Prepagos por ciudad",
+      title: `${route.title} por ciudad`,
       robots: {
         index: false,
         follow: false,
@@ -60,20 +53,20 @@ export async function generateMetadata({
   const place = city.department
     ? `${city.city}, ${city.department}`
     : city.city;
-  const title = `Prepagos en ${city.city}`;
-  const description = `Encuentra prepagos, escorts, acompañantes y damas de compañía en ${place}. Revisa perfiles aprobados, galerías públicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
+  const title = `${route.title} en ${city.city}`;
+  const description = `Encuentra ${route.pluralNoun}, escorts, prepagos, acompañantes, damas de compañía y chicas en ${place}. Revisa perfiles aprobados, fotos públicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
 
   return {
     title: `${title} | Perfiles aprobados en BelaClub`,
     description,
-    keywords: getPrepagosCityKeywords(city.city),
+    keywords: getProviderSearchKeywords(route, city.city),
     alternates: {
-      canonical: `/prepagos/${city.slug}`,
+      canonical: `/${route.segment}/${city.slug}`,
     },
     openGraph: {
       title: `${title} | BelaClub`,
       description,
-      url: `/prepagos/${city.slug}`,
+      url: `/${route.segment}/${city.slug}`,
       images: [
         {
           url: "/og-image.png",
@@ -94,18 +87,27 @@ export async function generateMetadata({
   };
 }
 
-export default async function PrepagosCityPage({ params }: CityPageProps) {
+export default async function ProviderCitySearchPage({
+  routeKey,
+  params,
+}: CityPageProps & {
+  routeKey: ProviderSearchRouteKey;
+}) {
+  const route = providerSearchRoutesByKey[routeKey];
   const { citySlug } = await params;
   const city = await findProviderCityBySlug(citySlug);
 
   if (!city) notFound();
 
-  const title = `Prepagos en ${city.city}`;
-  const pageUrl = `${siteUrl}/prepagos/${city.slug}`;
-  const keywords = getPrepagosCityKeywords(city.city);
+  const title = `${route.title} en ${city.city}`;
+  const pageUrl = `${siteUrl}/${route.segment}/${city.slug}`;
+  const keywords = getProviderSearchKeywords(route, city.city);
   const initialProviders = await getPublicProviderCards({
     citySlug: city.slug,
   });
+  const relatedRoutes = targetSeoCities
+    .filter((item) => item.slug !== city.slug)
+    .slice(0, 6);
 
   return (
     <>
@@ -115,9 +117,9 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
             "@context": "https://schema.org",
             "@type": "CollectionPage",
             name: title,
-            description: `Prepagos con perfiles aprobados en ${city.city}${
+            description: `${route.title}, escorts, prepagos, acompañantes, damas de compañía y chicas con perfiles aprobados en ${city.city}${
               city.department ? `, ${city.department}` : ""
-            }, galerías públicas, zonas disponibles y contacto por WhatsApp dentro de BelaClub.`,
+            }, fotos públicas, zonas disponibles y contacto por WhatsApp dentro de BelaClub.`,
             url: pageUrl,
             keywords: keywords.join(", "),
             about: keywords.map((keyword) => ({
@@ -143,8 +145,8 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
               {
                 "@type": "ListItem",
                 position: 2,
-                name: "Prepagos",
-                item: `${siteUrl}/prepagos`,
+                name: route.label,
+                item: `${siteUrl}/${route.segment}`,
               },
               {
                 "@type": "ListItem",
@@ -157,32 +159,7 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
           {
             "@context": "https://schema.org",
             "@type": "ItemList",
-            name: `Búsquedas relacionadas con prepagos en ${city.city}`,
-            itemListElement: [
-              {
-                "@type": "ListItem",
-                position: 1,
-                name: `Prepagos en ${city.city}`,
-                url: `${siteUrl}/prepagos/${city.slug}`,
-              },
-              {
-                "@type": "ListItem",
-                position: 2,
-                name: `Escorts en ${city.city}`,
-                url: `${siteUrl}/escorts/${city.slug}`,
-              },
-              {
-                "@type": "ListItem",
-                position: 3,
-                name: `Prestadores en ${city.city}`,
-                url: `${siteUrl}/prestadores/${city.slug}`,
-              },
-            ],
-          },
-          {
-            "@context": "https://schema.org",
-            "@type": "ItemList",
-            name: `Perfiles de prepagos en ${city.city}`,
+            name: `Perfiles de ${route.pluralNoun} en ${city.city}`,
             itemListElement: initialProviders
               .slice(0, 30)
               .map((provider, index) => ({
@@ -191,6 +168,25 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
                 name: provider.name || `Perfil en ${city.city}`,
                 url: `${siteUrl}${provider.profilePath}`,
               })),
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: `Búsquedas relacionadas con ${route.pluralNoun} en ${city.city}`,
+            itemListElement: [
+              ...keywords.slice(0, 5).map((keyword, index) => ({
+                "@type": "ListItem",
+                position: index + 1,
+                name: keyword,
+                url: pageUrl,
+              })),
+              ...relatedRoutes.map((item, index) => ({
+                "@type": "ListItem",
+                position: index + 6,
+                name: `${route.title} en ${item.city}`,
+                url: `${siteUrl}/${route.segment}/${item.slug}`,
+              })),
+            ],
           },
         ]}
       />

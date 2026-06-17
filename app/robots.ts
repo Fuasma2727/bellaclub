@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 const getBaseUrl = () =>
-  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -13,6 +13,9 @@ export default function robots(): MetadataRoute.Robots {
           "/prestadores",
           "/prepagos",
           "/escorts",
+          "/acompanantes",
+          "/damas-de-compania",
+          "/chicas",
           "/terminos",
           "/privacidad",
           "/seguridad",

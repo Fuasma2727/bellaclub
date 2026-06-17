@@ -10,6 +10,9 @@ import { getPublicProviderCards } from "@/lib/publicProviders";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
+export const revalidate = 300;
+export const dynamicParams = true;
+
 type CityPageProps = {
   params: Promise<{
     citySlug: string;
@@ -27,6 +30,8 @@ const getEscortsCityKeywords = (city: string) => [
   `acompanantes ${city}`,
   `damas de compañía en ${city}`,
   `damas de compania ${city}`,
+  `chicas en ${city}`,
+  `chicas ${city}`,
   `BelaClub ${city}`,
 ];
 
