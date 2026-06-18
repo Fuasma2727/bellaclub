@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import LegalPageShell from "@/components/LegalPageShell";
 
 export const metadata: Metadata = {
   title: "Reembolsos y disputas",
@@ -55,8 +56,7 @@ const sections = [
 
 export default function ReembolsosPage() {
   return (
-    <main className="min-h-screen bg-[#050505] px-6 py-10 text-white">
-      <section className="mx-auto max-w-4xl">
+    <LegalPageShell>
         <Link href="/prestadores" className="text-sm font-semibold text-blue-300">
           Volver a BelaClub
         </Link>
@@ -89,7 +89,6 @@ export default function ReembolsosPage() {
             </article>
           ))}
         </div>
-      </section>
-    </main>
+    </LegalPageShell>
   );
 }

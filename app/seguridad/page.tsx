@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import LegalPageShell from "@/components/LegalPageShell";
 
 export const metadata: Metadata = {
   title: "Seguridad y reglas de contenido",
@@ -63,8 +64,7 @@ const sections = [
 
 export default function SeguridadPage() {
   return (
-    <main className="min-h-screen bg-[#050505] px-6 py-10 text-white">
-      <section className="mx-auto max-w-4xl">
+    <LegalPageShell>
         <Link href="/prestadores" className="text-sm font-semibold text-blue-300">
           Volver a BelaClub
         </Link>
@@ -100,7 +100,6 @@ export default function SeguridadPage() {
             </article>
           ))}
         </div>
-      </section>
-    </main>
+    </LegalPageShell>
   );
 }

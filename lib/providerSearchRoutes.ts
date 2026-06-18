@@ -3,7 +3,10 @@ export type ProviderSearchRouteKey =
   | "prepagos"
   | "acompanantes"
   | "damas-de-compania"
-  | "chicas";
+  | "chicas"
+  | "masajistas"
+  | "universitarias"
+  | "putas";
 
 export type ProviderSearchRoute = {
   key: ProviderSearchRouteKey;
@@ -61,6 +64,33 @@ export const providerSearchRoutes: ProviderSearchRoute[] = [
     noun: "chica",
     pluralNoun: "chicas",
   },
+  {
+    key: "masajistas",
+    segment: "masajistas",
+    label: "Masajistas",
+    title: "Masajistas",
+    baseTitle: "Masajistas en Colombia",
+    noun: "masajista",
+    pluralNoun: "masajistas",
+  },
+  {
+    key: "universitarias",
+    segment: "universitarias",
+    label: "Universitarias",
+    title: "Universitarias",
+    baseTitle: "Universitarias en Colombia",
+    noun: "universitaria",
+    pluralNoun: "universitarias",
+  },
+  {
+    key: "putas",
+    segment: "putas",
+    label: "Putas",
+    title: "Putas",
+    baseTitle: "Putas en Colombia",
+    noun: "puta",
+    pluralNoun: "putas",
+  },
 ];
 
 export const providerSearchRoutesByKey = Object.fromEntries(
@@ -86,6 +116,12 @@ export const getProviderSearchKeywords = (
     `damas de compania ${cityText}`,
     `chicas en ${cityText}`,
     `chicas ${cityText}`,
+    `masajistas en ${cityText}`,
+    `masajistas ${cityText}`,
+    `universitarias en ${cityText}`,
+    `universitarias ${cityText}`,
+    `putas en ${cityText}`,
+    `putas ${cityText}`,
     `BelaClub ${cityText}`,
   ];
 };

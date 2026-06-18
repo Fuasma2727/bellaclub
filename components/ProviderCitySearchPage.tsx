@@ -54,7 +54,7 @@ export async function generateProviderCityMetadata(
     ? `${city.city}, ${city.department}`
     : city.city;
   const title = `${route.title} en ${city.city}`;
-  const description = `Encuentra ${route.pluralNoun}, escorts, prepagos, acompañantes, damas de compañía y chicas en ${place}. Revisa perfiles aprobados, fotos públicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
+  const description = `Encuentra ${route.pluralNoun}, escorts, prepagos, acompañantes, damas de compañía, chicas, masajistas y universitarias en ${place}. Revisa perfiles aprobados, fotos públicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
 
   return {
     title: `${title} | Perfiles aprobados en BelaClub`,
@@ -102,9 +102,10 @@ export default async function ProviderCitySearchPage({
   const title = `${route.title} en ${city.city}`;
   const pageUrl = `${siteUrl}/${route.segment}/${city.slug}`;
   const keywords = getProviderSearchKeywords(route, city.city);
-  const initialProviders = await getPublicProviderCards({
-    citySlug: city.slug,
-  });
+  const [cityProviders, allProviders] = await Promise.all([
+    getPublicProviderCards({ citySlug: city.slug }),
+    getPublicProviderCards(),
+  ]);
   const relatedRoutes = targetSeoCities
     .filter((item) => item.slug !== city.slug)
     .slice(0, 6);
@@ -117,7 +118,7 @@ export default async function ProviderCitySearchPage({
             "@context": "https://schema.org",
             "@type": "CollectionPage",
             name: title,
-            description: `${route.title}, escorts, prepagos, acompañantes, damas de compañía y chicas con perfiles aprobados en ${city.city}${
+            description: `${route.title}, escorts, prepagos, acompañantes, damas de compañía, chicas, masajistas y universitarias con perfiles aprobados en ${city.city}${
               city.department ? `, ${city.department}` : ""
             }, fotos públicas, zonas disponibles y contacto por WhatsApp dentro de BelaClub.`,
             url: pageUrl,
@@ -160,7 +161,7 @@ export default async function ProviderCitySearchPage({
             "@context": "https://schema.org",
             "@type": "ItemList",
             name: `Perfiles de ${route.pluralNoun} en ${city.city}`,
-            itemListElement: initialProviders
+            itemListElement: cityProviders
               .slice(0, 30)
               .map((provider, index) => ({
                 "@type": "ListItem",
@@ -193,7 +194,7 @@ export default async function ProviderCitySearchPage({
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
-        initialProviders={initialProviders}
+        initialProviders={allProviders}
         showPageIntro={false}
       />
     </>

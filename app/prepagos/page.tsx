@@ -3,6 +3,7 @@ import PrestadoresPage from "@/app/prestadores/page";
 import JsonLd from "@/components/JsonLd";
 import { targetSeoCities } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
+import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
@@ -60,6 +61,12 @@ export default async function PrepagosPage() {
     href: `/prepagos/${city.slug}`,
     label: `Prepagos en ${city.city}`,
   }));
+  const relatedCitySearchLinks = targetSeoCities.flatMap((city) =>
+    providerSearchRoutes.map((route) => ({
+      href: `/${route.segment}/${city.slug}`,
+      label: `${route.title} en ${city.city}`,
+    }))
+  );
 
   return (
     <>
@@ -93,14 +100,11 @@ export default async function PrepagosPage() {
         seoContent={{
           heading: "Prepagos por ciudad en BelaClub",
           paragraphs: [
-            "BelaClub organiza perfiles aprobados por ciudad para facilitar búsquedas como prepagos Medellín, prepagos Rionegro, prepagos La Ceja y escorts en Antioquia.",
+            "BelaClub organiza perfiles aprobados por ciudad para facilitar búsquedas como prepagos Medellín, escorts Medellín, acompañantes, damas de compañía, chicas, masajistas y universitarias.",
             "Cada página de ciudad permite revisar perfiles, fotos públicas, ubicación, zonas disponibles y contacto directo por WhatsApp.",
           ],
           zones: ["Medellín", "Rionegro", "La Ceja", "El Poblado", "Laureles", "San Antonio"],
-          relatedLinks: targetSeoCities.flatMap((city) => [
-            { href: `/prepagos/${city.slug}`, label: `Prepagos en ${city.city}` },
-            { href: `/escorts/${city.slug}`, label: `Escorts en ${city.city}` },
-          ]),
+          relatedLinks: relatedCitySearchLinks,
         }}
       />
     </>

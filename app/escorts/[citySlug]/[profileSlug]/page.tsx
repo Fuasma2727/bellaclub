@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Header from "@/components/header";
 import JsonLd from "@/components/JsonLd";
 import { citySlug as toCitySlug } from "@/lib/providerCitySeo";
+import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import {
   getPublicProviderCards,
   getPublicProviderProfileBySlug,
@@ -15,50 +16,6 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
 export const revalidate = 300;
 export const dynamicParams = true;
-
-const getPhoneSeoValues = (value?: string) => {
-  const raw = value?.trim() || "";
-  const digits = raw.replace(/\D/g, "");
-  const localDigits =
-    digits.length === 12 && digits.startsWith("57")
-      ? digits.slice(2)
-      : digits.length === 10 && digits.startsWith("3")
-        ? digits
-        : "";
-  const internationalDigits = localDigits
-    ? `57${localDigits}`
-    : digits.length >= 10
-      ? digits
-      : "";
-  const formattedLocal =
-    localDigits.length === 10
-      ? `${localDigits.slice(0, 3)} ${localDigits.slice(3, 6)} ${localDigits.slice(6)}`
-      : "";
-  const formattedInternational = formattedLocal
-    ? `+57 ${formattedLocal}`
-    : raw;
-
-  return {
-    raw,
-    digits,
-    localDigits,
-    internationalDigits,
-    formattedLocal,
-    formattedInternational,
-    variants: Array.from(
-      new Set(
-        [
-          raw,
-          digits,
-          localDigits,
-          internationalDigits,
-          formattedLocal,
-          formattedInternational,
-        ].filter(Boolean)
-      )
-    ),
-  };
-};
 
 type ProfilePageProps = {
   params: Promise<{
@@ -96,13 +53,18 @@ export async function generateMetadata({
   const place = [provider.zone, provider.city, provider.department]
     .filter(Boolean)
     .join(", ");
-  const title = `${name} en ${provider.city || "Colombia"}`;
   const phoneSeo = getPhoneSeoValues(provider.whatsapp);
-  const description = `${name} en ${place || "BelaClub"}. Revisa perfil aprobado, fotos públicas, precio base y contacto directo por WhatsApp${
-    phoneSeo.formattedInternational
-      ? ` ${phoneSeo.formattedInternational}`
-      : ""
-  } en BelaClub.`;
+  const title = `${name}${
+    phoneSeo.canonicalDigits ? ` WhatsApp ${phoneSeo.canonicalDigits}` : ""
+  } en ${provider.city || "Colombia"}`;
+  const phoneDescription = phoneSeo.canonicalDigits
+    ? ` WhatsApp ${phoneSeo.canonicalDigits}${
+        phoneSeo.formattedInternational
+          ? ` (${phoneSeo.formattedInternational})`
+          : ""
+      }`
+    : "";
+  const description = `${name} en ${place || "BelaClub"}. Revisa perfil aprobado, fotos públicas, precio base y contacto directo por${phoneDescription || " WhatsApp"} en BelaClub.`;
 
   return {
     title: `${title} | BelaClub`,
@@ -149,6 +111,10 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
 
   if (!provider) notFound();
 
+  if (profileSlug !== provider.profileSlug) {
+    permanentRedirect(provider.profilePath);
+  }
+
   const name = provider.name?.trim() || "Escort verificada";
   const location = [provider.zone, provider.city, provider.department]
     .filter(Boolean)
@@ -189,6 +155,22 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
                 phoneSeo.formattedInternational ||
                 phoneSeo.raw ||
                 undefined,
+              identifier: phoneSeo.canonicalDigits
+                ? [
+                    {
+                      "@type": "PropertyValue",
+                      propertyID: "WhatsApp",
+                      value: phoneSeo.canonicalDigits,
+                    },
+                    phoneSeo.internationalDigits
+                      ? {
+                          "@type": "PropertyValue",
+                          propertyID: "WhatsApp internacional",
+                          value: phoneSeo.internationalDigits,
+                        }
+                      : null,
+                  ].filter(Boolean)
+                : undefined,
               description: provider.description || undefined,
               contactPoint: phoneSeo.internationalDigits
                 ? {
@@ -282,10 +264,15 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
                     WhatsApp
                   </p>
-                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-neutral-300">
+                  <p className="mt-1 text-sm text-neutral-300">
+                    Numero de WhatsApp:{" "}
+                    <span className="font-semibold text-white">
+                      {phoneSeo.canonicalDigits || phoneSeo.raw}
+                    </span>
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-neutral-500">
                     {[
                       phoneSeo.formattedInternational,
-                      phoneSeo.localDigits,
                       phoneSeo.internationalDigits,
                     ]
                       .filter(Boolean)

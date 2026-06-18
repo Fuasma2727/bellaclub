@@ -1,6 +1,7 @@
 import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { citySlug } from "@/lib/providerCitySeo";
+import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import { getVerificationRank } from "@/lib/providerPromotion";
 
 type RawMediaItem = {
@@ -77,9 +78,15 @@ export const textSlug = (value: string) => {
 export const getProviderProfileSlug = (provider: {
   id: string;
   name?: string;
+  whatsapp?: string;
 }) => {
   const nameSlug = textSlug(provider.name || "perfil");
-  return `${nameSlug || "perfil"}--${provider.id}`;
+  const phoneSlug = getPhoneSeoValues(provider.whatsapp).canonicalDigits;
+  const publicSlug = [nameSlug || "perfil", phoneSlug]
+    .filter(Boolean)
+    .join("-");
+
+  return `${publicSlug || "perfil"}--${provider.id}`;
 };
 
 export const getProviderIdFromProfileSlug = (profileSlug: string) => {
@@ -91,6 +98,7 @@ export const getProviderProfilePath = (provider: {
   id: string;
   name?: string;
   city?: string;
+  whatsapp?: string;
 }) => `/escorts/${citySlug(provider.city || "colombia")}/${getProviderProfileSlug(provider)}`;
 
 const sanitizeMediaForCard = (media?: RawMediaItem[]) => {

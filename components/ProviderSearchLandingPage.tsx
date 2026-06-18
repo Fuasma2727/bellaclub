@@ -15,7 +15,7 @@ export async function generateProviderSearchLandingMetadata(
   routeKey: ProviderSearchRouteKey
 ): Promise<Metadata> {
   const route = providerSearchRoutesByKey[routeKey];
-  const description = `Encuentra ${route.pluralNoun}, escorts, prepagos, acompañantes, damas de compañía y chicas por ciudad en Colombia. Perfiles aprobados, fotos públicas y contacto por WhatsApp en BelaClub.`;
+  const description = `Encuentra ${route.pluralNoun}, escorts, prepagos, acompañantes, damas de compañía, chicas, masajistas y universitarias por ciudad en Colombia. Perfiles aprobados, fotos públicas y contacto por WhatsApp en BelaClub.`;
 
   return {
     title: route.baseTitle,
@@ -68,7 +68,7 @@ export default async function ProviderSearchLandingPage({
           "@context": "https://schema.org",
           "@type": "CollectionPage",
           name: route.baseTitle,
-          description: `Perfiles aprobados de ${route.pluralNoun}, escorts, prepagos, acompañantes, damas de compañía y chicas por ciudad dentro de BelaClub.`,
+          description: `Perfiles aprobados de ${route.pluralNoun}, escorts, prepagos, acompañantes, damas de compañía, chicas, masajistas y universitarias por ciudad dentro de BelaClub.`,
           url: pageUrl,
           isPartOf: {
             "@type": "WebSite",

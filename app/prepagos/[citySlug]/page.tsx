@@ -103,9 +103,10 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
   const title = `Prepagos en ${city.city}`;
   const pageUrl = `${siteUrl}/prepagos/${city.slug}`;
   const keywords = getPrepagosCityKeywords(city.city);
-  const initialProviders = await getPublicProviderCards({
-    citySlug: city.slug,
-  });
+  const [cityProviders, allProviders] = await Promise.all([
+    getPublicProviderCards({ citySlug: city.slug }),
+    getPublicProviderCards(),
+  ]);
 
   return (
     <>
@@ -183,7 +184,7 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
             "@context": "https://schema.org",
             "@type": "ItemList",
             name: `Perfiles de prepagos en ${city.city}`,
-            itemListElement: initialProviders
+            itemListElement: cityProviders
               .slice(0, 30)
               .map((provider, index) => ({
                 "@type": "ListItem",
@@ -197,7 +198,7 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
-        initialProviders={initialProviders}
+        initialProviders={allProviders}
         showPageIntro={false}
       />
     </>
