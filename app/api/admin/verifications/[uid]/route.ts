@@ -15,6 +15,7 @@ type VerificationAction =
   | "reject"
   | "rejectBadgeVerification"
   | "verifyVisit"
+  | "downgradeBadge"
   | "removeVisit"
   | "block"
   | "unblock"
@@ -23,6 +24,8 @@ type VerificationAction =
   | "deleteProvider"
   | "disableSubscription"
   | "enableSubscription";
+
+type VerificationBadge = "bronze" | "silver" | "gold" | "platinum";
 
 type MediaItem = {
   id?: string;
@@ -216,12 +219,20 @@ const deleteProviderRecords = async (uid: string) => {
   await removePurchasedContentReferences(uid);
 };
 
-const badgeByLevel = (level: number) => {
+const badgeByLevel = (level: number): VerificationBadge | null => {
   if (level === 1) return "bronze";
   if (level === 2) return "silver";
   if (level === 3) return "gold";
   if (level === 4) return "platinum";
   return null;
+};
+
+const levelByBadge = (badge?: string | null) => {
+  if (badge === "bronze") return 1;
+  if (badge === "silver") return 2;
+  if (badge === "gold") return 3;
+  if (badge === "platinum") return 4;
+  return 0;
 };
 
 const badgeLabelByLevel = (level: number) => {
@@ -267,6 +278,7 @@ export async function PATCH(request: Request, { params }: Params) {
       "reject",
       "rejectBadgeVerification",
       "verifyVisit",
+      "downgradeBadge",
       "removeVisit",
       "block",
       "unblock",
@@ -429,6 +441,64 @@ export async function PATCH(request: Request, { params }: Params) {
         success: true,
         verificationBadge: badge,
         subscriptionResult,
+      });
+    }
+
+    if (action === "downgradeBadge") {
+      const currentLevel =
+        Number(userData.badgeVerificationLevel || 0) ||
+        levelByBadge(userData.verificationBadge);
+      const currentBadge = badgeByLevel(currentLevel);
+
+      if (!currentBadge || currentLevel <= 0) {
+        return NextResponse.json(
+          { error: "El prestador no tiene un nivel para bajar" },
+          { status: 400 }
+        );
+      }
+
+      const nextLevel = Math.max(currentLevel - 1, 0);
+      const nextBadge = badgeByLevel(nextLevel);
+      const nextStatus = nextBadge ? "approved" : "none";
+      const previousLabel = badgeLabelByLevel(currentLevel);
+      const nextLabel = nextBadge ? badgeLabelByLevel(nextLevel) : "sin nivel";
+
+      await userRef.update({
+        verificationBadge: nextBadge,
+        badgeVerificationLevel: nextLevel || null,
+        badgeVerificationStatus: nextStatus,
+        badgeVerificationVideoUrl: adminFieldValue.delete(),
+        badgeVerificationEvidenceType: adminFieldValue.delete(),
+        badgeVerificationRequestedAt: adminFieldValue.delete(),
+        visitVerified: nextLevel >= 3,
+        visitVerificationStatus: nextLevel >= 3 ? "approved" : "none",
+        badgeDowngradedAt: adminFieldValue.serverTimestamp(),
+        badgeDowngradedBy: owner.uid,
+        previousVerificationBadge: currentBadge,
+        previousBadgeVerificationLevel: currentLevel,
+      });
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "badge_verification_downgraded",
+        title: "Nivel actualizado",
+        message: nextBadge
+          ? `Tu nivel de verificacion fue ajustado de ${previousLabel} a ${nextLabel} por revision del administrador.`
+          : `Tu nivel ${previousLabel} fue retirado por revision del administrador. Puedes enviar una nueva solicitud desde tu perfil.`,
+        previousBadge: currentBadge,
+        previousBadgeLevel: currentLevel,
+        badge: nextBadge,
+        badgeLevel: nextLevel || null,
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        verificationBadge: nextBadge,
+        badgeVerificationLevel: nextLevel || null,
+        badgeVerificationStatus: nextStatus,
+        visitVerified: nextLevel >= 3,
       });
     }
 

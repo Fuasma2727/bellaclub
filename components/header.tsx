@@ -17,6 +17,7 @@ import { app } from "@/lib/firebase";
 import { logoutUser } from "@/lib/auth";
 
 const rechargeOptions = [100000, 200000, 500000];
+const providerMonthlyFee = 100000;
 const withdrawalCommissionRate = 0.05;
 const minWithdrawalAmount = 50000;
 const supportInstagramUrl = "https://www.instagram.com/belaclub_0/";
@@ -55,6 +56,9 @@ export default function Header() {
   const [balanceMode, setBalanceMode] = useState<"recharge" | "withdraw">(
     "recharge"
   );
+  const [balanceContext, setBalanceContext] = useState<
+    "subscription" | null
+  >(null);
   const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<
     number | null
   >(null);
@@ -157,18 +161,29 @@ export default function Header() {
     setWithdrawalAccountType("");
     setBalanceMessage("");
     setBalanceSubmitting(false);
+    setBalanceContext(null);
   }, []);
 
   useEffect(() => {
     const handleOpenBalanceModal = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          mode?: "recharge" | "withdraw";
+          context?: "subscription";
+          amount?: number;
+        }>
+      ).detail;
       const mode =
-        (event as CustomEvent<{ mode?: "recharge" | "withdraw" }>).detail
-          ?.mode === "withdraw"
+        detail?.mode === "withdraw"
           ? "withdraw"
           : "recharge";
 
       resetBalanceModal();
       setBalanceMode(mode);
+      setBalanceContext(detail?.context === "subscription" ? "subscription" : null);
+      if (mode === "recharge" && detail?.amount) {
+        setSelectedRechargeAmount(detail.amount);
+      }
       setModalOpen(true);
     };
 
@@ -516,6 +531,7 @@ export default function Header() {
                   onClick={() => {
                     resetBalanceModal();
                     setBalanceMode("recharge");
+                    setBalanceContext(null);
                     setModalOpen(true);
                   }}
                   className="whitespace-nowrap rounded-md bg-green-500 px-2 py-1 text-[11px] font-semibold text-white shadow-lg shadow-emerald-950/20 transition hover:bg-green-400 min-[380px]:text-xs sm:px-3 sm:text-sm"
@@ -773,6 +789,25 @@ export default function Header() {
             <div className="p-5 sm:p-6">
               {balanceMode === "recharge" ? (
                 <>
+                  {balanceContext === "subscription" && (
+                    <div className="mb-5 rounded-lg border border-amber-300/25 bg-amber-300/[0.08] p-4 text-sm leading-6 text-amber-50">
+                      <p className="font-semibold text-amber-100">
+                        Mensualidad BelaClub: $
+                        {providerMonthlyFee.toLocaleString("es-CO")}
+                      </p>
+                      <p className="mt-1 text-amber-50/85">
+                        Cubre 30 dias de uso del perfil. Si pausas la pagina,
+                        esos dias no se consumen y siguen contando cuando la
+                        reactives.
+                      </p>
+                      <p className="mt-1 text-amber-50/85">
+                        Al terminar los 30 dias de uso, la mensualidad se
+                        descuenta automaticamente de tu saldo. Si no tienes
+                        saldo suficiente, el perfil se bloquea hasta que
+                        recargues.
+                      </p>
+                    </div>
+                  )}
                   <p className="mb-3 text-sm font-medium text-zinc-300">
                     Elige un paquete
                   </p>

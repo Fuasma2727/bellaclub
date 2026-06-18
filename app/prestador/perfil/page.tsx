@@ -1059,7 +1059,11 @@ export default function PerfilPrestador() {
   const openRechargeBalanceModal = () => {
     window.dispatchEvent(
       new CustomEvent("belaclub:open-balance-modal", {
-        detail: { mode: "recharge" },
+        detail: {
+          mode: "recharge",
+          context: "subscription",
+          amount: 100000,
+        },
       })
     );
   };

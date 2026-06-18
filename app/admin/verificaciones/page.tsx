@@ -39,7 +39,7 @@ type ProviderVerification = {
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
   badgeVerificationStatus?: BadgeVerificationStatus;
-  badgeVerificationLevel?: 1 | 2 | 3 | 4;
+  badgeVerificationLevel?: 1 | 2 | 3 | 4 | null;
   badgeVerificationVideoUrl?: string | null;
   badgeVerificationEvidenceType?: "photo" | "video" | null;
   badgeVerificationRequestedAt?: string | null;
@@ -121,6 +121,7 @@ type VerificationAction =
   | "reject"
   | "rejectBadgeVerification"
   | "verifyVisit"
+  | "downgradeBadge"
   | "removeVisit"
   | "block"
   | "unblock"
@@ -147,6 +148,26 @@ const badgeLabel: Record<VerificationBadge, string> = {
   silver: "Plata",
   gold: "Oro",
   platinum: "Diamante",
+};
+
+const badgeLevelByType: Record<VerificationBadge, 1 | 2 | 3 | 4> = {
+  bronze: 1,
+  silver: 2,
+  gold: 3,
+  platinum: 4,
+};
+
+const badgeByLevel = (level: number): VerificationBadge | null => {
+  if (level === 1) return "bronze";
+  if (level === 2) return "silver";
+  if (level === 3) return "gold";
+  if (level === 4) return "platinum";
+  return null;
+};
+
+const lowerBadgeLabel = (badge: VerificationBadge) => {
+  const nextBadge = badgeByLevel(badgeLevelByType[badge] - 1);
+  return nextBadge ? badgeLabel[nextBadge] : "sin insignia";
 };
 
 const money = (value?: number | null) => {
@@ -388,6 +409,7 @@ export default function AdminVerificationsPage() {
     if (
       action === "reject" ||
       action === "rejectBadgeVerification" ||
+      action === "downgradeBadge" ||
       action === "block"
     ) {
       const confirmed = window.confirm(
@@ -395,6 +417,10 @@ export default function AdminVerificationsPage() {
           ? "Seguro que quieres bloquear este perfil?"
           : action === "rejectBadgeVerification"
             ? "Seguro que quieres no aprobar esta evidencia de verificacion?"
+          : action === "downgradeBadge"
+            ? `Seguro que quieres bajar de nivel a ${
+                provider.name || provider.email || "este prestador"
+              }?`
           : "Seguro que quieres rechazar esta solicitud?"
       );
 
@@ -460,6 +486,9 @@ export default function AdminVerificationsPage() {
         error?: string;
         photoUrl?: string;
         profileVisible?: boolean;
+        verificationBadge?: VerificationBadge | null;
+        badgeVerificationLevel?: 1 | 2 | 3 | 4 | null;
+        badgeVerificationStatus?: BadgeVerificationStatus;
       };
 
       if (!res.ok) {
@@ -542,6 +571,24 @@ export default function AdminVerificationsPage() {
               subscriptionManualOverride: false,
             };
           });
+        }
+
+        if (action === "downgradeBadge") {
+          return current.map((item) =>
+            item.id === provider.id
+              ? {
+                  ...item,
+                  verificationBadge: data.verificationBadge || null,
+                  badgeVerificationLevel: data.badgeVerificationLevel || null,
+                  badgeVerificationStatus:
+                    data.badgeVerificationStatus ||
+                    (data.verificationBadge ? "approved" : "none"),
+                  badgeVerificationVideoUrl: null,
+                  badgeVerificationEvidenceType: null,
+                  badgeVerificationRequestedAt: null,
+                }
+              : item
+          );
         }
 
         return current.filter((item) => item.id !== provider.id);
@@ -1067,6 +1114,29 @@ export default function AdminVerificationsPage() {
               ? "Desbloquear perfil"
               : "Bloquear perfil"}
         </button>
+
+        {provider.verificationBadge && !isBadgeRequest && (
+          <div className="rounded-lg border border-amber-400/25 bg-amber-400/[0.06] p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/80">
+              Nivel de verificacion
+            </p>
+            <p className="mt-1 text-xs leading-5 text-amber-50/75">
+              Actual: {badgeLabel[provider.verificationBadge]}. Al bajar quedara{" "}
+              {lowerBadgeLabel(provider.verificationBadge)}.
+            </p>
+            <button
+              type="button"
+              disabled={actionId === provider.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleAction(provider, "downgradeBadge");
+              }}
+              className="mt-3 w-full rounded-lg border border-amber-400/35 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {actionId === provider.id ? "Procesando..." : "Bajar de nivel"}
+            </button>
+          </div>
+        )}
 
         <div className="rounded-lg border border-red-500/25 bg-red-500/[0.06] p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-red-200/80">
