@@ -6,6 +6,7 @@ import {
   findProviderCityBySlug,
   getPublicProviderCities,
 } from "@/lib/providerCitySeo";
+import { getCitySearchSeoContent } from "@/lib/providerCitySearchSeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
@@ -137,6 +138,16 @@ export default async function PrestadoresCityPage({ params }: CityPageProps) {
         initialCity={city.city}
         initialDepartment={city.department}
         initialProviders={allProviders}
+        pageTitle={title}
+        pageDescription={`Perfiles aprobados en ${city.city}${
+          city.department ? `, ${city.department}` : ""
+        }, con fotos publicas, zonas disponibles y contacto directo por WhatsApp.`}
+        seoContent={getCitySearchSeoContent({
+          city,
+          routeTitle: "Escorts",
+          routeSegment: "escorts",
+          pluralNoun: "escorts",
+        })}
       />
     </>
   );

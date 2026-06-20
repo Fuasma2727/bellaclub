@@ -122,6 +122,9 @@ export const getProviderSearchKeywords = (
     `universitarias ${cityText}`,
     `putas en ${cityText}`,
     `putas ${cityText}`,
+    `${route.pluralNoun} ${cityText} BelaClub`,
+    `escorts ${cityText} BelaClub`,
+    `prepagos ${cityText} BelaClub`,
     `BelaClub ${cityText}`,
   ];
 };

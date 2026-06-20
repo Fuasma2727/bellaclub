@@ -7,6 +7,7 @@ import {
   getPublicProviderCities,
   targetSeoCities,
 } from "@/lib/providerCitySeo";
+import { getCitySearchSeoContent } from "@/lib/providerCitySearchSeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 import {
   getProviderSearchKeywords,
@@ -195,7 +196,17 @@ export default async function ProviderCitySearchPage({
         initialCity={city.city}
         initialDepartment={city.department}
         initialProviders={allProviders}
+        pageTitle={title}
+        pageDescription={`${route.title} en ${city.city}${
+          city.department ? `, ${city.department}` : ""
+        }, con perfiles aprobados, fotos publicas y contacto directo por WhatsApp.`}
         showPageIntro={false}
+        seoContent={getCitySearchSeoContent({
+          city,
+          routeTitle: route.title,
+          routeSegment: route.segment,
+          pluralNoun: route.pluralNoun,
+        })}
       />
     </>
   );

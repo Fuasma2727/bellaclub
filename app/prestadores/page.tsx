@@ -815,6 +815,48 @@ export default function PrestadoresPage({
               ))}
             </div>
           )}
+
+          {!showPageIntro && seoContent && (
+            <section className="mt-8 border-t border-white/[0.08] pt-5">
+              <h2 className="text-base font-semibold text-white">
+                {seoContent.heading}
+              </h2>
+              <div className="mt-3 max-w-4xl space-y-2 text-sm leading-6 text-neutral-400">
+                {seoContent.paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
+              {seoContent.zones && seoContent.zones.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {seoContent.zones.map((zone) => (
+                    <span
+                      key={zone}
+                      className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200"
+                    >
+                      {zone}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {seoContent.relatedLinks &&
+                seoContent.relatedLinks.length > 0 && (
+                  <nav
+                    aria-label="Busquedas relacionadas"
+                    className="mt-4 flex flex-wrap gap-2"
+                  >
+                    {seoContent.relatedLinks.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className="rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1.5 text-xs font-semibold text-blue-100 transition hover:border-blue-200/35 hover:bg-blue-400/15"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </nav>
+                )}
+            </section>
+          )}
         </section>
       </main>
 

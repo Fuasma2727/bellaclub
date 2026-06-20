@@ -6,6 +6,7 @@ import {
   findProviderCityBySlug,
   getPublicProviderCities,
 } from "@/lib/providerCitySeo";
+import { getCitySearchSeoContent } from "@/lib/providerCitySearchSeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
@@ -30,6 +31,14 @@ const getPrepagosCityKeywords = (city: string) => [
   `damas de compania ${city}`,
   `chicas en ${city}`,
   `chicas ${city}`,
+  `masajistas en ${city}`,
+  `masajistas ${city}`,
+  `universitarias en ${city}`,
+  `universitarias ${city}`,
+  `putas en ${city}`,
+  `putas ${city}`,
+  `prepagos ${city} BelaClub`,
+  `escorts ${city} BelaClub`,
   `BelaClub ${city}`,
 ];
 
@@ -199,7 +208,17 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
         initialCity={city.city}
         initialDepartment={city.department}
         initialProviders={allProviders}
+        pageTitle={title}
+        pageDescription={`Prepagos y perfiles aprobados en ${city.city}${
+          city.department ? `, ${city.department}` : ""
+        }, con fotos publicas, zonas disponibles y contacto directo por WhatsApp.`}
         showPageIntro={false}
+        seoContent={getCitySearchSeoContent({
+          city,
+          routeTitle: "Prepagos",
+          routeSegment: "prepagos",
+          pluralNoun: "prepagos",
+        })}
       />
     </>
   );
