@@ -38,7 +38,9 @@ const getPrepagosCityKeywords = (city: string) => [
   `putas en ${city}`,
   `putas ${city}`,
   `prepagos ${city} BelaClub`,
+  `prepagos en ${city} BelaClub`,
   `escorts ${city} BelaClub`,
+  `escorts en ${city} BelaClub`,
   `BelaClub ${city}`,
 ];
 

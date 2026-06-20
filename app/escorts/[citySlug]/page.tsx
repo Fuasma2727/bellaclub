@@ -40,7 +40,9 @@ const getEscortsCityKeywords = (city: string) => [
   `putas en ${city}`,
   `putas ${city}`,
   `escorts ${city} BelaClub`,
+  `escorts en ${city} BelaClub`,
   `prepagos ${city} BelaClub`,
+  `prepagos en ${city} BelaClub`,
   `BelaClub ${city}`,
 ];
 

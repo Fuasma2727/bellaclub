@@ -32,7 +32,7 @@ export function getCitySearchSeoContent({
     return {
       heading: `${routeTitle} La Ceja y perfiles en el Oriente Antioqueno`,
       paragraphs: [
-        `BelaClub organiza perfiles aprobados para busquedas como ${pluralNoun} La Ceja, ${pluralNoun} en La Ceja, ${pluralNoun} La Ceja BelaClub y perfiles en el Oriente Antioqueno.`,
+        `BelaClub organiza perfiles aprobados para busquedas como ${pluralNoun} La Ceja, ${pluralNoun} en La Ceja, ${pluralNoun} La Ceja BelaClub, ${pluralNoun} en La Ceja BelaClub y perfiles en el Oriente Antioqueno.`,
         `La pagina muestra perfiles visibles en ${place}, con fotos publicas, zona, precio base y contacto directo por WhatsApp cuando esta disponible.`,
       ],
       zones: ["La Ceja", "Centro", "Oriente Antioqueno", "Rionegro cercano"],

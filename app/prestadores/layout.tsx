@@ -1,26 +1,35 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Escorts verificadas",
+  title: "Escorts verificadas por ciudad",
   description:
-    "Explora escorts verificadas, prepagos, acompañantes y damas de compañía en BelaClub. Revisa galerias publicas, desbloquea contenido privado y contacta por WhatsApp.",
+    "Explora escorts verificadas, prepagos, acompanantes y damas de compania en Medellin, La Ceja, Rionegro y otras ciudades dentro de BelaClub.",
   keywords: [
     "escorts verificadas",
     "prepagos",
-    "acompañantes",
     "acompanantes",
-    "damas de compañía",
     "damas de compania",
-    "escorts Medellín",
-    "prepagos Medellín",
+    "escorts Medellin",
+    "prepagos Medellin",
+    "escorts La Ceja",
+    "escorts en La Ceja",
+    "escorts La Ceja BelaClub",
+    "escorts en La Ceja BelaClub",
+    "prepagos La Ceja",
+    "prepagos en La Ceja",
+    "prepagos La Ceja BelaClub",
+    "prepagos en La Ceja BelaClub",
+    "BelaClub La Ceja",
+    "escorts Rionegro",
+    "prepagos Rionegro",
   ],
   alternates: {
     canonical: "/prestadores",
   },
   openGraph: {
-    title: "Escorts verificadas | BelaClub",
+    title: "Escorts verificadas por ciudad | BelaClub",
     description:
-      "Escorts verificadas, prepagos y acompañantes con galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
+      "Escorts verificadas, prepagos y acompanantes en Medellin, La Ceja y Rionegro con galerias publicas y contacto directo dentro de BelaClub.",
     url: "/prestadores",
     images: [
       {
@@ -34,9 +43,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Escorts verificadas | BelaClub",
+    title: "Escorts verificadas por ciudad | BelaClub",
     description:
-      "Escorts verificadas, prepagos y acompañantes con galerias publicas y contacto directo dentro de BelaClub.",
+      "Escorts verificadas, prepagos y acompanantes en Medellin, La Ceja y Rionegro dentro de BelaClub.",
     images: ["/og-image.png"],
   },
 };
