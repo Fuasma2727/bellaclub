@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import PrestadoresPage from "@/app/prestadores/page";
+import PrestadoresPage from "@/app/prestadores/PrestadoresClientPage";
 import JsonLd from "@/components/JsonLd";
 import { targetSeoCities } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import PrestadoresPage from "@/app/prestadores/page";
+import PrestadoresPage from "@/app/prestadores/PrestadoresClientPage";
 import JsonLd from "@/components/JsonLd";
 import {
   findProviderCityBySlug,
