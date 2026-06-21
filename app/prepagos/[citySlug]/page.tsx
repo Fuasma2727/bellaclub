@@ -98,10 +98,7 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
   const title = `Prepagos en ${city.city}`;
   const pageUrl = `${siteUrl}/prepagos/${city.slug}`;
   const keywords = getPrepagosCityKeywords(city.city);
-  const [cityProviders, allProviders] = await Promise.all([
-    getPublicProviderCards({ citySlug: city.slug }),
-    getPublicProviderCards(),
-  ]);
+  const cityProviders = await getPublicProviderCards({ citySlug: city.slug });
 
   return (
     <>
@@ -193,7 +190,7 @@ export default async function PrepagosCityPage({ params }: CityPageProps) {
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
-        initialProviders={allProviders}
+        initialProviders={cityProviders}
         showPageIntro={false}
       />
     </>

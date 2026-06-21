@@ -360,11 +360,17 @@ export default function PrestadoresPage({
   }, [expandedMedia, mediaList.length, moveExpandedMedia]);
 
   useEffect(() => {
-    if (initialProviders) return;
+    const shouldFetchProviders = !initialProviders || Boolean(initialCity);
+
+    if (!shouldFetchProviders) return;
+
+    let cancelled = false;
 
     const fetchPrestadores = async () => {
-      setLoading(true);
-      setPageError("");
+      if (!initialProviders) {
+        setLoading(true);
+        setPageError("");
+      }
 
       try {
         const res = await fetch("/api/providers");
@@ -377,20 +383,30 @@ export default function PrestadoresPage({
           throw new Error(payload.error || "No pudimos cargar los perfiles");
         }
 
-        setPrestadores(payload.providers || []);
+        if (!cancelled) {
+          setPrestadores(payload.providers || []);
+        }
       } catch (error) {
+        if (initialProviders || cancelled) return;
+
         const message =
           error instanceof Error
             ? error.message
             : "No pudimos cargar los perfiles";
         setPageError(message);
       } finally {
-        setLoading(false);
+        if (!initialProviders && !cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     void fetchPrestadores();
-  }, [initialProviders]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialCity, initialProviders]);
 
   const openModal = async (id: string) => {
     setOpeningProfileId(id);

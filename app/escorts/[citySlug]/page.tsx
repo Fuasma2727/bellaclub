@@ -100,10 +100,7 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
   const title = `Escorts en ${city.city}`;
   const pageUrl = `${siteUrl}/escorts/${city.slug}`;
   const keywords = getEscortsCityKeywords(city.city);
-  const [cityProviders, allProviders] = await Promise.all([
-    getPublicProviderCards({ citySlug: city.slug }),
-    getPublicProviderCards(),
-  ]);
+  const cityProviders = await getPublicProviderCards({ citySlug: city.slug });
 
   return (
     <>
@@ -195,7 +192,7 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
-        initialProviders={allProviders}
+        initialProviders={cityProviders}
         showPageIntro={false}
       />
     </>

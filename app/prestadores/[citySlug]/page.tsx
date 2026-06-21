@@ -82,7 +82,7 @@ export default async function PrestadoresCityPage({ params }: CityPageProps) {
 
   const title = `Escorts en ${city.city}`;
   const pageUrl = `${siteUrl}/prestadores/${city.slug}`;
-  const allProviders = await getPublicProviderCards();
+  const cityProviders = await getPublicProviderCards({ citySlug: city.slug });
 
   return (
     <>
@@ -131,7 +131,7 @@ export default async function PrestadoresCityPage({ params }: CityPageProps) {
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
-        initialProviders={allProviders}
+        initialProviders={cityProviders}
       />
     </>
   );

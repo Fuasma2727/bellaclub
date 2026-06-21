@@ -97,10 +97,7 @@ export default async function ProviderCitySearchPage({
   const title = `${route.title} en ${city.city}`;
   const pageUrl = `${siteUrl}/${route.segment}/${city.slug}`;
   const keywords = getProviderSearchKeywords(route, city.city);
-  const [cityProviders, allProviders] = await Promise.all([
-    getPublicProviderCards({ citySlug: city.slug }),
-    getPublicProviderCards(),
-  ]);
+  const cityProviders = await getPublicProviderCards({ citySlug: city.slug });
   const relatedRoutes = targetSeoCities
     .filter((item) => item.slug !== city.slug)
     .slice(0, 6);
@@ -189,7 +186,7 @@ export default async function ProviderCitySearchPage({
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
-        initialProviders={allProviders}
+        initialProviders={cityProviders}
         showPageIntro={false}
       />
     </>
