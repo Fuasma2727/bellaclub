@@ -59,7 +59,7 @@ export async function generateMetadata({
   const description = `${name} en ${place || "BelaClub"}. Revisa perfil aprobado, fotos públicas, precio base y contacto directo por${phoneDescription || " WhatsApp"} en BelaClub.`;
 
   return {
-    title: `${title} | BelaClub`,
+    title,
     description,
     keywords: [
       `${name} ${provider.city || ""}`.trim(),

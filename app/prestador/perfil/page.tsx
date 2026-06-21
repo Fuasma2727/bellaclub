@@ -1280,6 +1280,7 @@ export default function PerfilPrestador() {
           city,
           zone: zoneOptions.length > 0 ? zone.trim() : "",
           whatsapp: whatsapp.trim(),
+          profileUpdatedAt: serverTimestamp(),
         },
         { merge: true }
       );
@@ -1320,6 +1321,7 @@ export default function PerfilPrestador() {
             verificationStatus === "approved" &&
             !profilePaused &&
             subscriptionStatus !== "past_due",
+          profileUpdatedAt: serverTimestamp(),
         },
         { merge: true }
       );

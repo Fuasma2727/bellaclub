@@ -86,6 +86,7 @@ export async function POST(request: Request) {
         tx.update(userRef, {
           media: updated,
           mediaUpdatedAt: adminFieldValue.serverTimestamp(),
+          profileUpdatedAt: adminFieldValue.serverTimestamp(),
         });
 
         return { media: updated };
@@ -142,6 +143,7 @@ export async function POST(request: Request) {
         tx.update(userRef, {
           media: updated,
           mediaUpdatedAt: adminFieldValue.serverTimestamp(),
+          profileUpdatedAt: adminFieldValue.serverTimestamp(),
         });
 
         return { media: updated, videoSecondsLimit };
@@ -181,6 +183,7 @@ export async function POST(request: Request) {
       tx.update(userRef, {
         media: updated,
         mediaUpdatedAt: adminFieldValue.serverTimestamp(),
+        profileUpdatedAt: adminFieldValue.serverTimestamp(),
       });
 
       return { media: updated, videoSecondsLimit };

@@ -164,7 +164,7 @@ const toPublicProviderCard = (
     dailyVideo: getActiveDailyVideo(data.dailyVideo, now),
     media: sanitizeMediaForCard(data.media),
     createdAt: toIsoString(data.createdAt),
-    updatedAt: toIsoString(data.updatedAt || data.profileUpdatedAt),
+    updatedAt: toIsoString(data.profileUpdatedAt || data.updatedAt),
     profileSlug: "",
     profilePath: "",
   };
