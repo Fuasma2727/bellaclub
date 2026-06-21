@@ -7,7 +7,7 @@ import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Prepagos en Colombia",

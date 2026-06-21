@@ -4,7 +4,6 @@ import PrestadoresPage from "../page";
 import JsonLd from "@/components/JsonLd";
 import {
   findProviderCityBySlug,
-  getPublicProviderCities,
 } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 
@@ -20,11 +19,7 @@ type CityPageProps = {
 };
 
 export async function generateStaticParams() {
-  const cities = await getPublicProviderCities();
-
-  return cities.map((city) => ({
-    citySlug: city.slug,
-  }));
+  return [];
 }
 
 export async function generateMetadata({

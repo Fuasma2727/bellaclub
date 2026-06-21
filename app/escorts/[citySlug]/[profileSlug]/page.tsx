@@ -6,10 +6,7 @@ import Header from "@/components/header";
 import JsonLd from "@/components/JsonLd";
 import { citySlug as toCitySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
-import {
-  getPublicProviderCards,
-  getPublicProviderProfileBySlug,
-} from "@/lib/publicProviders";
+import { getPublicProviderProfileBySlug } from "@/lib/publicProviders";
 import { formatMoney, getWhatsAppUrl } from "@/app/prestadores/_components/utils";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
@@ -25,12 +22,7 @@ type ProfilePageProps = {
 };
 
 export async function generateStaticParams() {
-  const providers = await getPublicProviderCards();
-
-  return providers.map((provider) => ({
-    citySlug: toCitySlug(provider.city || "colombia"),
-    profileSlug: provider.profileSlug,
-  }));
+  return [];
 }
 
 export async function generateMetadata({

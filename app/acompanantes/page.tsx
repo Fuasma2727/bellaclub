@@ -2,7 +2,7 @@ import ProviderSearchLandingPage, {
   generateProviderSearchLandingMetadata,
 } from "@/components/ProviderSearchLandingPage";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const generateMetadata = () =>
   generateProviderSearchLandingMetadata("acompanantes");
