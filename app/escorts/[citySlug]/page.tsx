@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import PrestadoresPage from "@/app/prestadores/PrestadoresClientPage";
+import PrestadoresPage from "@/app/prestadores/page";
 import JsonLd from "@/components/JsonLd";
 import {
   findProviderCityBySlug,
   getPublicProviderCities,
 } from "@/lib/providerCitySeo";
-import { getCitySearchSeoContent } from "@/lib/providerCitySearchSeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
@@ -33,16 +32,6 @@ const getEscortsCityKeywords = (city: string) => [
   `damas de compania ${city}`,
   `chicas en ${city}`,
   `chicas ${city}`,
-  `masajistas en ${city}`,
-  `masajistas ${city}`,
-  `universitarias en ${city}`,
-  `universitarias ${city}`,
-  `putas en ${city}`,
-  `putas ${city}`,
-  `escorts ${city} BelaClub`,
-  `escorts en ${city} BelaClub`,
-  `prepagos ${city} BelaClub`,
-  `prepagos en ${city} BelaClub`,
   `BelaClub ${city}`,
 ];
 
@@ -212,17 +201,7 @@ export default async function EscortsCityPage({ params }: CityPageProps) {
         initialCity={city.city}
         initialDepartment={city.department}
         initialProviders={allProviders}
-        pageTitle={title}
-        pageDescription={`Perfiles aprobados en ${city.city}${
-          city.department ? `, ${city.department}` : ""
-        }, con fotos publicas, zonas disponibles y contacto directo por WhatsApp.`}
         showPageIntro={false}
-        seoContent={getCitySearchSeoContent({
-          city,
-          routeTitle: "Escorts",
-          routeSegment: "escorts",
-          pluralNoun: "escorts",
-        })}
       />
     </>
   );
