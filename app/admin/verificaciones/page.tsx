@@ -49,6 +49,7 @@ type ProviderVerification = {
   subscriptionLastPaidAt?: string | null;
   subscriptionAmount?: number | null;
   subscriptionManualOverride?: boolean;
+  adminQualityRank?: number | null;
   media?: AdminMediaItem[];
   createdAt?: string | null;
 };
@@ -127,6 +128,7 @@ type VerificationAction =
   | "unblock"
   | "deleteMedia"
   | "setProfilePhoto"
+  | "setQualityRank"
   | "deleteProvider"
   | "disableSubscription"
   | "enableSubscription";
@@ -608,6 +610,61 @@ export default function AdminVerificationsPage() {
     }
   };
 
+  const handleQualityRankChange = async (
+    provider: ProviderVerification,
+    value: string
+  ) => {
+    if (!user) return;
+
+    const qualityRank = value ? Number(value) : null;
+    const currentActionId = `${provider.id}:quality`;
+
+    setActionId(currentActionId);
+    setMessage("");
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/verifications/${provider.id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "setQualityRank",
+          qualityRank,
+        }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        adminQualityRank?: number | null;
+      };
+
+      if (!res.ok) {
+        throw new Error(data.error || "No pudimos actualizar la calidad");
+      }
+
+      setProviders((current) =>
+        current.map((item) =>
+          item.id === provider.id
+            ? {
+                ...item,
+                adminQualityRank: data.adminQualityRank || null,
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "No pudimos actualizar la calidad";
+      setMessage(errorMessage);
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const handleReportAction = async (
     report: ReportItem,
     action: "markReviewed" | "blockProvider"
@@ -965,6 +1022,11 @@ export default function AdminVerificationsPage() {
               : "Bloqueado"}
             </span>
           )}
+          {provider.adminQualityRank && (
+            <span className="rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-2.5 py-1 text-[11px] font-medium text-fuchsia-100">
+              Calidad {provider.adminQualityRank}/5
+            </span>
+          )}
           <button
             type="button"
             disabled={actionId === provider.id}
@@ -1014,6 +1076,37 @@ export default function AdminVerificationsPage() {
               ).toLocaleString("es-CO")}
             </p>
           )}
+        </div>
+
+        <div className="rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.06] p-3">
+          <label
+            htmlFor={`quality-${provider.id}`}
+            className="text-xs font-semibold uppercase tracking-wide text-fuchsia-100/80"
+          >
+            Calidad interna
+          </label>
+          <select
+            id={`quality-${provider.id}`}
+            value={provider.adminQualityRank || ""}
+            disabled={actionId === `${provider.id}:quality`}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => {
+              event.stopPropagation();
+              void handleQualityRankChange(provider, event.target.value);
+            }}
+            className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm font-semibold text-white outline-none transition focus:border-fuchsia-300/60 focus:ring-2 focus:ring-fuchsia-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <option value="">Sin calidad</option>
+            <option value="1">1 - baja</option>
+            <option value="2">2</option>
+            <option value="3">3 - media</option>
+            <option value="4">4</option>
+            <option value="5">5 - alta</option>
+          </select>
+          <p className="mt-2 text-xs leading-5 text-fuchsia-50/65">
+            Ordena perfiles dentro del mismo nivel de verificacion. No se muestra
+            al usuario.
+          </p>
         </div>
 
         {(isBadgeRequest || evidenceUrl) && (

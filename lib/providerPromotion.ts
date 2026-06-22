@@ -16,3 +16,11 @@ export const getVerificationRank = (
 
   return 0;
 };
+
+export const getAdminQualityRank = (value?: number | string | null) => {
+  const rank = Number(value || 0);
+
+  if (!Number.isInteger(rank) || rank < 1 || rank > 5) return 0;
+
+  return rank;
+};

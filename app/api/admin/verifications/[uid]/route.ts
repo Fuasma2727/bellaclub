@@ -5,6 +5,7 @@ import {
   processProviderSubscription,
   PROVIDER_MONTHLY_FEE,
 } from "@/lib/providerSubscription";
+import { getAdminQualityRank } from "@/lib/providerPromotion";
 import {
   guardMutationRequest,
   securityErrorResponse,
@@ -21,6 +22,7 @@ type VerificationAction =
   | "unblock"
   | "deleteMedia"
   | "setProfilePhoto"
+  | "setQualityRank"
   | "deleteProvider"
   | "disableSubscription"
   | "enableSubscription";
@@ -260,10 +262,12 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const owner = await requireOwner(request);
     const { uid } = await params;
-    const { action, mediaId, confirmText } = (await request.json()) as {
+    const { action, mediaId, confirmText, qualityRank } =
+      (await request.json()) as {
       action?: VerificationAction;
       mediaId?: string;
       confirmText?: string;
+      qualityRank?: number | null;
     };
 
     if (!uid) {
@@ -284,6 +288,7 @@ export async function PATCH(request: Request, { params }: Params) {
       "unblock",
       "deleteMedia",
       "setProfilePhoto",
+      "setQualityRank",
       "deleteProvider",
       "disableSubscription",
       "enableSubscription",
@@ -563,6 +568,32 @@ export async function PATCH(request: Request, { params }: Params) {
       });
 
       return NextResponse.json({ success: true, blocked: true });
+    }
+
+    if (action === "setQualityRank") {
+      const rank =
+        qualityRank === null || typeof qualityRank === "undefined"
+          ? null
+          : getAdminQualityRank(qualityRank);
+
+      if (qualityRank !== null && typeof qualityRank !== "undefined" && !rank) {
+        return NextResponse.json(
+          { error: "La calidad debe estar entre 1 y 5" },
+          { status: 400 }
+        );
+      }
+
+      await userRef.update({
+        adminQualityRank: rank || adminFieldValue.delete(),
+        adminQualityRankUpdatedAt: adminFieldValue.serverTimestamp(),
+        adminQualityRankUpdatedBy: owner.uid,
+        profileUpdatedAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        adminQualityRank: rank,
+      });
     }
 
     if (action === "disableSubscription") {

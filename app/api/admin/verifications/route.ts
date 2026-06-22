@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
+import { getAdminQualityRank } from "@/lib/providerPromotion";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
@@ -42,6 +43,7 @@ type ProviderVerification = {
   subscriptionLastPaidAt?: string | null;
   subscriptionAmount?: number | null;
   subscriptionManualOverride?: boolean;
+  adminQualityRank?: number | null;
   media?: AdminMediaItem[];
   createdAt?: string | null;
 };
@@ -122,6 +124,7 @@ export async function GET(request: Request) {
           subscriptionLastPaidAt: toDateString(data.subscriptionLastPaidAt),
           subscriptionAmount: data.subscriptionAmount || null,
           subscriptionManualOverride: Boolean(data.subscriptionManualOverride),
+          adminQualityRank: getAdminQualityRank(data.adminQualityRank) || null,
           media: sanitizeMediaForAdmin(data.media),
           createdAt: toDateString(data.createdAt),
         };

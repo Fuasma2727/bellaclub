@@ -2,7 +2,10 @@ import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { citySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
-import { getVerificationRank } from "@/lib/providerPromotion";
+import {
+  getAdminQualityRank,
+  getVerificationRank,
+} from "@/lib/providerPromotion";
 
 type RawMediaItem = {
   id?: string;
@@ -180,11 +183,13 @@ const sortProviders = (
     promotedRank?: number;
     dailyVideoRank?: number;
     verificationRank?: number;
+    adminQualityRank?: number;
   },
   b: PublicProviderCard & {
     promotedRank?: number;
     dailyVideoRank?: number;
     verificationRank?: number;
+    adminQualityRank?: number;
   }
 ) => {
   if ((b.dailyVideoRank || 0) !== (a.dailyVideoRank || 0)) {
@@ -197,6 +202,10 @@ const sortProviders = (
 
   if ((b.verificationRank || 0) !== (a.verificationRank || 0)) {
     return (b.verificationRank || 0) - (a.verificationRank || 0);
+  }
+
+  if ((b.adminQualityRank || 0) !== (a.adminQualityRank || 0)) {
+    return (b.adminQualityRank || 0) - (a.adminQualityRank || 0);
   }
 
   return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
@@ -229,12 +238,14 @@ export async function getPublicProviderCards(options?: {
           data.badgeVerificationLevel,
           data.verificationBadge
         ),
+        adminQualityRank: getAdminQualityRank(data.adminQualityRank),
       };
     })
     .filter((provider): provider is PublicProviderCard & {
       promotedRank: number;
       dailyVideoRank: number;
       verificationRank: number;
+      adminQualityRank: number;
     } => Boolean(provider))
     .filter((provider) => {
       if (!options?.citySlug) return true;
@@ -250,6 +261,7 @@ export async function getPublicProviderCards(options?: {
     delete publicProvider.promotedRank;
     delete publicProvider.dailyVideoRank;
     delete publicProvider.verificationRank;
+    delete publicProvider.adminQualityRank;
 
     return publicProvider as PublicProviderCard;
   });
