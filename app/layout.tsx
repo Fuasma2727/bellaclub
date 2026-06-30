@@ -16,7 +16,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
+const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co").replace(
+  /\/+$/,
+  ""
+);
+const siteHomeUrl = `${siteUrl}/`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -27,6 +31,8 @@ export const metadata: Metadata = {
   description:
     "Plataforma privada para conectar clientes con escorts verificadas, prepagos, acompañantes y damas de compañía, contenido seguro y abonos dentro de BelaClub.",
   applicationName: "BelaClub",
+  creator: "BelaClub",
+  publisher: "BelaClub",
   keywords: [
     "BelaClub",
     "escorts verificadas",
@@ -48,7 +54,7 @@ export const metadata: Metadata = {
     title: "BelaClub",
     description:
       "Conecta con escorts verificadas, prepagos y acompañantes de forma segura.",
-    url: "/prestadores",
+    url: "/",
     siteName: "BelaClub",
     images: [
       {
@@ -89,16 +95,26 @@ export default function RootLayout({
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
+      "@id": `${siteUrl}/#website`,
       name: "BelaClub",
-      url: siteUrl,
+      alternateName: ["Bela Club", "belaclub.co"],
+      url: siteHomeUrl,
       inLanguage: "es-CO",
+      publisher: {
+        "@id": `${siteUrl}/#organization`,
+      },
     },
     {
       "@context": "https://schema.org",
       "@type": "Organization",
+      "@id": `${siteUrl}/#organization`,
       name: "BelaClub",
-      url: siteUrl,
-      logo: `${siteUrl}/logo.jpg`,
+      alternateName: "Bela Club",
+      url: siteHomeUrl,
+      logo: {
+        "@type": "ImageObject",
+        url: `${siteUrl}/logo.jpg`,
+      },
     },
   ];
 
