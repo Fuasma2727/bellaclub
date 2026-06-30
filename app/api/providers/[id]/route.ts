@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { createPrivateMediaUrl } from "@/lib/privateMediaAccess";
+import {
+  getPublicVerificationBadge,
+  getVerificationLevelFromBadge,
+} from "@/lib/providerPromotion";
 
 type MediaItem = {
   id?: string;
@@ -111,6 +115,14 @@ export async function GET(request: Request, { params }: Params) {
     const purchased = await userPurchased(requesterId, id);
     const purchasedIds = new Set(purchased.map((item) => item.mediaId));
     const media = Array.isArray(data.media) ? (data.media as MediaItem[]) : [];
+    const publicVerificationBadge = getPublicVerificationBadge(
+      data.verificationBadge || null,
+      data.badgeVerificationStatus || null,
+      data.badgeVerificationLevel || null
+    );
+    const publicBadgeVerificationLevel = getVerificationLevelFromBadge(
+      publicVerificationBadge
+    );
 
     if (requesterId !== id) {
       await providerRef.update({
@@ -157,8 +169,8 @@ export async function GET(request: Request, { params }: Params) {
         whatsapp: data.whatsapp || "",
         description: data.description || "",
         rating: data.rating || 0,
-        verificationBadge: data.verificationBadge || null,
-        badgeVerificationLevel: data.badgeVerificationLevel || null,
+        verificationBadge: publicVerificationBadge,
+        badgeVerificationLevel: publicBadgeVerificationLevel,
         dailyVideo: getActiveDailyVideo(data.dailyVideo),
         media: safeMedia,
       },

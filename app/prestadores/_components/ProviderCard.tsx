@@ -127,18 +127,7 @@ export default function ProviderCard({
   const location = getLocation(provider);
   const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
   const rating = Number(provider.rating || 0);
-  const badgeLevel = Number(provider.badgeVerificationLevel);
-  const verificationBadge =
-    provider.verificationBadge ||
-    (badgeLevel === 1
-      ? "bronze"
-      : badgeLevel === 2
-        ? "silver"
-        : badgeLevel === 3
-          ? "gold"
-          : badgeLevel === 4
-            ? "platinum"
-            : null);
+  const verificationBadge = provider.verificationBadge || null;
   const badgeText =
     verificationBadge === "bronze"
       ? "Este usuario fue verificado por foto"

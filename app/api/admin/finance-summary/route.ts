@@ -19,6 +19,7 @@ export async function GET(request: Request) {
 
     const users = usersSnap.docs.map((doc) => doc.data());
     const providers = users.filter((user) => user.role === "prestador");
+    const normalUsers = users.filter((user) => user.role === "cliente");
 
     const totalPlatformBalance = users.reduce(
       (total, user) => total + sumNumber(user.balance),
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
         blockedProviders,
         activeVisibleProviders,
         providerCount: providers.length,
+        normalUserCount: normalUsers.length,
       },
     });
   } catch (error) {

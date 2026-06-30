@@ -4,6 +4,8 @@ import { citySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import {
   getAdminQualityRank,
+  getPublicVerificationBadge,
+  getVerificationLevelFromBadge,
   getVerificationRank,
 } from "@/lib/providerPromotion";
 
@@ -150,6 +152,15 @@ const toPublicProviderCard = (
 ): PublicProviderCard | null => {
   if (!isPublicProvider(data)) return null;
 
+  const publicVerificationBadge = getPublicVerificationBadge(
+    data.verificationBadge || null,
+    data.badgeVerificationStatus || null,
+    data.badgeVerificationLevel || null
+  );
+  const publicBadgeVerificationLevel = getVerificationLevelFromBadge(
+    publicVerificationBadge
+  );
+
   const provider: PublicProviderCard = {
     id,
     name: data.name || "",
@@ -161,8 +172,8 @@ const toPublicProviderCard = (
     whatsapp: data.whatsapp || "",
     description: data.description || "",
     rating: data.rating || 0,
-    verificationBadge: data.verificationBadge || null,
-    badgeVerificationLevel: data.badgeVerificationLevel || null,
+    verificationBadge: publicVerificationBadge,
+    badgeVerificationLevel: publicBadgeVerificationLevel,
     promotedUntil: toIsoString(data.promotedUntil),
     dailyVideo: getActiveDailyVideo(data.dailyVideo, now),
     media: sanitizeMediaForCard(data.media),
@@ -235,8 +246,8 @@ export async function getPublicProviderCards(options?: {
         promotedRank: toMillis(data.promotedUntil) > now ? 1 : 0,
         dailyVideoRank: getActiveDailyVideo(data.dailyVideo, now) ? 1 : 0,
         verificationRank: getVerificationRank(
-          data.badgeVerificationLevel,
-          data.verificationBadge
+          provider.badgeVerificationLevel,
+          provider.verificationBadge
         ),
         adminQualityRank: getAdminQualityRank(data.adminQualityRank),
       };

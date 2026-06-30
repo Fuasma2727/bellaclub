@@ -110,6 +110,7 @@ type FinanceSummary = {
   blockedProviders: number;
   activeVisibleProviders: number;
   providerCount: number;
+  normalUserCount: number;
 };
 
 type FinanceSummaryResponse = {
@@ -1395,7 +1396,7 @@ export default function AdminVerificationsPage() {
         {user && (
           <section className="mt-6 rounded-lg border border-white/10 bg-neutral-950 p-4">
             {financeSummary && (
-              <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/[0.06] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200/80">
                     Saldo en plataforma
@@ -1429,6 +1430,17 @@ export default function AdminVerificationsPage() {
                   </p>
                   <p className="mt-1 text-xs text-neutral-400">
                     Total registrado por compras, abonos y retiros.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-sky-400/15 bg-sky-400/[0.06] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200/80">
+                    Numero de usuarios
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-white">
+                    {financeSummary.normalUserCount.toLocaleString("es-CO")}
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Cuentas registradas como usuarios normales.
                   </p>
                 </div>
                 <div className="rounded-lg border border-white/[0.08] bg-white/[0.035] p-4">
