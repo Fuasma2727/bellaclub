@@ -52,6 +52,15 @@ const citySlugValue = (value: string) => {
     .replace(/^-+|-+$/g, "");
 };
 
+const footerSeoLinks: CitySeoLink[] = [
+  { href: "/escorts/medellin", label: "Escorts Medellin" },
+  { href: "/prepagos/medellin", label: "Prepagos Medellin" },
+  { href: "/escorts/la-ceja", label: "Escorts La Ceja" },
+  { href: "/prepagos/la-ceja", label: "Prepagos La Ceja" },
+  { href: "/escorts/rionegro", label: "Escorts Rionegro" },
+  { href: "/prepagos/rionegro", label: "Prepagos Rionegro" },
+];
+
 export default function PrestadoresPage({
   initialCity = "",
   initialDepartment = "",
@@ -711,65 +720,47 @@ export default function PrestadoresPage({
                   ))}
                 </nav>
               )}
-              {seoContent && (
-                <section className="mt-5 max-w-4xl rounded-lg border border-white/[0.08] bg-white/[0.025] p-4">
-                  <h2 className="text-base font-semibold text-white">
-                    {seoContent.heading}
-                  </h2>
-                  <div className="mt-3 space-y-2 text-sm leading-6 text-neutral-400">
-                    {seoContent.paragraphs.map((paragraph) => (
-                      <p key={paragraph}>{paragraph}</p>
-                    ))}
-                  </div>
-                  {seoContent.zones && seoContent.zones.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                        Zonas populares
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {seoContent.zones.map((zone) => (
-                          <span
-                            key={zone}
-                            className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200"
-                          >
-                            {zone}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {seoContent.relatedLinks &&
-                    seoContent.relatedLinks.length > 0 && (
-                      <nav
-                        aria-label="Busquedas relacionadas"
-                        className="mt-4 flex flex-wrap gap-2"
-                      >
-                        {seoContent.relatedLinks.map((link) => (
-                          <Link
-                            key={link.href}
-                            href={link.href}
-                            className="rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1.5 text-xs font-semibold text-blue-100 transition hover:border-blue-200/35 hover:bg-blue-400/15"
-                          >
-                            {link.label}
-                          </Link>
-                        ))}
-                      </nav>
-                    )}
-                </section>
-              )}
             </div>
           </section>
         )}
 
         {!showPageIntro && (initialCity || pageTitle) && (
-          <section className="sr-only" aria-label="Informacion de la pagina">
-            <h1>{pageTitle || `Escorts en ${initialCity}`}</h1>
-            <p>
-              {pageDescription ||
-                `Perfiles aprobados en ${initialCity}${
-                  initialDepartment ? `, ${initialDepartment}` : ""
-                }, con galerias publicas y contacto directo por WhatsApp.`}
-            </p>
+          <section className="border-b border-white/[0.08] bg-[#080809]">
+            <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-4 lg:px-8">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-3xl">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-300">
+                    {pageEyebrow}
+                  </p>
+                  <h1 className="mt-1 text-xl font-semibold text-white sm:text-2xl">
+                    {pageTitle || `Escorts en ${initialCity}`}
+                  </h1>
+                  <p className="mt-1 text-sm leading-6 text-neutral-400">
+                    {pageDescription ||
+                      `Perfiles aprobados en ${initialCity}${
+                        initialDepartment ? `, ${initialDepartment}` : ""
+                      }, con galerias publicas y contacto directo por WhatsApp.`}
+                  </p>
+                </div>
+
+                {seoCityLinks.length > 0 && (
+                  <nav
+                    aria-label="Busquedas relacionadas"
+                    className="flex flex-wrap gap-2 lg:max-w-xl lg:justify-end"
+                  >
+                    {seoCityLinks.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </nav>
+                )}
+              </div>
+            </div>
           </section>
         )}
 
@@ -831,29 +822,96 @@ export default function PrestadoresPage({
               ))}
             </div>
           )}
+
+          {seoContent && !loading && !pageError && (
+            <section className="mt-6 border-t border-white/[0.08] pt-5">
+              <div className="max-w-4xl">
+                <h2 className="text-base font-semibold text-white">
+                  {seoContent.heading}
+                </h2>
+                <div className="mt-2 space-y-2 text-sm leading-6 text-neutral-400">
+                  {seoContent.paragraphs.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                </div>
+              </div>
+
+              {seoContent.zones && seoContent.zones.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                    Zonas populares
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {seoContent.zones.map((zone) => (
+                      <span
+                        key={zone}
+                        className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200"
+                      >
+                        {zone}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {seoContent.relatedLinks &&
+                seoContent.relatedLinks.length > 0 && (
+                  <nav
+                    aria-label="Mas busquedas"
+                    className="mt-4 flex flex-wrap gap-2"
+                  >
+                    {seoContent.relatedLinks.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className="rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1.5 text-xs font-semibold text-blue-100 transition hover:border-blue-200/35 hover:bg-blue-400/15"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </nav>
+                )}
+            </section>
+          )}
         </section>
       </main>
 
       <footer className="border-t border-white/[0.08] px-4 py-8 text-sm text-neutral-500 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <p>BelaClub · Plataforma para mayores de edad.</p>
-          <nav className="flex flex-wrap gap-4">
-            <Link href="/terminos" className="transition hover:text-white">
-              Terminos
-            </Link>
-            <Link href="/privacidad" className="transition hover:text-white">
-              Privacidad
-            </Link>
-            <Link href="/seguridad" className="transition hover:text-white">
-              Seguridad
-            </Link>
-            <Link href="/reembolsos" className="transition hover:text-white">
-              Reembolsos
-            </Link>
-            <Link href="/soporte" className="transition hover:text-white">
-              Soporte
-            </Link>
-          </nav>
+          <div className="flex flex-col gap-3 lg:items-end">
+            <nav
+              aria-label="Busquedas populares"
+              className="flex flex-wrap gap-x-4 gap-y-2"
+            >
+              {footerSeoLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="transition hover:text-white"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+            <nav className="flex flex-wrap gap-x-4 gap-y-2">
+              <Link href="/terminos" className="transition hover:text-white">
+                Terminos
+              </Link>
+              <Link href="/privacidad" className="transition hover:text-white">
+                Privacidad
+              </Link>
+              <Link href="/seguridad" className="transition hover:text-white">
+                Seguridad
+              </Link>
+              <Link href="/reembolsos" className="transition hover:text-white">
+                Reembolsos
+              </Link>
+              <Link href="/soporte" className="transition hover:text-white">
+                Soporte
+              </Link>
+            </nav>
+          </div>
         </div>
       </footer>
 

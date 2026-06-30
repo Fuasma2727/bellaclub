@@ -9,6 +9,7 @@ import {
 import { getPublicProviderCards } from "@/lib/publicProviders";
 import {
   getProviderSearchKeywords,
+  providerSearchRoutes,
   providerSearchRoutesByKey,
   type ProviderSearchRouteKey,
 } from "@/lib/providerSearchRoutes";
@@ -101,6 +102,22 @@ export default async function ProviderCitySearchPage({
   const relatedRoutes = targetSeoCities
     .filter((item) => item.slug !== city.slug)
     .slice(0, 6);
+  const sameCityLinks = providerSearchRoutes
+    .filter((item) => item.key !== route.key)
+    .map((item) => ({
+      href: `/${item.segment}/${city.slug}`,
+      label: `${item.title} en ${city.city}`,
+    }));
+  const relatedCityLinks = relatedRoutes.map((item) => ({
+    href: `/${route.segment}/${item.slug}`,
+    label: `${route.title} en ${item.city}`,
+  }));
+  const cityDescription = `Perfiles aprobados en ${city.city}${
+    city.department ? `, ${city.department}` : ""
+  }, con fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
+  const cityIntro =
+    city.seoIntro ||
+    `BelaClub organiza perfiles aprobados en ${city.city} para facilitar busquedas por ciudad, zonas disponibles y contacto directo.`;
 
   return (
     <>
@@ -186,7 +203,21 @@ export default async function ProviderCitySearchPage({
       <PrestadoresPage
         initialCity={city.city}
         initialDepartment={city.department}
+        pageTitle={title}
+        pageEyebrow={`${route.label} por ciudad`}
+        pageDescription={cityDescription}
+        seoCityLinks={sameCityLinks.slice(0, 6)}
         initialProviders={cityProviders}
+        seoContent={{
+          heading: `${route.title} en ${city.city}: perfiles y busquedas relacionadas`,
+          paragraphs: [
+            cityIntro,
+            `En esta pagina se agrupan perfiles de ${route.pluralNoun} en ${city.city} junto con busquedas relacionadas como escorts, prepagos, acompanantes, damas de compania, chicas, masajistas y universitarias.`,
+            `La disponibilidad de perfiles en ${city.city} se mantiene alineada con los perfiles activos y aprobados dentro de BelaClub.`,
+          ],
+          zones: city.zones,
+          relatedLinks: [...sameCityLinks, ...relatedCityLinks],
+        }}
         showPageIntro={false}
       />
     </>
