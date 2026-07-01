@@ -1,6 +1,7 @@
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { setLedgerEntry } from "@/lib/ledger";
 import { processProviderSubscription } from "@/lib/providerSubscription";
+import { releaseReferralReward } from "@/lib/referrals";
 
 type WompiTransactionStatus =
   | "APPROVED"
@@ -78,6 +79,16 @@ export async function creditApprovedRecharge(transaction: WompiTransaction) {
   });
 
   await processProviderSubscription(recharge.userId);
+
+  try {
+    await releaseReferralReward(recharge.userId, "client_activation", {
+      trigger: "approved_recharge",
+      reference: transaction.reference,
+      wompiTransactionId: transaction.id,
+    });
+  } catch (error) {
+    console.error("REFERRAL REWARD ERROR:", error);
+  }
 
   return { credited: true };
 }

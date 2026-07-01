@@ -14,6 +14,7 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import { normalizeReferralCode } from "@/lib/referralCodes";
 
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -24,7 +25,8 @@ export const registerUser = async (
   email: string,
   password: string,
   role: UserRole,
-  verificationPhotoUrl?: string
+  verificationPhotoUrl?: string,
+  referralCode?: string
 ) => {
   const credential: UserCredential = await createUserWithEmailAndPassword(
     auth,
@@ -34,6 +36,8 @@ export const registerUser = async (
 
   const user = credential.user;
   const isProvider = role === "prestador";
+  const referredBy = normalizeReferralCode(referralCode);
+  const hasValidReferrer = referredBy && referredBy !== user.uid;
 
   await setDoc(doc(db, "users", user.uid), {
     uid: user.uid,
@@ -51,6 +55,14 @@ export const registerUser = async (
     profileVisible: !isProvider,
     verificationStatus: isProvider ? "pending" : "approved",
     verificationPhotoUrl: isProvider ? verificationPhotoUrl ?? null : null,
+    ...(hasValidReferrer
+      ? {
+          referredBy,
+          referralRole: role,
+          referralStatus: "pending",
+          referralCreatedAt: serverTimestamp(),
+        }
+      : {}),
     createdAt: serverTimestamp(),
   });
 

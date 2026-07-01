@@ -23,6 +23,10 @@ import {
   PROVIDER_PROMOTION_DAYS,
   PROVIDER_PROMOTION_PRICE,
 } from "@/lib/providerPromotion";
+import {
+  CLIENT_REFERRAL_REWARD,
+  PROVIDER_REFERRAL_REWARD,
+} from "@/lib/referralCodes";
 import { getProviderZoneOptions } from "@/lib/providerZones";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
@@ -843,7 +847,9 @@ export default function PerfilPrestador() {
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showDailyVideoModal, setShowDailyVideoModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [showQuickGuide, setShowQuickGuide] = useState(false);
+  const [inviteCopyMessage, setInviteCopyMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [contentPrice, setContentPrice] = useState("");
   const [contentDescription, setContentDescription] = useState("");
@@ -994,6 +1000,10 @@ export default function PerfilPrestador() {
       helper: "Contenido",
     },
   ];
+  const inviteLink =
+    typeof window !== "undefined" && user?.uid
+      ? `${window.location.origin}/register?ref=${encodeURIComponent(user.uid)}`
+      : "";
   const onboardingSteps = [
     {
       label: "Datos publicos",
@@ -1066,6 +1076,18 @@ export default function PerfilPrestador() {
         },
       })
     );
+  };
+  const copyInviteLink = async () => {
+    if (!inviteLink) return;
+
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setInviteCopyMessage("Link copiado");
+    } catch {
+      setInviteCopyMessage("No pudimos copiarlo. Selecciona el link manualmente.");
+    }
+
+    window.setTimeout(() => setInviteCopyMessage(""), 2200);
   };
   const clearVerificationUploadProgress = useCallback(() => {
     setVerificationUploadProgress((current) => {
@@ -1228,7 +1250,8 @@ export default function PerfilPrestador() {
       showVerificationModal ||
       showPauseModal ||
       showPromotionModal ||
-      showDailyVideoModal
+      showDailyVideoModal ||
+      showInviteModal
         ? "hidden"
         : "auto";
 
@@ -1242,6 +1265,7 @@ export default function PerfilPrestador() {
     showPauseModal,
     showPromotionModal,
     showDailyVideoModal,
+    showInviteModal,
   ]);
 
   useEffect(() => {
@@ -2125,9 +2149,10 @@ export default function PerfilPrestador() {
 
         <section
           id="estado-perfil"
-          className="scroll-mt-24 overflow-hidden rounded-lg border border-white/[0.08] bg-[#101012] shadow-2xl shadow-black/25"
+          className="scroll-mt-24 overflow-hidden rounded-xl border border-white/[0.09] bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.10),transparent_36%),linear-gradient(135deg,#121214,#09090a_58%,#050505)] shadow-2xl shadow-black/30"
         >
-          <div>
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
             <div className="px-3 py-3 sm:px-4 sm:py-4">
               <div className="flex items-start gap-3 sm:gap-4">
                 <div className="flex shrink-0 flex-col items-center gap-1.5">
@@ -2318,16 +2343,16 @@ export default function PerfilPrestador() {
                       </div>
                     </div>
 
-                    <div className="grid w-full max-w-xs grid-cols-2 divide-x divide-white/[0.08] rounded-md border border-white/[0.08] bg-white/[0.025] px-1.5 py-1.5 sm:max-w-sm">
+                    <div className="grid w-full max-w-xs grid-cols-2 divide-x divide-white/[0.08] rounded-lg border border-white/[0.09] bg-black/20 px-1.5 py-1.5 shadow-inner shadow-black/20 sm:max-w-sm">
                       {profileStats.map((item) => (
                         <div
                           key={item.label}
-                          className="min-w-0 px-1.5 text-left last:text-right sm:px-2"
+                          className="min-w-0 px-1.5 text-left last:text-right sm:px-3"
                         >
                           <span className="block truncate text-[10px] font-medium uppercase text-neutral-500">
                             {item.label}
                           </span>
-                          <span className="mt-0.5 block truncate text-sm font-semibold text-neutral-100">
+                          <span className="mt-1 block truncate text-base font-semibold text-neutral-50">
                             {item.value}
                           </span>
                           <span className="mt-0.5 block truncate text-[10px] text-neutral-600">
@@ -2345,6 +2370,28 @@ export default function PerfilPrestador() {
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(true)}
+                  className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-violet-300/20 bg-violet-400/[0.07] px-2.5 text-xs font-semibold text-violet-50 transition hover:border-violet-200/35 hover:bg-violet-400/12 sm:px-3"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-3.5 w-3.5 text-violet-200"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M19 8v6" />
+                    <path d="M22 11h-6" />
+                  </svg>
+                  Invitar
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setEditMode((value) => !value)}
@@ -2999,6 +3046,102 @@ export default function PerfilPrestador() {
           )}
         </section>
       </main>
+
+      {showInviteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
+          onClick={() => setShowInviteModal(false)}
+        >
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-xl border border-white/[0.09] bg-[#101012] shadow-2xl shadow-black/45"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-white/[0.08] bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.20),transparent_38%),#111113] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-200">
+                Programa de referidos
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-white">
+                Invita y gana saldo
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-neutral-400">
+                Comparte tu link. El saldo se acredita cuando el referido cumple
+                una condicion real de activacion.
+              </p>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-white/[0.08] bg-white/[0.035] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                    Cliente
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-white">
+                    ${CLIENT_REFERRAL_REWARD.toLocaleString("es-CO")}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-neutral-400">
+                    Se libera cuando hace su primera recarga, compra de
+                    contenido o abono.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-violet-300/20 bg-violet-400/[0.08] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-200">
+                    Escort
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-white">
+                    ${PROVIDER_REFERRAL_REWARD.toLocaleString("es-CO")}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-neutral-300">
+                    Se libera cuando su perfil alcanza minimo nivel bronce.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="invite-link"
+                  className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                >
+                  Link de invitacion
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="invite-link"
+                    readOnly
+                    value={inviteLink}
+                    className="min-w-0 flex-1 rounded-md border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-neutral-200 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void copyInviteLink()}
+                    className="rounded-md border border-violet-300/25 bg-violet-400/10 px-4 text-sm font-semibold text-violet-100 transition hover:border-violet-200/40 hover:bg-violet-400/15"
+                  >
+                    Copiar
+                  </button>
+                </div>
+                {inviteCopyMessage && (
+                  <p className="mt-2 text-xs text-violet-200">
+                    {inviteCopyMessage}
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-amber-300/20 bg-amber-400/[0.07] p-3 text-xs leading-5 text-amber-50/90">
+                Para proteger el programa, las cuentas vacias no generan pago.
+                Cada bono queda registrado una sola vez y se paga al saldo.
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowInviteModal(false)}
+                className="w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showPauseModal && (
         <div

@@ -6,6 +6,7 @@ import {
   PROVIDER_MONTHLY_FEE,
 } from "@/lib/providerSubscription";
 import { getAdminQualityRank } from "@/lib/providerPromotion";
+import { releaseReferralReward } from "@/lib/referrals";
 import {
   guardMutationRequest,
   securityErrorResponse,
@@ -442,10 +443,24 @@ export async function PATCH(request: Request, { params }: Params) {
         createdAt: adminFieldValue.serverTimestamp(),
       });
 
+      let referralResult = null;
+
+      try {
+        referralResult = await releaseReferralReward(uid, "provider_bronze", {
+          trigger: "badge_verification_approved",
+          badge,
+          badgeLevel: level,
+          verifiedBy: owner.uid,
+        });
+      } catch (referralError) {
+        console.error("REFERRAL REWARD ERROR:", referralError);
+      }
+
       return NextResponse.json({
         success: true,
         verificationBadge: badge,
         subscriptionResult,
+        referralResult,
       });
     }
 

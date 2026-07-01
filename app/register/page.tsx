@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { registerUser, UserRole } from "@/lib/auth";
+import { normalizeReferralCode } from "@/lib/referralCodes";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -21,6 +22,21 @@ export default function RegisterPage() {
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlReferralCode = normalizeReferralCode(params.get("ref"));
+    const storedReferralCode = normalizeReferralCode(
+      window.localStorage.getItem("belaclub_ref")
+    );
+    const nextReferralCode = urlReferralCode || storedReferralCode;
+
+    if (!nextReferralCode) return;
+
+    window.localStorage.setItem("belaclub_ref", nextReferralCode);
+    setReferralCode(nextReferralCode);
+  }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +52,16 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await registerUser(email, password, role);
+      await registerUser(
+        email,
+        password,
+        role,
+        undefined,
+        referralCode || undefined
+      );
+      if (referralCode) {
+        window.localStorage.removeItem("belaclub_ref");
+      }
       router.push(role === "prestador" ? "/prestador/perfil" : "/prestadores");
     } catch (error) {
       const errorMessage =
@@ -215,6 +240,19 @@ export default function RegisterPage() {
                       Dentro de tu perfil podras solicitar verificacion bronce,
                       plata, oro o diamante. Tu perfil se publicara cuando sea
                       aprobada.
+                    </p>
+                  </div>
+                )}
+
+                {referralCode && (
+                  <div className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 p-4">
+                    <p className="text-sm font-semibold text-emerald-100">
+                      Invitacion aplicada
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-neutral-300">
+                      Tu registro quedara asociado a quien te invito. Los bonos
+                      se acreditan cuando la cuenta cumple las reglas de
+                      referido.
                     </p>
                   </div>
                 )}
