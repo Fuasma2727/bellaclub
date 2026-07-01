@@ -71,6 +71,7 @@ export async function generateMetadata({
       title: `${title} | BelaClub`,
       description,
       url: `/escorts/${city.slug}`,
+      siteName: "BelaClub",
       images: [
         {
           url: "/og-image.png",

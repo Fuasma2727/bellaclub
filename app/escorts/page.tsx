@@ -52,6 +52,7 @@ export const metadata: Metadata = {
     description:
       "Escorts, prepagos y acompañantes en Medellín, La Ceja y Rionegro con perfiles aprobados y contacto directo por WhatsApp.",
     url: "/escorts",
+    siteName: "BelaClub",
     images: [
       {
         url: "/og-image.png",

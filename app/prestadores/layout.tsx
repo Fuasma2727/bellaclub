@@ -22,6 +22,7 @@ export const metadata: Metadata = {
     description:
       "Escorts verificadas, prepagos y acompañantes con galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
     url: "/prestadores",
+    siteName: "BelaClub",
     images: [
       {
         url: "/og-image.png",

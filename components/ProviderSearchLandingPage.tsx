@@ -28,6 +28,7 @@ export async function generateProviderSearchLandingMetadata(
       title: `${route.baseTitle} | BelaClub`,
       description,
       url: `/${route.segment}`,
+      siteName: "BelaClub",
       images: [
         {
           url: "/og-image.png",

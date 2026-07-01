@@ -63,6 +63,7 @@ export async function generateProviderCityMetadata(
       title: `${title} | BelaClub`,
       description,
       url: `/${route.segment}/${city.slug}`,
+      siteName: "BelaClub",
       images: [
         {
           url: "/og-image.png",
