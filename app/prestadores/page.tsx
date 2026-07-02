@@ -38,6 +38,11 @@ type PrestadoresPageProps = {
     heading: string;
     paragraphs: string[];
     zones?: string[];
+    searchTerms?: string[];
+    faqs?: {
+      question: string;
+      answer: string;
+    }[];
     relatedLinks?: CitySeoLink[];
   };
 };
@@ -53,12 +58,12 @@ const citySlugValue = (value: string) => {
 };
 
 const footerSeoLinks: CitySeoLink[] = [
-  { href: "/escorts/medellin", label: "Escorts Medellin" },
-  { href: "/prepagos/medellin", label: "Prepagos Medellin" },
-  { href: "/escorts/la-ceja", label: "Escorts La Ceja" },
-  { href: "/prepagos/la-ceja", label: "Prepagos La Ceja" },
-  { href: "/escorts/rionegro", label: "Escorts Rionegro" },
-  { href: "/prepagos/rionegro", label: "Prepagos Rionegro" },
+  { href: "/escorts/medellin", label: "Escorts en Medellin" },
+  { href: "/prepagos/medellin", label: "Prepagos en Medellin" },
+  { href: "/escorts/la-ceja", label: "Escorts en La Ceja" },
+  { href: "/prepagos/la-ceja", label: "Prepagos en La Ceja" },
+  { href: "/escorts/rionegro", label: "Escorts en Rionegro" },
+  { href: "/prepagos/rionegro", label: "Prepagos en Rionegro" },
 ];
 
 export default function PrestadoresPage({
@@ -851,6 +856,43 @@ export default function PrestadoresPage({
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {seoContent.searchTerms &&
+                seoContent.searchTerms.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                      Busquedas frecuentes
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {seoContent.searchTerms.map((term) => (
+                        <span
+                          key={term}
+                          className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200"
+                        >
+                          {term}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {seoContent.faqs && seoContent.faqs.length > 0 && (
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  {seoContent.faqs.map((faq) => (
+                    <article
+                      key={faq.question}
+                      className="rounded-md border border-white/[0.08] bg-white/[0.03] p-4"
+                    >
+                      <h3 className="text-sm font-semibold text-neutral-100">
+                        {faq.question}
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-neutral-400">
+                        {faq.answer}
+                      </p>
+                    </article>
+                  ))}
                 </div>
               )}
 

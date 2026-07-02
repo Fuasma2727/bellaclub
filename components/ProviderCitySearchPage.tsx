@@ -24,6 +24,43 @@ type CityPageProps = {
   }>;
 };
 
+type CityFaq = {
+  question: string;
+  answer: string;
+};
+
+const uniqueTexts = (items: string[]) =>
+  Array.from(new Set(items.filter(Boolean)));
+
+const buildCityFaqs = (
+  routeTitle: string,
+  routePluralNoun: string,
+  cityName: string,
+  place: string,
+  profileCount: number
+): CityFaq[] => {
+  const profileText =
+    profileCount > 0
+      ? `${profileCount} perfiles visibles y aprobados`
+      : "perfiles visibles y aprobados cuando esten disponibles";
+
+  return [
+    {
+      question: `Donde encontrar ${routePluralNoun} en ${cityName}?`,
+      answer: `En BelaClub puedes revisar ${profileText} en ${place}, filtrar por ciudad o zona cuando este disponible y abrir cada perfil para ver fotos publicas y opciones de contacto.`,
+    },
+    {
+      question: `La pagina de ${routeTitle} en ${cityName} se actualiza?`,
+      answer:
+        "Si. La pagina usa los perfiles activos, visibles y aprobados dentro de BelaClub, por eso el listado puede cambiar cuando se aprueban, pausan o actualizan perfiles.",
+    },
+    {
+      question: `Tambien sirve para buscar prepagos, acompanantes o damas de compania en ${cityName}?`,
+      answer: `Si. BelaClub conecta busquedas relacionadas como escorts, prepagos, acompanantes, damas de compania, chicas, masajistas y universitarias en ${cityName} con paginas filtradas por ciudad.`,
+    },
+  ];
+};
+
 export async function generateProviderCityStaticParams() {
   return [];
 }
@@ -97,9 +134,19 @@ export default async function ProviderCitySearchPage({
   if (!city) notFound();
 
   const title = `${route.title} en ${city.city}`;
+  const place = city.department
+    ? `${city.city}, ${city.department}`
+    : city.city;
   const pageUrl = `${siteUrl}/${route.segment}/${city.slug}`;
   const keywords = getProviderSearchKeywords(route, city.city);
   const cityProviders = await getPublicProviderCards({ citySlug: city.slug });
+  const faqs = buildCityFaqs(
+    route.title,
+    route.pluralNoun,
+    city.city,
+    place,
+    cityProviders.length
+  );
   const relatedRoutes = targetSeoCities
     .filter((item) => item.slug !== city.slug)
     .slice(0, 6);
@@ -119,6 +166,22 @@ export default async function ProviderCitySearchPage({
   const cityIntro =
     city.seoIntro ||
     `BelaClub organiza perfiles aprobados en ${city.city} para facilitar busquedas por ciudad, zonas disponibles y contacto directo.`;
+  const searchTerms = uniqueTexts([
+    `${route.title} en ${city.city}`,
+    `escorts en ${city.city}`,
+    `prepagos en ${city.city}`,
+    `acompanantes en ${city.city}`,
+    `damas de compania en ${city.city}`,
+    `chicas en ${city.city}`,
+    `masajistas en ${city.city}`,
+    `universitarias en ${city.city}`,
+  ]);
+  const nearbyText =
+    city.nearbyCities && city.nearbyCities.length > 0
+      ? `Tambien se conectan busquedas cercanas desde ${city.nearbyCities.join(
+          ", "
+        )}, manteniendo el foco principal en perfiles de ${city.city}.`
+      : "";
 
   return (
     <>
@@ -141,6 +204,16 @@ export default async function ProviderCitySearchPage({
               "@type": "WebSite",
               name: "BelaClub",
               url: siteUrl,
+            },
+            spatialCoverage: {
+              "@type": "City",
+              name: city.city,
+              containedInPlace: city.department
+                ? {
+                    "@type": "AdministrativeArea",
+                    name: city.department,
+                  }
+                : undefined,
             },
           },
           {
@@ -199,6 +272,18 @@ export default async function ProviderCitySearchPage({
               })),
             ],
           },
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map((faq) => ({
+              "@type": "Question",
+              name: faq.question,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: faq.answer,
+              },
+            })),
+          },
         ]}
       />
       <PrestadoresPage
@@ -213,9 +298,15 @@ export default async function ProviderCitySearchPage({
           heading: `${route.title} en ${city.city}: perfiles y busquedas relacionadas`,
           paragraphs: [
             cityIntro,
+            cityProviders.length > 0
+              ? `Actualmente se muestran ${cityProviders.length} perfiles activos para ${city.city}. El listado se alimenta de perfiles aprobados, visibles y actualizados dentro de BelaClub.`
+              : `Esta pagina queda preparada para mostrar perfiles activos en ${city.city} tan pronto sean aprobados y visibles dentro de BelaClub.`,
             `En esta pagina se agrupan perfiles de ${route.pluralNoun} en ${city.city} junto con busquedas relacionadas como escorts, prepagos, acompanantes, damas de compania, chicas, masajistas y universitarias.`,
+            nearbyText,
             `La disponibilidad de perfiles en ${city.city} se mantiene alineada con los perfiles activos y aprobados dentro de BelaClub.`,
-          ],
+          ].filter(Boolean),
+          searchTerms,
+          faqs,
           zones: city.zones,
           relatedLinks: [...sameCityLinks, ...relatedCityLinks],
         }}

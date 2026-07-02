@@ -7,6 +7,7 @@ export type ProviderCitySeo = {
   count: number;
   zones?: string[];
   seoIntro?: string;
+  nearbyCities?: string[];
 };
 
 export const targetSeoCities: ProviderCitySeo[] = [
@@ -15,6 +16,7 @@ export const targetSeoCities: ProviderCitySeo[] = [
     department: "Antioquia",
     slug: "medellin",
     count: 0,
+    nearbyCities: ["Envigado", "Itagui", "Sabaneta", "Rionegro"],
     zones: [
       "El Poblado",
       "Laureles",
@@ -31,7 +33,8 @@ export const targetSeoCities: ProviderCitySeo[] = [
     department: "Antioquia",
     slug: "la-ceja",
     count: 0,
-    zones: ["Centro", "zonas cercanas"],
+    nearbyCities: ["Rionegro", "El Retiro", "El Carmen de Viboral"],
+    zones: ["Centro", "zonas cercanas", "oriente antioqueno"],
     seoIntro:
       "La Ceja conecta usuarios que buscan perfiles en el oriente antioqueño con opciones cercanas y contacto directo.",
   },
@@ -40,7 +43,8 @@ export const targetSeoCities: ProviderCitySeo[] = [
     department: "Antioquia",
     slug: "rionegro",
     count: 0,
-    zones: ["San Antonio", "Centro"],
+    nearbyCities: ["La Ceja", "Marinilla", "Guarne", "El Carmen de Viboral"],
+    zones: ["San Antonio", "Centro", "Llanogrande", "Aeropuerto JMC"],
     seoIntro:
       "Rionegro concentra busquedas en zonas como San Antonio y Centro, con perfiles visibles y contacto directo por WhatsApp.",
   },
@@ -95,6 +99,9 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
       city: current?.city || city.city,
       department: current?.department || city.department,
       count: current?.count || city.count,
+      zones: current?.zones || city.zones,
+      seoIntro: current?.seoIntro || city.seoIntro,
+      nearbyCities: current?.nearbyCities || city.nearbyCities,
     });
   });
 
