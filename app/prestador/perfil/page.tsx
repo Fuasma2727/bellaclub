@@ -24,7 +24,6 @@ import {
   PROVIDER_PROMOTION_PRICE,
 } from "@/lib/providerPromotion";
 import {
-  CLIENT_REFERRAL_REWARD,
   PROVIDER_REFERRAL_REWARD,
 } from "@/lib/referralCodes";
 import { getProviderZoneOptions } from "@/lib/providerZones";
@@ -3061,38 +3060,26 @@ export default function PerfilPrestador() {
                 Programa de referidos
               </p>
               <h3 className="mt-2 text-xl font-semibold text-white">
-                Invita y gana saldo
+                Invita prestadores y gana saldo
               </h3>
               <p className="mt-2 text-sm leading-6 text-neutral-400">
-                Comparte tu link. El saldo se acredita cuando el referido cumple
-                una condicion real de activacion.
+                Comparte tu link con otro prestador. El bono se acredita cuando
+                cree su perfil y alcance minimo nivel bronce.
               </p>
             </div>
 
             <div className="space-y-4 p-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-white/[0.08] bg-white/[0.035] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
-                    Cliente
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
-                    ${CLIENT_REFERRAL_REWARD.toLocaleString("es-CO")}
-                  </p>
-                  <p className="mt-2 text-xs leading-5 text-neutral-400">
-                    Se libera cuando hace su primera recarga, compra de
-                    contenido o abono.
-                  </p>
-                </div>
-
+              <div className="grid gap-3">
                 <div className="rounded-lg border border-violet-300/20 bg-violet-400/[0.08] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-200">
-                    Escort
+                    Prestador referido
                   </p>
                   <p className="mt-2 text-2xl font-semibold text-white">
                     ${PROVIDER_REFERRAL_REWARD.toLocaleString("es-CO")}
                   </p>
                   <p className="mt-2 text-xs leading-5 text-neutral-300">
-                    Se libera cuando su perfil alcanza minimo nivel bronce.
+                    Se libera una sola vez cuando su perfil alcanza minimo
+                    nivel bronce.
                   </p>
                 </div>
               </div>
@@ -3127,8 +3114,9 @@ export default function PerfilPrestador() {
               </div>
 
               <div className="rounded-lg border border-amber-300/20 bg-amber-400/[0.07] p-3 text-xs leading-5 text-amber-50/90">
-                Para proteger el programa, las cuentas vacias no generan pago.
-                Cada bono queda registrado una sola vez y se paga al saldo.
+                Las cuentas de cliente no generan bono. Para proteger el
+                programa, solo se paga por prestadores reales verificados al
+                menos en bronce.
               </div>
 
               <button

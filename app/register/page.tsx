@@ -52,12 +52,15 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const providerReferralCode =
+        role === "prestador" ? referralCode : "";
+
       await registerUser(
         email,
         password,
         role,
         undefined,
-        referralCode || undefined
+        providerReferralCode || undefined
       );
       if (referralCode) {
         window.localStorage.removeItem("belaclub_ref");
@@ -244,15 +247,27 @@ export default function RegisterPage() {
                   </div>
                 )}
 
-                {referralCode && (
+                {referralCode && role === "prestador" && (
                   <div className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 p-4">
                     <p className="text-sm font-semibold text-emerald-100">
-                      Invitacion aplicada
+                      Invitacion de prestador aplicada
                     </p>
                     <p className="mt-1 text-xs leading-5 text-neutral-300">
-                      Tu registro quedara asociado a quien te invito. Los bonos
-                      se acreditan cuando la cuenta cumple las reglas de
-                      referido.
+                      Tu perfil quedara asociado a quien te invito. El bono se
+                      acredita solo si alcanzas minimo nivel bronce.
+                    </p>
+                  </div>
+                )}
+
+                {referralCode && role === "cliente" && (
+                  <div className="rounded-lg border border-amber-400/25 bg-amber-400/10 p-4">
+                    <p className="text-sm font-semibold text-amber-100">
+                      Referido solo para prestadores
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-neutral-300">
+                      Puedes registrarte como cliente normalmente, pero este
+                      enlace solo genera bono si se crea un perfil de escort y
+                      alcanza minimo nivel bronce.
                     </p>
                   </div>
                 )}

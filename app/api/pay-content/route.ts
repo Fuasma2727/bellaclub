@@ -4,7 +4,6 @@ import admin from "firebase-admin";
 import { calculateCommission } from "@/lib/commission";
 import { setLedgerEntry } from "@/lib/ledger";
 import { createPrivateMediaUrl } from "@/lib/privateMediaAccess";
-import { releaseReferralReward } from "@/lib/referrals";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
 import {
   guardMutationRequest,
@@ -205,18 +204,6 @@ export async function POST(req: Request) {
         metadata: { buyerId, sellerId, mediaId },
       });
     });
-
-    if (!purchaseAlreadyCompleted) {
-      try {
-        await releaseReferralReward(buyerId, "client_activation", {
-          trigger: "content_purchase",
-          sellerId,
-          mediaId,
-        });
-      } catch (referralError) {
-        console.error("REFERRAL REWARD ERROR:", referralError);
-      }
-    }
 
     return NextResponse.json(
       {

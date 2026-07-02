@@ -1,28 +1,21 @@
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { setLedgerEntry } from "@/lib/ledger";
 import {
-  CLIENT_REFERRAL_REWARD,
   PROVIDER_REFERRAL_REWARD,
   normalizeReferralCode,
 } from "@/lib/referralCodes";
 
-export type ReferralRewardKind = "client_activation" | "provider_bronze";
+export type ReferralRewardKind = "provider_bronze";
 
 const rewardConfig: Record<
   ReferralRewardKind,
   {
     amount: number;
-    expectedRole: "cliente" | "prestador";
+    expectedRole: "prestador";
     statusField: string;
     paidAtField: string;
   }
 > = {
-  client_activation: {
-    amount: CLIENT_REFERRAL_REWARD,
-    expectedRole: "cliente",
-    statusField: "clientReferralRewardStatus",
-    paidAtField: "clientReferralRewardPaidAt",
-  },
   provider_bronze: {
     amount: PROVIDER_REFERRAL_REWARD,
     expectedRole: "prestador",
@@ -94,15 +87,13 @@ export async function releaseReferralReward(
       return;
     }
 
-    if (kind === "provider_bronze") {
-      const level =
-        Number(referred.badgeVerificationLevel || 0) ||
-        levelByBadge(referred.verificationBadge);
+    const level =
+      Number(referred.badgeVerificationLevel || 0) ||
+      levelByBadge(referred.verificationBadge);
 
-      if (level < 1) {
-        result = { released: false, reason: "provider_not_bronze" };
-        return;
-      }
+    if (level < 1) {
+      result = { released: false, reason: "provider_not_bronze" };
+      return;
     }
 
     const referrerRef = adminDb.collection("users").doc(referrerId);
@@ -167,14 +158,9 @@ export async function releaseReferralReward(
       userId: referrerId,
       type: "referral_reward",
       title: "Bono de referido acreditado",
-      message:
-        kind === "provider_bronze"
-          ? `Ganaste $${amount.toLocaleString(
-              "es-CO"
-            )} porque tu escort referida alcanzo nivel bronce.`
-          : `Ganaste $${amount.toLocaleString(
-              "es-CO"
-            )} porque tu referido activo su cuenta con una transaccion real.`,
+      message: `Ganaste $${amount.toLocaleString(
+        "es-CO"
+      )} porque tu escort referida alcanzo nivel bronce.`,
       amount,
       referredUserId,
       referralKind: kind,

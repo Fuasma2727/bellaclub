@@ -3,7 +3,6 @@ import admin from "firebase-admin";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { calculateCommission } from "@/lib/commission";
 import { setLedgerEntry } from "@/lib/ledger";
-import { releaseReferralReward } from "@/lib/referrals";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
 import {
   guardMutationRequest,
@@ -203,16 +202,6 @@ export async function POST(req: Request) {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
-
-    try {
-      await releaseReferralReward(buyerId, "client_activation", {
-        trigger: "service_deposit",
-        sellerId,
-        code: depositCode,
-      });
-    } catch (referralError) {
-      console.error("REFERRAL REWARD ERROR:", referralError);
-    }
 
     return NextResponse.json({ success: true, code: depositCode }, { status: 200 });
   } catch (error) {
