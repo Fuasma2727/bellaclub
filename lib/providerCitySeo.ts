@@ -10,6 +10,16 @@ export type ProviderCitySeo = {
   nearbyCities?: string[];
 };
 
+type ProviderCityCache = {
+  cities: ProviderCitySeo[];
+  expiresAt: number;
+  staleUntil: number;
+  inFlight?: Promise<ProviderCitySeo[]>;
+};
+
+const PROVIDER_CITY_CACHE_TTL_MS = 5 * 60 * 1000;
+const PROVIDER_CITY_STALE_TTL_MS = 24 * 60 * 60 * 1000;
+
 export const targetSeoCities: ProviderCitySeo[] = [
   {
     city: "Medellín",
@@ -50,6 +60,19 @@ export const targetSeoCities: ProviderCitySeo[] = [
   },
 ];
 
+const globalForProviderCityCache = globalThis as typeof globalThis & {
+  __belaclubProviderCityCache?: ProviderCityCache;
+};
+
+const providerCityCache =
+  globalForProviderCityCache.__belaclubProviderCityCache || {
+    cities: [],
+    expiresAt: 0,
+    staleUntil: 0,
+  };
+
+globalForProviderCityCache.__belaclubProviderCityCache = providerCityCache;
+
 export const citySlug = (value: string) => {
   return value
     .normalize("NFD")
@@ -60,7 +83,14 @@ export const citySlug = (value: string) => {
     .replace(/^-+|-+$/g, "");
 };
 
-export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
+const isFirestoreQuotaError = (error: unknown) => {
+  const typed = error as { code?: unknown; details?: unknown; message?: unknown };
+  const message = String(typed.details || typed.message || "");
+
+  return typed.code === 8 || message.includes("Quota exceeded");
+};
+
+async function fetchPublicProviderCities(): Promise<ProviderCitySeo[]> {
   const snapshot = await adminDb
     .collection("users")
     .where("role", "==", "prestador")
@@ -108,6 +138,63 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
   return Array.from(bySlug.values()).sort((a, b) =>
     a.city.localeCompare(b.city, "es")
   );
+}
+
+export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
+  const now = Date.now();
+
+  if (providerCityCache.cities.length > 0) {
+    if (providerCityCache.expiresAt > now) {
+      return providerCityCache.cities;
+    }
+
+    if (providerCityCache.inFlight) {
+      return providerCityCache.cities;
+    }
+  }
+
+  if (providerCityCache.inFlight) {
+    return providerCityCache.inFlight;
+  }
+
+  providerCityCache.inFlight = fetchPublicProviderCities()
+    .then((cities) => {
+      const refreshedAt = Date.now();
+
+      providerCityCache.cities = cities;
+      providerCityCache.expiresAt = refreshedAt + PROVIDER_CITY_CACHE_TTL_MS;
+      providerCityCache.staleUntil =
+        refreshedAt + PROVIDER_CITY_STALE_TTL_MS;
+
+      return cities;
+    })
+    .catch((error) => {
+      if (
+        providerCityCache.cities.length > 0 &&
+        providerCityCache.staleUntil > Date.now()
+      ) {
+        console.error(
+          "Error refreshing provider city cache; serving stale cities:",
+          error
+        );
+        return providerCityCache.cities;
+      }
+
+      if (isFirestoreQuotaError(error)) {
+        console.error(
+          "Provider cities unavailable because Firestore quota is exhausted:",
+          error
+        );
+        return targetSeoCities;
+      }
+
+      throw error;
+    })
+    .finally(() => {
+      providerCityCache.inFlight = undefined;
+    });
+
+  return providerCityCache.inFlight;
 }
 
 export async function findProviderCityBySlug(slug: string) {

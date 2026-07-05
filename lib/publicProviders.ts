@@ -100,6 +100,13 @@ const writePublicProviderDiskCache = async (
   }
 };
 
+const isFirestoreQuotaError = (error: unknown) => {
+  const typed = error as { code?: unknown; details?: unknown; message?: unknown };
+  const message = String(typed.details || typed.message || "");
+
+  return typed.code === 8 || message.includes("Quota exceeded");
+};
+
 const toIsoString = (value: unknown) => {
   if (!value) return null;
   if (typeof value === "string") return value;
@@ -411,6 +418,14 @@ async function readPublicProviderCards() {
           error
         );
         return publicProviderCache.providers;
+      }
+
+      if (isFirestoreQuotaError(error)) {
+        console.error(
+          "Public providers unavailable because Firestore quota is exhausted:",
+          error
+        );
+        return [];
       }
 
       throw error;
