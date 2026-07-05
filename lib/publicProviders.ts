@@ -39,6 +39,7 @@ type PublicProviderCache = {
   expiresAt: number;
   staleUntil: number;
   inFlight?: Promise<PublicProviderCard[]>;
+  loaded?: boolean;
   diskLoaded?: boolean;
 };
 
@@ -59,6 +60,7 @@ const publicProviderCache =
     providers: [],
     expiresAt: 0,
     staleUntil: 0,
+    loaded: false,
     diskLoaded: false,
   };
 
@@ -377,10 +379,11 @@ async function readPublicProviderCards() {
       publicProviderCache.providers = diskProviders;
       publicProviderCache.expiresAt = now + PUBLIC_PROVIDER_CACHE_TTL_MS;
       publicProviderCache.staleUntil = now + PUBLIC_PROVIDER_STALE_TTL_MS;
+      publicProviderCache.loaded = true;
     }
   }
 
-  if (publicProviderCache.providers.length > 0) {
+  if (publicProviderCache.loaded) {
     if (publicProviderCache.expiresAt > now) {
       return publicProviderCache.providers;
     }
@@ -403,6 +406,7 @@ async function readPublicProviderCards() {
         refreshedAt + PUBLIC_PROVIDER_CACHE_TTL_MS;
       publicProviderCache.staleUntil =
         refreshedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
+      publicProviderCache.loaded = true;
 
       void writePublicProviderDiskCache(providers);
 
@@ -421,6 +425,14 @@ async function readPublicProviderCards() {
       }
 
       if (isFirestoreQuotaError(error)) {
+        const failedAt = Date.now();
+
+        publicProviderCache.providers = [];
+        publicProviderCache.expiresAt =
+          failedAt + PUBLIC_PROVIDER_CACHE_TTL_MS;
+        publicProviderCache.staleUntil =
+          failedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
+        publicProviderCache.loaded = true;
         console.error(
           "Public providers unavailable because Firestore quota is exhausted:",
           error

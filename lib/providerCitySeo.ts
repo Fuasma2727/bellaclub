@@ -181,6 +181,11 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
       }
 
       if (isFirestoreQuotaError(error)) {
+        const failedAt = Date.now();
+
+        providerCityCache.cities = targetSeoCities;
+        providerCityCache.expiresAt = failedAt + PROVIDER_CITY_CACHE_TTL_MS;
+        providerCityCache.staleUntil = failedAt + PROVIDER_CITY_STALE_TTL_MS;
         console.error(
           "Provider cities unavailable because Firestore quota is exhausted:",
           error
