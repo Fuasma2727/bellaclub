@@ -32,6 +32,30 @@ export type PublicProviderProfile = PublicProviderCard & {
   privateMediaCount: number;
 };
 
+type PublicProviderCache = {
+  providers: PublicProviderCard[];
+  expiresAt: number;
+  staleUntil: number;
+  inFlight?: Promise<PublicProviderCard[]>;
+};
+
+const PUBLIC_PROVIDER_CACHE_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_PROVIDER_STALE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const globalForPublicProviderCache = globalThis as typeof globalThis & {
+  __belaclubPublicProviderCache?: PublicProviderCache;
+};
+
+const publicProviderCache =
+  globalForPublicProviderCache.__belaclubPublicProviderCache || {
+    providers: [],
+    expiresAt: 0,
+    staleUntil: 0,
+  };
+
+globalForPublicProviderCache.__belaclubPublicProviderCache =
+  publicProviderCache;
+
 const toIsoString = (value: unknown) => {
   if (!value) return null;
   if (typeof value === "string") return value;
@@ -226,6 +250,21 @@ export async function getPublicProviderCards(options?: {
   citySlug?: string;
   limit?: number;
 }) {
+  const providers = await readPublicProviderCards();
+  const filtered = options?.citySlug
+    ? providers.filter(
+        (provider) => citySlug(provider.city || "") === options.citySlug
+      )
+    : providers;
+  const limited =
+    options?.limit && options.limit > 0
+      ? filtered.slice(0, options.limit)
+      : filtered;
+
+  return limited;
+}
+
+async function fetchPublicProviderCards() {
   const now = Date.now();
   const snapshot = await adminDb
     .collection("users")
@@ -258,15 +297,9 @@ export async function getPublicProviderCards(options?: {
       verificationRank: number;
       adminQualityRank: number;
     } => Boolean(provider))
-    .filter((provider) => {
-      if (!options?.citySlug) return true;
-      return citySlug(provider.city || "") === options.citySlug;
-    })
     .sort(sortProviders);
 
-  const limited = options?.limit ? providers.slice(0, options.limit) : providers;
-
-  return limited.map((provider) => {
+  return providers.map((provider) => {
     const publicProvider: Partial<typeof provider> = { ...provider };
 
     delete publicProvider.promotedRank;
@@ -276,6 +309,56 @@ export async function getPublicProviderCards(options?: {
 
     return publicProvider as PublicProviderCard;
   });
+}
+
+async function readPublicProviderCards() {
+  const now = Date.now();
+
+  if (publicProviderCache.providers.length > 0) {
+    if (publicProviderCache.expiresAt > now) {
+      return publicProviderCache.providers;
+    }
+
+    if (publicProviderCache.inFlight) {
+      return publicProviderCache.providers;
+    }
+  }
+
+  if (publicProviderCache.inFlight) {
+    return publicProviderCache.inFlight;
+  }
+
+  publicProviderCache.inFlight = fetchPublicProviderCards()
+    .then((providers) => {
+      const refreshedAt = Date.now();
+
+      publicProviderCache.providers = providers;
+      publicProviderCache.expiresAt =
+        refreshedAt + PUBLIC_PROVIDER_CACHE_TTL_MS;
+      publicProviderCache.staleUntil =
+        refreshedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
+
+      return providers;
+    })
+    .catch((error) => {
+      if (
+        publicProviderCache.providers.length > 0 &&
+        publicProviderCache.staleUntil > Date.now()
+      ) {
+        console.error(
+          "Error refreshing public provider cache; serving stale providers:",
+          error
+        );
+        return publicProviderCache.providers;
+      }
+
+      throw error;
+    })
+    .finally(() => {
+      publicProviderCache.inFlight = undefined;
+    });
+
+  return publicProviderCache.inFlight;
 }
 
 export async function getPublicProviderProfileById(id: string) {

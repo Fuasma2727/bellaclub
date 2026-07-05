@@ -374,7 +374,7 @@ export default function PrestadoresPage({
   }, [expandedMedia, mediaList.length, moveExpandedMedia]);
 
   useEffect(() => {
-    const shouldFetchProviders = !initialProviders || Boolean(initialCity);
+    const shouldFetchProviders = !initialProviders;
 
     if (!shouldFetchProviders) return;
 
