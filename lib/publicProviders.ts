@@ -1,4 +1,6 @@
 import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
+import { mkdir, readFile, writeFile } from "fs/promises";
+import path from "path";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { citySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
@@ -37,10 +39,16 @@ type PublicProviderCache = {
   expiresAt: number;
   staleUntil: number;
   inFlight?: Promise<PublicProviderCard[]>;
+  diskLoaded?: boolean;
 };
 
 const PUBLIC_PROVIDER_CACHE_TTL_MS = 5 * 60 * 1000;
 const PUBLIC_PROVIDER_STALE_TTL_MS = 24 * 60 * 60 * 1000;
+const PUBLIC_PROVIDER_DISK_CACHE_PATH = path.join(
+  process.cwd(),
+  ".runtime-cache",
+  "public-providers.json"
+);
 
 const globalForPublicProviderCache = globalThis as typeof globalThis & {
   __belaclubPublicProviderCache?: PublicProviderCache;
@@ -51,10 +59,46 @@ const publicProviderCache =
     providers: [],
     expiresAt: 0,
     staleUntil: 0,
+    diskLoaded: false,
   };
 
 globalForPublicProviderCache.__belaclubPublicProviderCache =
   publicProviderCache;
+
+const readPublicProviderDiskCache = async () => {
+  try {
+    const raw = await readFile(PUBLIC_PROVIDER_DISK_CACHE_PATH, "utf8");
+    const parsed = JSON.parse(raw) as { providers?: PublicProviderCard[] };
+
+    return Array.isArray(parsed.providers) ? parsed.providers : null;
+  } catch {
+    return null;
+  }
+};
+
+const writePublicProviderDiskCache = async (
+  providers: PublicProviderCard[]
+) => {
+  try {
+    await mkdir(path.dirname(PUBLIC_PROVIDER_DISK_CACHE_PATH), {
+      recursive: true,
+    });
+    await writeFile(
+      PUBLIC_PROVIDER_DISK_CACHE_PATH,
+      JSON.stringify(
+        {
+          updatedAt: new Date().toISOString(),
+          providers,
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+  } catch (error) {
+    console.error("Error writing public provider disk cache:", error);
+  }
+};
 
 const toIsoString = (value: unknown) => {
   if (!value) return null;
@@ -314,6 +358,21 @@ async function fetchPublicProviderCards() {
 async function readPublicProviderCards() {
   const now = Date.now();
 
+  if (
+    publicProviderCache.providers.length === 0 &&
+    !publicProviderCache.diskLoaded
+  ) {
+    const diskProviders = await readPublicProviderDiskCache();
+
+    publicProviderCache.diskLoaded = true;
+
+    if (diskProviders?.length) {
+      publicProviderCache.providers = diskProviders;
+      publicProviderCache.expiresAt = now + PUBLIC_PROVIDER_CACHE_TTL_MS;
+      publicProviderCache.staleUntil = now + PUBLIC_PROVIDER_STALE_TTL_MS;
+    }
+  }
+
   if (publicProviderCache.providers.length > 0) {
     if (publicProviderCache.expiresAt > now) {
       return publicProviderCache.providers;
@@ -337,6 +396,8 @@ async function readPublicProviderCards() {
         refreshedAt + PUBLIC_PROVIDER_CACHE_TTL_MS;
       publicProviderCache.staleUntil =
         refreshedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
+
+      void writePublicProviderDiskCache(providers);
 
       return providers;
     })
