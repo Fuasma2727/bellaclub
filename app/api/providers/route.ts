@@ -9,8 +9,7 @@ export async function GET() {
       { providers },
       {
         headers: {
-          "Cache-Control":
-            "public, max-age=60, s-maxage=300, stale-while-revalidate=3600",
+          "Cache-Control": "no-store, max-age=0",
         },
       }
     );

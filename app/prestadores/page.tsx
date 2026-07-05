@@ -387,7 +387,7 @@ export default function PrestadoresPage({
       }
 
       try {
-        const res = await fetch("/api/providers");
+        const res = await fetch("/api/providers", { cache: "no-store" });
         const payload = (await res.json()) as {
           providers?: Prestador[];
           error?: string;
