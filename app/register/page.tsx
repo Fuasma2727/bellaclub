@@ -98,10 +98,10 @@ export default function RegisterPage() {
               Crea tu acceso a la red
             </p>
             <h1 className="max-w-xl text-4xl font-semibold leading-tight xl:text-5xl">
-              Unete como cliente o crea tu perfil de escort.
+              Unete como catador o crea tu perfil de escort.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-neutral-300">
-              Los clientes pueden explorar perfiles al instante. Las escorts
+              Los catadores pueden explorar perfiles al instante. Las escorts
               completan su perfil y solicitan verificacion antes de aparecer
               publicamente.
             </p>
@@ -167,7 +167,7 @@ export default function RegisterPage() {
                       }`}
                     >
                       <span className="block text-sm font-semibold">
-                        Cliente
+                        Catador
                       </span>
                       <span className="mt-1 block text-xs">
                         Explorar servicios
@@ -260,14 +260,15 @@ export default function RegisterPage() {
                 )}
 
                 {referralCode && role === "cliente" && (
-                  <div className="rounded-lg border border-amber-400/25 bg-amber-400/10 p-4">
-                    <p className="text-sm font-semibold text-amber-100">
-                      Referido solo para prestadores
+                  <div className="rounded-lg border border-blue-400/30 bg-blue-500/10 p-4 shadow-lg shadow-blue-950/20">
+                    <p className="text-sm font-semibold text-blue-100">
+                      Conviertete en Catador
                     </p>
                     <p className="mt-1 text-xs leading-5 text-neutral-300">
-                      Puedes registrarte como cliente normalmente, pero este
-                      enlace solo genera bono si se crea un perfil de escort y
-                      alcanza minimo nivel bronce.
+                      Explora perfiles al instante, guarda tus favoritos y
+                      desbloquea contenido dentro de BelaClub. Si prefieres
+                      crear un perfil de escort, este enlace puede activar bono
+                      al alcanzar minimo nivel bronce.
                     </p>
                   </div>
                 )}

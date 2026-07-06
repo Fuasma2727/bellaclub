@@ -126,6 +126,9 @@ export default function ExpandedMediaModal({
 
   if (!item.url) return null;
 
+  const expandedMediaClass =
+    "h-auto max-h-[90dvh] max-w-[calc(100vw-2rem)] w-auto rounded-lg object-contain";
+
   const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
     const start = touchStart.current;
     const end = event.changedTouches[0];
@@ -184,7 +187,7 @@ export default function ExpandedMediaModal({
             src={item.url}
             alt="Contenido ampliado"
             draggable={false}
-            className="max-h-[90vh] w-auto rounded-lg object-contain"
+            className={expandedMediaClass}
           />
         ) : item.type === "photo" ? (
           <Image
@@ -193,7 +196,7 @@ export default function ExpandedMediaModal({
             width={1600}
             height={1600}
             draggable={false}
-            className="max-h-[90vh] w-auto rounded-lg object-contain"
+            className={expandedMediaClass}
           />
         ) : (
           <video
@@ -203,7 +206,7 @@ export default function ExpandedMediaModal({
             controlsList="nodownload noplaybackrate"
             disablePictureInPicture
             onContextMenu={(event) => event.preventDefault()}
-            className="max-h-[90vh] w-auto rounded-lg object-contain"
+            className={`${expandedMediaClass} bg-black`}
           />
         )}
 

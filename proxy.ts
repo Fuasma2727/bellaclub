@@ -9,7 +9,7 @@ const normalizeHost = (value: string) =>
     .toLowerCase()
     .replace(/:\d+$/, "");
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return NextResponse.next();
   }

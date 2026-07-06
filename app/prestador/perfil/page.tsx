@@ -3642,39 +3642,43 @@ export default function PerfilPrestador() {
         )}
 
         {expandedMedia && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setExpandedMedia(null)}
-        >
-          <div className="relative inline-flex" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              aria-label="Cerrar"
-              onClick={() => setExpandedMedia(null)}
-              className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/70 text-xl text-white"
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+            onClick={() => setExpandedMedia(null)}
+          >
+            <div
+              className="relative inline-flex"
+              onClick={(e) => e.stopPropagation()}
             >
-              ×
-            </button>
+              <button
+                type="button"
+                aria-label="Cerrar"
+                onClick={() => setExpandedMedia(null)}
+                className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/70 text-xl text-white"
+              >
+                ×
+              </button>
 
-            {mediaList[currentIndex]?.type === "photo" ? (
-              <Image
-                src={mediaList[currentIndex].url}
-                alt="Contenido ampliado"
-                width={1400}
-                height={1400}
-                className="max-h-[90vh] w-auto rounded-lg object-contain"
-              />
-            ) : (
-              <video
-                src={mediaList[currentIndex].url}
-                controls
-                autoPlay
-                className="max-h-[90vh] w-auto rounded-lg object-contain"
-              />
-            )}
+              {mediaList[currentIndex]?.type === "photo" ? (
+                <Image
+                  src={mediaList[currentIndex].url}
+                  alt="Contenido ampliado"
+                  width={1400}
+                  height={1400}
+                  className="h-auto max-h-[90dvh] max-w-[calc(100vw-2rem)] w-auto rounded-lg object-contain"
+                />
+              ) : (
+                <video
+                  src={mediaList[currentIndex].url}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="h-auto max-h-[90dvh] max-w-[calc(100vw-2rem)] w-auto rounded-lg bg-black object-contain"
+                />
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
