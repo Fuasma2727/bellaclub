@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     "abonos seguros",
   ],
   alternates: {
-    canonical: "/prestadores",
+    canonical: "/escorts",
   },
   icons: {
     icon: "/favicon.ico",

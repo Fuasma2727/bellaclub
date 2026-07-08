@@ -10,7 +10,6 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: [
           "/",
-          "/prestadores",
           "/prepagos",
           "/escorts",
           "/acompanantes",

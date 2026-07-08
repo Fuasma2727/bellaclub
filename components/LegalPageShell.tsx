@@ -9,7 +9,7 @@ export default function LegalPageShell({ children }: PropsWithChildren) {
   return (
     <main
       className="min-h-screen cursor-pointer bg-[#050505] px-6 py-10 text-white"
-      onClick={() => router.push("/prestadores")}
+      onClick={() => router.push("/escorts")}
       aria-label="Cerrar y volver a BelaClub"
     >
       <section

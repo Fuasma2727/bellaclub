@@ -118,6 +118,20 @@ type FinanceSummaryResponse = {
   error?: string;
 };
 
+type AdminUserItem = {
+  id: string;
+  name: string;
+  email?: string;
+  role?: string;
+  createdAt?: string | null;
+  isOwner?: boolean;
+};
+
+type AdminUsersResponse = {
+  users?: AdminUserItem[];
+  error?: string;
+};
+
 type VerificationAction =
   | "approve"
   | "reject"
@@ -177,11 +191,18 @@ const money = (value?: number | null) => {
   return `$${Number(value || 0).toLocaleString("es-CO")}`;
 };
 
+const userRoleLabel = (role?: string) => {
+  if (role === "prestador") return "Prestador";
+  if (role === "cliente") return "Cliente";
+  return "Usuario";
+};
+
 export default function AdminVerificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const [providers, setProviders] = useState<ProviderVerification[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUserItem[]>([]);
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(
     null
   );
@@ -190,7 +211,7 @@ export default function AdminVerificationsPage() {
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [activeView, setActiveView] = useState<
-    "requests" | "blocked" | "reports" | "withdrawals"
+    "requests" | "blocked" | "reports" | "withdrawals" | "users"
   >("requests");
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     null
@@ -241,6 +262,47 @@ export default function AdminVerificationsPage() {
         setReports(data.reports || []);
         setProviders([]);
         setWithdrawals([]);
+        setAdminUsers([]);
+        return;
+      }
+
+      if (activeView === "users") {
+        if (!search.trim()) {
+          const summaryRes = await summaryPromise;
+          const summaryData =
+            (await summaryRes.json()) as FinanceSummaryResponse;
+
+          if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
+
+          setAdminUsers([]);
+          setProviders([]);
+          setReports([]);
+          setWithdrawals([]);
+          return;
+        }
+
+        const queryString = params.toString() ? `?${params.toString()}` : "";
+        const [res, summaryRes] = await Promise.all([
+          fetch(`/api/admin/users${queryString}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          summaryPromise,
+        ]);
+        const data = (await res.json()) as AdminUsersResponse;
+        const summaryData =
+          (await summaryRes.json()) as FinanceSummaryResponse;
+
+        if (!res.ok) {
+          throw new Error(data.error || "No pudimos cargar los usuarios");
+        }
+        if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
+
+        setAdminUsers(data.users || []);
+        setProviders([]);
+        setReports([]);
+        setWithdrawals([]);
         return;
       }
 
@@ -267,6 +329,7 @@ export default function AdminVerificationsPage() {
         setWithdrawals(data.withdrawals || []);
         setReports([]);
         setProviders([]);
+        setAdminUsers([]);
         return;
       }
 
@@ -292,6 +355,7 @@ export default function AdminVerificationsPage() {
       setProviders(data.providers || []);
       setReports([]);
       setWithdrawals([]);
+      setAdminUsers([]);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "No pudimos cargar el panel";
@@ -605,6 +669,56 @@ export default function AdminVerificationsPage() {
         error instanceof Error
           ? error.message
           : "No pudimos actualizar la solicitud";
+      setMessage(errorMessage);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleDeleteAdminUser = async (target: AdminUserItem) => {
+    if (!user || target.isOwner) return;
+
+    const confirmed = window.confirm(
+      `Esta accion elimina por completo a ${
+        target.name || target.email || "este usuario"
+      }, incluyendo cuenta de acceso y registros asociados. No se puede deshacer. Quieres continuar?`
+    );
+
+    if (!confirmed) return;
+
+    const confirmText =
+      window.prompt("Escribe ELIMINAR para confirmar el borrado total.") || "";
+
+    if (confirmText !== "ELIMINAR") return;
+
+    const actionKey = `user:${target.id}`;
+    setActionId(actionKey);
+    setMessage("");
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/users/${target.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ confirmText }),
+      });
+      const data = (await res.json()) as { error?: string };
+
+      if (!res.ok) {
+        throw new Error(data.error || "No pudimos eliminar el usuario");
+      }
+
+      setAdminUsers((current) =>
+        current.filter((item) => item.id !== target.id)
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "No pudimos eliminar el usuario";
       setMessage(errorMessage);
     } finally {
       setActionId(null);
@@ -1323,7 +1437,8 @@ export default function AdminVerificationsPage() {
   const selectedProvider =
     selectedProviderId &&
     activeView !== "reports" &&
-    activeView !== "withdrawals"
+    activeView !== "withdrawals" &&
+    activeView !== "users"
       ? providers.find((provider) => provider.id === selectedProviderId) || null
       : null;
   const isLoading = authLoading || loading;
@@ -1332,6 +1447,8 @@ export default function AdminVerificationsPage() {
       ? reports.length > 0
       : activeView === "withdrawals"
         ? withdrawals.length > 0
+      : activeView === "users"
+        ? adminUsers.length > 0
         : providers.length > 0;
 
   return (
@@ -1340,7 +1457,7 @@ export default function AdminVerificationsPage() {
         <header className="flex flex-col gap-5 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link
-              href="/prestadores"
+              href="/escorts"
               className="mb-6 inline-flex items-center gap-3"
             >
               <Image
@@ -1365,7 +1482,7 @@ export default function AdminVerificationsPage() {
           </div>
 
           <Link
-            href="/prestadores"
+            href="/escorts"
             className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-neutral-300 transition hover:border-white/20 hover:text-white"
           >
             Ver sitio publico
@@ -1504,6 +1621,17 @@ export default function AdminVerificationsPage() {
               >
                 Retiros
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveView("users")}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  activeView === "users"
+                    ? "bg-emerald-500 text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Usuarios
+              </button>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -1518,6 +1646,8 @@ export default function AdminVerificationsPage() {
                     ? "Buscar reporte por prestador, correo, WhatsApp o motivo"
                     : activeView === "withdrawals"
                       ? "Buscar retiro por prestador, correo, titular, banco o cuenta"
+                    : activeView === "users"
+                      ? "Escribe nombre o correo del usuario"
                     : activeView === "blocked"
                     ? "Buscar bloqueado por nombre, correo o WhatsApp"
                     : "Buscar por nombre, correo o WhatsApp"
@@ -1548,7 +1678,15 @@ export default function AdminVerificationsPage() {
 
         {isLoading && (
           <div className="mt-10 rounded-lg border border-white/10 bg-neutral-950 p-8 text-center text-neutral-400">
-            Cargando prestadores...
+            {activeView === "users"
+              ? search.trim()
+                ? "Buscando usuario..."
+                : "Preparando busqueda..."
+              : activeView === "reports"
+                ? "Cargando reportes..."
+              : activeView === "withdrawals"
+                ? "Cargando retiros..."
+              : "Cargando prestadores..."}
           </div>
         )}
 
@@ -1561,6 +1699,10 @@ export default function AdminVerificationsPage() {
                   ? "No hay reportes"
                 : activeView === "withdrawals"
                   ? "No hay retiros"
+                : activeView === "users"
+                  ? search
+                    ? "No hay resultados"
+                    : "Busca un usuario"
                 : activeView === "blocked"
                   ? "No hay bloqueados"
                   : "No hay solicitudes"}
@@ -1572,10 +1714,80 @@ export default function AdminVerificationsPage() {
                   ? "Cuando un usuario reporte un perfil aparecera aqui."
                 : activeView === "withdrawals"
                   ? "Cuando un prestador solicite retirar saldo aparecera aqui."
+                : activeView === "users"
+                  ? search
+                    ? "Prueba con otro nombre o correo."
+                    : "Escribe en la barra de busqueda para mostrar solo el usuario que necesitas."
                 : activeView === "blocked"
                   ? "No tienes perfiles bloqueados en este momento."
                   : "Cuando un prestador solicite aprobacion o una insignia aparecera aqui."}
             </p>
+          </section>
+        )}
+
+        {user && !isLoading && activeView === "users" && adminUsers.length > 0 && (
+          <section className="mt-8 overflow-hidden rounded-lg border border-white/10 bg-neutral-950">
+            <div className="grid grid-cols-[1fr_auto] border-b border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
+              <span>Usuario</span>
+              <span>Accion</span>
+            </div>
+
+            <div className="divide-y divide-white/10">
+              {adminUsers.map((adminUser) => {
+                const actionKey = `user:${adminUser.id}`;
+
+                return (
+                  <article
+                    key={adminUser.id}
+                    className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-4"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {adminUser.name}
+                        </p>
+                        {adminUser.isOwner && (
+                          <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-100">
+                            Admin
+                          </span>
+                        )}
+                        {adminUser.role && (
+                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                            {userRoleLabel(adminUser.role)}
+                          </span>
+                        )}
+                      </div>
+                      {adminUser.email && (
+                        <p className="mt-1 truncate text-xs text-neutral-500">
+                          {adminUser.email}
+                        </p>
+                      )}
+                      {adminUser.createdAt && (
+                        <p className="mt-1 text-xs text-neutral-600">
+                          Registro:{" "}
+                          {new Date(adminUser.createdAt).toLocaleDateString(
+                            "es-CO"
+                          )}
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={adminUser.isOwner || actionId === actionKey}
+                      onClick={() => void handleDeleteAdminUser(adminUser)}
+                      className="rounded-md border border-red-500/35 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {actionId === actionKey
+                        ? "Eliminando..."
+                        : adminUser.isOwner
+                          ? "Protegido"
+                          : "Eliminar"}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
           </section>
         )}
 

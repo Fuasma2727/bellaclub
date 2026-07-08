@@ -65,7 +65,7 @@ export default function RegisterPage() {
       if (referralCode) {
         window.localStorage.removeItem("belaclub_ref");
       }
-      router.push(role === "prestador" ? "/prestador/perfil" : "/prestadores");
+      router.push(role === "prestador" ? "/prestador/perfil" : "/escorts");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "No pudimos crear la cuenta";
@@ -81,7 +81,7 @@ export default function RegisterPage() {
         <div className="grid w-full gap-10 lg:grid-cols-[1fr_1fr] lg:items-center">
           <section className="hidden lg:block">
             <Link
-              href="/prestadores"
+              href="/escorts"
               className="mb-14 inline-flex items-center gap-3"
             >
               <Image
@@ -125,7 +125,7 @@ export default function RegisterPage() {
 
           <section className="mx-auto w-full max-w-md">
             <Link
-              href="/prestadores"
+              href="/escorts"
               className="mb-8 flex items-center justify-center gap-3 lg:hidden"
             >
               <Image

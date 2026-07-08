@@ -105,8 +105,7 @@ const uploadToBunny = async ({
     method: "PUT",
     headers,
     body,
-    duplex: "half",
-  } as RequestInit & { duplex: "half" });
+  });
 
   if (!upload.ok) {
     const errorText = await upload.text();
@@ -178,9 +177,25 @@ export async function POST(request: Request) {
         );
       }
 
+      const body = await request.arrayBuffer();
+
+      if (!body.byteLength) {
+        return NextResponse.json(
+          { error: "No se recibio ningun archivo" },
+          { status: 400 }
+        );
+      }
+
+      if (body.byteLength > maxSize * 1024 * 1024) {
+        return NextResponse.json(
+          { error: `El archivo supera el limite de ${maxSize} MB` },
+          { status: 400 }
+        );
+      }
+
       return uploadToBunny({
-        body: request.body,
-        contentLength,
+        body,
+        contentLength: body.byteLength || contentLength,
         contentType,
         filename,
         uid: decoded.uid,
@@ -216,7 +231,7 @@ export async function POST(request: Request) {
     }
 
     return uploadToBunny({
-      body: file.stream(),
+      body: await file.arrayBuffer(),
       contentLength: file.size,
       contentType,
       filename: file.name,

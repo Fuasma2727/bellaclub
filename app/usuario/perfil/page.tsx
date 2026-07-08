@@ -198,6 +198,13 @@ export default function PerfilUsuario() {
   const currentStep =
     levelSteps.find((step) => step.level === progress.level) || levelSteps[0];
   const nextStep = levelSteps.find((step) => !step.completed && !step.locked);
+  const visibleLevelSteps =
+    nextStep && nextStep.level !== currentStep.level
+      ? [currentStep, nextStep]
+      : [currentStep];
+  const showUnlockedContentStat =
+    progress.level >= 2 || nextStep?.level === 2;
+  const showServiceDepositStat = progress.level >= 3 || nextStep?.level === 3;
   const progressPercent = Math.round((progress.level / progress.maxLevel) * 100);
 
   const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,7 +281,7 @@ export default function PerfilUsuario() {
       return;
     }
 
-    router.push("/prestadores");
+    router.push("/escorts");
   };
 
   if (loading || pageLoading) {
@@ -403,10 +410,9 @@ export default function PerfilUsuario() {
                     Conviértete en Catador Premium
                   </h2>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
-                    Sube de nivel desbloqueando contenido, realizando abonos y
-                    manteniendo saldo disponible. Al llegar a Catador Premium
-                    podrás ser tenido en cuenta para experiencias gratuitas con
-                    retroalimentación privada.
+                    Completa el reto visible para revelar el siguiente nivel.
+                    Al llegar a Catador Premium podrás ser tenido en cuenta
+                    para experiencias gratuitas con retroalimentación privada.
                   </p>
                 </div>
 
@@ -441,26 +447,30 @@ export default function PerfilUsuario() {
                   {money(progress.balance)}
                 </p>
               </div>
-              <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
-                  Contenido oculto
-                </p>
-                <p className="mt-2 text-xl font-semibold text-white">
-                  {progress.unlockedContentCount}
-                </p>
-              </div>
-              <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
-                  Abonos realizados
-                </p>
-                <p className="mt-2 text-xl font-semibold text-white">
-                  {progress.serviceDepositCount}
-                </p>
-              </div>
+              {showUnlockedContentStat && (
+                <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                    Contenido oculto
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-white">
+                    {progress.unlockedContentCount}
+                  </p>
+                </div>
+              )}
+              {showServiceDepositStat && (
+                <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                    Abonos realizados
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-white">
+                    {progress.serviceDepositCount}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-3 lg:grid-cols-2">
-              {levelSteps.map((step) => (
+              {visibleLevelSteps.map((step) => (
                 <article
                   key={step.level}
                   className={`rounded-md border p-4 transition ${

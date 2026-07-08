@@ -207,7 +207,7 @@ export default function Header() {
 
   const handleLogout = async () => {
     await logoutUser();
-    window.location.href = "/prestadores";
+    window.location.href = "/escorts";
   };
 
   const handleRecharge = async () => {
@@ -324,7 +324,7 @@ export default function Header() {
         <div className="w-full px-3 sm:px-6">
           <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-3">
             <Link
-              href="/prestadores"
+              href="/escorts"
               className="flex min-w-0 items-center gap-2"
             >
               <Image
@@ -356,7 +356,7 @@ export default function Header() {
         <div className="w-full px-3 sm:px-6">
           <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-3">
             <Link
-              href="/prestadores"
+              href="/escorts"
               className="flex min-w-0 items-center gap-2"
             >
               <Image

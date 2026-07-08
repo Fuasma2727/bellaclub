@@ -307,6 +307,60 @@ const uploadWithTimeout = async (
   return Promise.race([request(), timeout]);
 };
 
+const createUploadProgressSmoother = (
+  onProgress: (progress: number) => void
+) => {
+  let shown = 0;
+  let target = 3;
+  let stopped = false;
+
+  const publish = () => {
+    onProgress(Math.max(0, Math.min(100, Math.round(shown))));
+  };
+
+  const interval = window.setInterval(() => {
+    if (stopped || shown >= target) return;
+
+    const gap = target - shown;
+    const step = gap > 28 ? 5 : gap > 12 ? 3 : 1;
+
+    shown = Math.min(target, shown + step);
+    publish();
+  }, 140);
+
+  onProgress(0);
+
+  return {
+    setTarget(nextTarget: number) {
+      target = Math.max(target, Math.min(99, nextTarget));
+    },
+    finish() {
+      stopped = true;
+      window.clearInterval(interval);
+
+      return new Promise<void>((resolve) => {
+        const finishInterval = window.setInterval(() => {
+          const gap = 100 - shown;
+
+          if (gap <= 0) {
+            window.clearInterval(finishInterval);
+            onProgress(100);
+            resolve();
+            return;
+          }
+
+          shown = Math.min(100, shown + Math.max(4, Math.ceil(gap / 4)));
+          publish();
+        }, 70);
+      });
+    },
+    stop() {
+      stopped = true;
+      window.clearInterval(interval);
+    },
+  };
+};
+
 const uploadFileBinary = async (
   file: File,
   token: string,
@@ -423,6 +477,7 @@ const uploadFileWithProgress = (
 
   return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    const progress = createUploadProgressSmoother(onProgress);
 
     xhr.open("POST", "/api/upload-profile-photo");
     xhr.timeout = 5 * 60 * 1000;
@@ -434,32 +489,46 @@ const uploadFileWithProgress = (
 
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || event.total <= 0) {
-        onProgress(5);
+        progress.setTarget(12);
         return;
       }
 
-      onProgress(Math.min(99, Math.max(1, Math.round((event.loaded / event.total) * 100))));
+      const uploadPercent = event.loaded / event.total;
+      progress.setTarget(6 + uploadPercent * 68);
+    };
+
+    xhr.upload.onload = () => {
+      progress.setTarget(88);
     };
 
     xhr.onload = () => {
       const data = parseUploadResponseText(xhr.status, xhr.responseText || "");
 
       if (xhr.status >= 200 && xhr.status < 300 && data.url) {
-        onProgress(100);
-        resolve(data.url);
+        const uploadedUrl = data.url;
+
+        progress.setTarget(96);
+        progress.finish().then(() => resolve(uploadedUrl));
         return;
       }
 
+      progress.stop();
+      const error = new Error(
+        data.error || data.details || "No pudimos subir el archivo"
+      ) as Error & { status?: number };
+      error.status = xhr.status;
       reject(
-        new Error(data.error || data.details || "No pudimos subir el archivo")
+        error
       );
     };
 
     xhr.onerror = () => {
+      progress.stop();
       reject(new Error("No pudimos conectar con el servidor de subida."));
     };
 
     xhr.ontimeout = () => {
+      progress.stop();
       reject(
         new Error(
           "La subida tardo demasiado. Intenta con un video mas liviano o revisa la conexion."
@@ -467,9 +536,61 @@ const uploadFileWithProgress = (
       );
     };
 
-    onProgress(0);
     xhr.send(file);
   });
+};
+
+const uploadFileWithProgressFallback = async (
+  file: File,
+  token: string,
+  onProgress: (progress: number) => void
+) => {
+  let progressError: unknown = null;
+
+  try {
+    return await uploadFileWithProgress(file, token, onProgress);
+  } catch (error) {
+    progressError = error;
+  }
+
+  const status =
+    typeof progressError === "object" &&
+    progressError !== null &&
+    "status" in progressError
+      ? Number((progressError as { status?: number }).status || 0)
+      : 0;
+
+  if (status === 401 || status === 403 || status === 413) {
+    throw progressError;
+  }
+
+  let res: Response;
+
+  try {
+    res = await uploadFileMultipart(file, token);
+  } catch (fallbackError) {
+    throw new Error(
+      fallbackError instanceof Error
+        ? fallbackError.message
+        : progressError instanceof Error
+          ? progressError.message
+          : "No pudimos subir el archivo"
+    );
+  }
+
+  const data = await parseUploadResponse(res);
+
+  if (!res.ok || !data.url) {
+    throw new Error(
+      data.error ||
+        data.details ||
+        (progressError instanceof Error ? progressError.message : "") ||
+        "No pudimos subir el archivo"
+    );
+  }
+
+  onProgress(100);
+  return data.url;
 };
 
 const getVideoDuration = (file: File) => {
@@ -1519,7 +1640,7 @@ export default function PerfilPrestador() {
                 });
               }
 
-              const url = await uploadFileWithProgress(
+              const url = await uploadFileWithProgressFallback(
                 item.file,
                 token,
                 (progress) => {
@@ -1965,7 +2086,7 @@ export default function PerfilPrestador() {
         setVerificationUploadProgress(progressItem);
         scrollToVerificationFileArea();
 
-        evidenceUrl = await uploadFileWithProgress(
+        evidenceUrl = await uploadFileWithProgressFallback(
           verificationFile,
           await user.getIdToken(),
           (progress) => {

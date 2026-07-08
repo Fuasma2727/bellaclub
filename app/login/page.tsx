@@ -29,7 +29,7 @@ export default function LoginPage() {
 
     try {
       await loginUser(email, password);
-      router.push("/prestadores");
+      router.push("/escorts");
     } catch {
       setMessageType("error");
       setMessage("Correo o contrasena incorrectos");
@@ -72,7 +72,7 @@ export default function LoginPage() {
         <div className="grid w-full gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <section className="hidden lg:block">
             <Link
-              href="/prestadores"
+              href="/escorts"
               className="mb-14 inline-flex items-center gap-3"
             >
               <Image
@@ -113,7 +113,7 @@ export default function LoginPage() {
 
           <section className="mx-auto w-full max-w-md">
             <Link
-              href="/prestadores"
+              href="/escorts"
               className="mb-8 flex items-center justify-center gap-3 lg:hidden"
             >
               <Image
@@ -223,7 +223,7 @@ export default function LoginPage() {
                 </p>
 
                 <Link
-                  href="/prestadores"
+                  href="/escorts"
                   className="text-neutral-500 hover:text-neutral-300 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
                   Explorar escorts sin iniciar sesion

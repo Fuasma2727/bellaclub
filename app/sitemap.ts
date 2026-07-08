@@ -26,17 +26,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.8,
     },
-    {
-      url: `${baseUrl}/prestadores`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 1,
-    },
     ...providerSearchRoutes.map((route) => ({
       url: `${baseUrl}/${route.segment}`,
       lastModified: now,
       changeFrequency: "daily" as const,
-      priority: route.key === "escorts" ? 0.95 : 0.9,
+      priority: route.key === "escorts" ? 1 : 0.9,
     })),
     {
       url: `${baseUrl}/terminos`,
@@ -70,12 +64,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const cityRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
-    url: `${baseUrl}/prestadores/${city.slug}`,
-    lastModified: now,
-    changeFrequency: "daily",
-    priority: targetCitySlugs.has(city.slug) ? 0.9 : 0.75,
-  }));
   const searchCityRoutes: MetadataRoute.Sitemap = providerSearchRoutes.flatMap(
     (route) =>
       cities.map((city) => ({
@@ -102,7 +90,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...staticRoutes,
-    ...cityRoutes,
     ...searchCityRoutes,
     ...profileRoutes,
   ];

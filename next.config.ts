@@ -20,6 +20,20 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  async redirects() {
+    return [
+      {
+        source: "/prestadores",
+        destination: "/escorts",
+        permanent: true,
+      },
+      {
+        source: "/prestadores/:citySlug",
+        destination: "/escorts/:citySlug",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

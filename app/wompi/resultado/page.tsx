@@ -106,7 +106,7 @@ function WompiResultContent() {
           <p className="mt-3 text-sm leading-6 text-current/80">{message}</p>
 
           <Link
-            href="/prestadores"
+            href="/escorts"
             className="mt-6 inline-flex rounded-md bg-white px-5 py-3 text-sm font-semibold text-[#101012] transition hover:bg-neutral-200"
           >
             Volver a escorts

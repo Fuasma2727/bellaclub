@@ -47,7 +47,7 @@ const supportTopics = [
 export default function SoportePage() {
   return (
     <LegalPageShell>
-        <Link href="/prestadores" className="text-sm font-semibold text-blue-300">
+        <Link href="/escorts" className="text-sm font-semibold text-blue-300">
           Volver a BelaClub
         </Link>
         <p className="mt-8 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">

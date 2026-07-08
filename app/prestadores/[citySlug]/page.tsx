@@ -48,12 +48,12 @@ export async function generateMetadata({
     title,
     description,
     alternates: {
-      canonical: `/prestadores/${city.slug}`,
+      canonical: `/escorts/${city.slug}`,
     },
     openGraph: {
       title: `${title} | BelaClub`,
       description,
-      url: `/prestadores/${city.slug}`,
+      url: `/escorts/${city.slug}`,
       siteName: "BelaClub",
       images: [
         {
@@ -82,7 +82,7 @@ export default async function PrestadoresCityPage({ params }: CityPageProps) {
   if (!city) notFound();
 
   const title = `Escorts en ${city.city}`;
-  const pageUrl = `${siteUrl}/prestadores/${city.slug}`;
+  const pageUrl = `${siteUrl}/escorts/${city.slug}`;
   const cityProviders = await getPublicProviderCards({ citySlug: city.slug });
 
   return (
@@ -117,7 +117,7 @@ export default async function PrestadoresCityPage({ params }: CityPageProps) {
                 "@type": "ListItem",
                 position: 2,
                 name: "Escorts",
-                item: `${siteUrl}/prestadores`,
+                item: `${siteUrl}/escorts`,
               },
               {
                 "@type": "ListItem",

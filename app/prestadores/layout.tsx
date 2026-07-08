@@ -15,13 +15,13 @@ export const metadata: Metadata = {
     "prepagos Medellín",
   ],
   alternates: {
-    canonical: "/prestadores",
+    canonical: "/escorts",
   },
   openGraph: {
     title: "Escorts verificadas | BelaClub",
     description:
       "Escorts verificadas, prepagos y acompañantes con galerias publicas, contenido privado y contacto directo dentro de BelaClub.",
-    url: "/prestadores",
+    url: "/escorts",
     siteName: "BelaClub",
     images: [
       {
