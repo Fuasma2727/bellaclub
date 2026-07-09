@@ -5,6 +5,7 @@ import {
   guardMutationRequest,
   securityErrorResponse,
 } from "@/lib/requestSecurity";
+import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 
 export const runtime = "nodejs";
 
@@ -79,12 +80,13 @@ export async function POST(request: Request) {
     if (
       user.verificationStatus !== "approved" ||
       user.profileVisible !== true ||
-      user.blocked === true
+      user.blocked === true ||
+      !isProviderSubscriptionPubliclyActive(user)
     ) {
       return NextResponse.json(
         {
           error:
-            "Tu perfil debe estar aprobado y visible para publicar video del dia.",
+            "Tu perfil debe estar aprobado, visible y al dia para publicar video del dia.",
         },
         { status: 403 }
       );

@@ -5,6 +5,7 @@ import {
   getPublicVerificationBadge,
   getVerificationLevelFromBadge,
 } from "@/lib/providerPromotion";
+import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 
 type MediaItem = {
   id?: string;
@@ -104,7 +105,8 @@ export async function GET(request: Request, { params }: Params) {
       data.profileVisible !== true ||
       data.verificationStatus !== "approved" ||
       !data.photoUrl ||
-      data.blocked === true
+      data.blocked === true ||
+      !isProviderSubscriptionPubliclyActive(data)
     ) {
       return NextResponse.json(
         { error: "Perfil no disponible" },

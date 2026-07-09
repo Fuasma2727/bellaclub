@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
 import { getAdminQualityRank } from "@/lib/providerPromotion";
+import { isProviderSubscriptionPastDue } from "@/lib/providerSubscription";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
@@ -76,6 +77,27 @@ const sanitizeMediaForAdmin = (value: unknown): AdminMediaItem[] => {
   return items.filter((item): item is AdminMediaItem => Boolean(item));
 };
 
+const matchesProviderSearch = (
+  provider: ProviderVerification,
+  query: string
+) => {
+  if (!query) return true;
+
+  const haystack = [
+    provider.name,
+    provider.email,
+    provider.whatsapp,
+    provider.city,
+    provider.department,
+    provider.zone,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(query);
+};
+
 export async function GET(request: Request) {
   try {
     await requireOwner(request);
@@ -133,37 +155,17 @@ export async function GET(request: Request) {
         if (filter === "blocked") {
           if (!provider.blocked) return false;
 
-          if (!query) return true;
+          return matchesProviderSearch(provider, query);
+        }
 
-          const haystack = [
-            provider.name,
-            provider.email,
-            provider.whatsapp,
-            provider.city,
-            provider.department,
-            provider.zone,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
+        if (filter === "past_due") {
+          if (!isProviderSubscriptionPastDue(provider)) return false;
 
-          return haystack.includes(query);
+          return matchesProviderSearch(provider, query);
         }
 
         if (query) {
-          const haystack = [
-            provider.name,
-            provider.email,
-            provider.whatsapp,
-            provider.city,
-            provider.department,
-            provider.zone,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-
-          return haystack.includes(query);
+          return matchesProviderSearch(provider, query);
         }
 
         return (
@@ -176,6 +178,16 @@ export async function GET(request: Request) {
         if (filter === "blocked") {
           return String(b.blockedAt || b.createdAt || "").localeCompare(
             String(a.blockedAt || a.createdAt || "")
+          );
+        }
+
+        if (filter === "past_due") {
+          return String(
+            a.subscriptionNextChargeAt || a.blockedAt || a.createdAt || ""
+          ).localeCompare(
+            String(
+              b.subscriptionNextChargeAt || b.blockedAt || b.createdAt || ""
+            )
           );
         }
 

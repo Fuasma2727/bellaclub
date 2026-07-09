@@ -39,6 +39,54 @@ type NotificationItem = {
   };
 };
 
+const toDate = (value: unknown) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof value.toDate === "function"
+  ) {
+    return value.toDate() as Date;
+  }
+
+  return null;
+};
+
+const isProviderSubscriptionPastDue = (data: Record<string, unknown>) => {
+  if (data.role !== "prestador" || data.verificationStatus !== "approved") {
+    return false;
+  }
+
+  if (
+    data.subscriptionManualOverride === true ||
+    data.subscriptionStatus === "admin_override" ||
+    data.subscriptionStatus === "paused"
+  ) {
+    return false;
+  }
+
+  if (
+    data.blockedReason === "subscription_unpaid" ||
+    data.subscriptionStatus === "past_due" ||
+    data.subscriptionStatus === "pending_payment"
+  ) {
+    return true;
+  }
+
+  const nextChargeAt = toDate(data.subscriptionNextChargeAt);
+
+  if (data.subscriptionStatus === "active") {
+    return !nextChargeAt || nextChargeAt.getTime() <= Date.now();
+  }
+
+  return false;
+};
+
 export default function Header() {
   const { user } = useAuth();
   const db = getFirestore(app);
@@ -73,6 +121,8 @@ export default function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [providerCanPostDailyVideo, setProviderCanPostDailyVideo] =
+    useState(false);
+  const [providerSubscriptionPastDue, setProviderSubscriptionPastDue] =
     useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -117,14 +167,18 @@ export default function Header() {
       if (!snap.exists()) return;
 
       const data = snap.data();
+      const subscriptionPastDue = isProviderSubscriptionPastDue(data);
+
       setRole(data.role || null);
       setBalance(Number(data.balance || 0));
+      setProviderSubscriptionPastDue(subscriptionPastDue);
       setProviderCanPostDailyVideo(
         data.role === "prestador" &&
           data.verificationStatus === "approved" &&
           data.profileVisible === true &&
           data.profilePaused !== true &&
-          data.blocked !== true
+          data.blocked !== true &&
+          !subscriptionPastDue
       );
     });
 
@@ -236,6 +290,20 @@ export default function Header() {
 
     if (data.url) window.location.href = data.url;
     else alert(data.error || "Error generando el pago");
+  };
+
+  const openBalanceModal = () => {
+    resetBalanceModal();
+    setBalanceMode("recharge");
+
+    if (providerSubscriptionPastDue) {
+      setBalanceContext("subscription");
+      setSelectedRechargeAmount(providerMonthlyFee);
+    } else {
+      setBalanceContext(null);
+    }
+
+    setModalOpen(true);
   };
 
   const handleWithdraw = async () => {
@@ -528,13 +596,26 @@ export default function Header() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    resetBalanceModal();
-                    setBalanceMode("recharge");
-                    setBalanceContext(null);
-                    setModalOpen(true);
-                  }}
-                  className="whitespace-nowrap rounded-md bg-green-500 px-2 py-1 text-[11px] font-semibold text-white shadow-lg shadow-emerald-950/20 transition hover:bg-green-400 min-[380px]:text-xs sm:px-3 sm:text-sm"
+                  onClick={openBalanceModal}
+                  title={
+                    providerSubscriptionPastDue
+                      ? "Mensualidad vencida. Recarga saldo para reactivar tu perfil."
+                      : "Abrir saldo"
+                  }
+                  aria-label={
+                    providerSubscriptionPastDue
+                      ? `Saldo ${balance.toLocaleString(
+                          "es-CO"
+                        )}. Mensualidad vencida. Abrir recarga.`
+                      : `Saldo ${balance.toLocaleString(
+                          "es-CO"
+                        )}. Abrir saldo.`
+                  }
+                  className={`whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-white shadow-lg transition min-[380px]:text-xs sm:px-3 sm:text-sm ${
+                    providerSubscriptionPastDue
+                      ? "border border-red-300/40 bg-red-600 shadow-red-950/35 hover:bg-red-500"
+                      : "bg-green-500 shadow-emerald-950/20 hover:bg-green-400"
+                  }`}
                 >
                   ${balance.toLocaleString("es-CO")}
                 </button>
@@ -791,6 +872,12 @@ export default function Header() {
                 <>
                   {balanceContext === "subscription" && (
                     <div className="mb-5 rounded-lg border border-amber-300/25 bg-amber-300/[0.08] p-4 text-sm leading-6 text-amber-50">
+                      {providerSubscriptionPastDue && (
+                        <p className="mb-3 rounded-md border border-red-300/25 bg-red-500/15 p-3 font-semibold text-red-50">
+                          Tu perfil esta vencido por mensualidad pendiente.
+                          Recarga saldo para que vuelva a estar activo.
+                        </p>
+                      )}
                       <p className="font-semibold text-amber-100">
                         Mensualidad BelaClub: $
                         {providerMonthlyFee.toLocaleString("es-CO")}

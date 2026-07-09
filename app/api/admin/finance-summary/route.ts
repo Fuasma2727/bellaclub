@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
+import {
+  isProviderSubscriptionPastDue,
+  isProviderSubscriptionPubliclyActive,
+} from "@/lib/providerSubscription";
 
 const sumNumber = (value: unknown) => Math.floor(Number(value || 0));
 
@@ -33,8 +37,8 @@ export async function GET(request: Request) {
       const data = doc.data();
       return total + sumNumber(data.amount || data.commissionAmount);
     }, 0);
-    const pastDueProviders = providers.filter(
-      (provider) => provider.subscriptionStatus === "past_due"
+    const pastDueProviders = providers.filter((provider) =>
+      isProviderSubscriptionPastDue(provider)
     ).length;
     const blockedProviders = providers.filter((provider) =>
       Boolean(provider.blocked)
@@ -43,7 +47,8 @@ export async function GET(request: Request) {
       (provider) =>
         provider.verificationStatus === "approved" &&
         provider.profileVisible === true &&
-        !provider.blocked
+        !provider.blocked &&
+        isProviderSubscriptionPubliclyActive(provider)
     ).length;
 
     return NextResponse.json({

@@ -21,6 +21,10 @@ const addOneMonth = (date: Date) => {
 const toDate = (value: unknown) => {
   if (!value) return null;
   if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
   if (
     typeof value === "object" &&
     "toDate" in value &&
@@ -29,6 +33,67 @@ const toDate = (value: unknown) => {
     return value.toDate() as Date;
   }
   return null;
+};
+
+export const isProviderSubscriptionPubliclyActive = (
+  user: {
+    subscriptionStatus?: unknown;
+    subscriptionManualOverride?: unknown;
+    subscriptionNextChargeAt?: unknown;
+  },
+  now = new Date()
+) => {
+  if (
+    user.subscriptionManualOverride === true ||
+    user.subscriptionStatus === "admin_override"
+  ) {
+    return true;
+  }
+
+  if (user.subscriptionStatus !== "active") return false;
+
+  const nextChargeAt = toDate(user.subscriptionNextChargeAt);
+
+  return Boolean(nextChargeAt && nextChargeAt.getTime() > now.getTime());
+};
+
+export const isProviderSubscriptionPastDue = (
+  user: {
+    blockedReason?: unknown;
+    subscriptionStatus?: unknown;
+    subscriptionManualOverride?: unknown;
+    subscriptionNextChargeAt?: unknown;
+    verificationStatus?: unknown;
+  },
+  now = new Date()
+) => {
+  if (user.verificationStatus && user.verificationStatus !== "approved") {
+    return false;
+  }
+
+  if (
+    user.subscriptionManualOverride === true ||
+    user.subscriptionStatus === "admin_override" ||
+    user.subscriptionStatus === "paused"
+  ) {
+    return false;
+  }
+
+  if (
+    user.blockedReason === "subscription_unpaid" ||
+    user.subscriptionStatus === "past_due" ||
+    user.subscriptionStatus === "pending_payment"
+  ) {
+    return true;
+  }
+
+  const nextChargeAt = toDate(user.subscriptionNextChargeAt);
+
+  if (user.subscriptionStatus === "active") {
+    return !nextChargeAt || nextChargeAt.getTime() <= now.getTime();
+  }
+
+  return !user.subscriptionStatus;
 };
 
 const shouldNotifyFailedPayment = (value: unknown) => {

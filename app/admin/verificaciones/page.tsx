@@ -197,6 +197,34 @@ const userRoleLabel = (role?: string) => {
   return "Usuario";
 };
 
+const isPastDueProvider = (provider: ProviderVerification) => {
+  if (
+    provider.subscriptionManualOverride ||
+    provider.subscriptionStatus === "admin_override" ||
+    provider.subscriptionStatus === "paused"
+  ) {
+    return false;
+  }
+
+  if (
+    provider.blockedReason === "subscription_unpaid" ||
+    provider.subscriptionStatus === "past_due" ||
+    provider.subscriptionStatus === "pending_payment"
+  ) {
+    return true;
+  }
+
+  if (provider.subscriptionStatus === "active") {
+    const nextChargeAt = provider.subscriptionNextChargeAt
+      ? new Date(provider.subscriptionNextChargeAt)
+      : null;
+
+    return !nextChargeAt || nextChargeAt.getTime() <= Date.now();
+  }
+
+  return !provider.subscriptionStatus;
+};
+
 export default function AdminVerificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const [providers, setProviders] = useState<ProviderVerification[]>([]);
@@ -211,7 +239,7 @@ export default function AdminVerificationsPage() {
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [activeView, setActiveView] = useState<
-    "requests" | "blocked" | "reports" | "withdrawals" | "users"
+    "requests" | "blocked" | "past_due" | "reports" | "withdrawals" | "users"
   >("requests");
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     null
@@ -334,6 +362,7 @@ export default function AdminVerificationsPage() {
       }
 
       if (activeView === "blocked") params.set("filter", "blocked");
+      if (activeView === "past_due") params.set("filter", "past_due");
 
       const queryString = params.toString() ? `?${params.toString()}` : "";
       const [res, summaryRes] = await Promise.all([
@@ -619,6 +648,10 @@ export default function AdminVerificationsPage() {
           action === "disableSubscription" ||
           action === "enableSubscription"
         ) {
+          if (action === "disableSubscription" && activeView === "past_due") {
+            return current.filter((item) => item.id !== provider.id);
+          }
+
           return current.map((item) => {
             if (item.id !== provider.id) return item;
 
@@ -1091,6 +1124,7 @@ export default function AdminVerificationsPage() {
     const subscriptionDisabled =
       provider.subscriptionManualOverride ||
       provider.subscriptionStatus === "admin_override";
+    const subscriptionPastDue = isPastDueProvider(provider);
     const subscriptionAction: VerificationAction = subscriptionDisabled
       ? "enableSubscription"
       : "disableSubscription";
@@ -1134,7 +1168,12 @@ export default function AdminVerificationsPage() {
             <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-200">
               {provider.blockedReason === "subscription_unpaid"
                 ? "Mensualidad pendiente"
-              : "Bloqueado"}
+                : "Bloqueado"}
+            </span>
+          )}
+          {!provider.blocked && subscriptionPastDue && (
+            <span className="rounded-full border border-orange-400/30 bg-orange-400/10 px-2.5 py-1 text-[11px] font-medium text-orange-100">
+              Mensualidad vencida
             </span>
           )}
           {provider.adminQualityRank && (
@@ -1182,6 +1221,14 @@ export default function AdminVerificationsPage() {
                   : provider.subscriptionStatus === "admin_override"
                     ? "Desactivada por admin"
                     : "Por cobrar"}
+            </p>
+          )}
+          {provider.subscriptionNextChargeAt && (
+            <p>
+              Cobro:{" "}
+              {new Date(provider.subscriptionNextChargeAt).toLocaleDateString(
+                "es-CO"
+              )}
             </p>
           )}
           {provider.createdAt && (
@@ -1569,7 +1616,7 @@ export default function AdminVerificationsPage() {
                     {financeSummary.providerCount}
                   </p>
                   <p className="mt-1 text-xs text-neutral-400">
-                    {financeSummary.pastDueProviders} vencidos ·{" "}
+                    {financeSummary.pastDueProviders} vencidos /{" "}
                     {financeSummary.blockedProviders} bloqueados.
                   </p>
                 </div>
@@ -1598,6 +1645,17 @@ export default function AdminVerificationsPage() {
                 }`}
               >
                 Bloqueados
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveView("past_due")}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  activeView === "past_due"
+                    ? "bg-orange-500 text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Vencidos
               </button>
               <button
                 type="button"
@@ -1648,6 +1706,8 @@ export default function AdminVerificationsPage() {
                       ? "Buscar retiro por prestador, correo, titular, banco o cuenta"
                     : activeView === "users"
                       ? "Escribe nombre o correo del usuario"
+                    : activeView === "past_due"
+                    ? "Buscar vencido por nombre, correo o WhatsApp"
                     : activeView === "blocked"
                     ? "Buscar bloqueado por nombre, correo o WhatsApp"
                     : "Buscar por nombre, correo o WhatsApp"
@@ -1686,6 +1746,8 @@ export default function AdminVerificationsPage() {
                 ? "Cargando reportes..."
               : activeView === "withdrawals"
                 ? "Cargando retiros..."
+              : activeView === "past_due"
+                ? "Cargando vencidos..."
               : "Cargando prestadores..."}
           </div>
         )}
@@ -1703,6 +1765,8 @@ export default function AdminVerificationsPage() {
                   ? search
                     ? "No hay resultados"
                     : "Busca un usuario"
+                : activeView === "past_due"
+                  ? "No hay vencidos"
                 : activeView === "blocked"
                   ? "No hay bloqueados"
                   : "No hay solicitudes"}
@@ -1718,6 +1782,8 @@ export default function AdminVerificationsPage() {
                   ? search
                     ? "Prueba con otro nombre o correo."
                     : "Escribe en la barra de busqueda para mostrar solo el usuario que necesitas."
+                : activeView === "past_due"
+                  ? "No tienes perfiles con mensualidad vencida en este momento."
                 : activeView === "blocked"
                   ? "No tienes perfiles bloqueados en este momento."
                   : "Cuando un prestador solicite aprobacion o una insignia aparecera aqui."}
@@ -2076,7 +2142,8 @@ export default function AdminVerificationsPage() {
                       (selectedProvider.verificationStatus || "pending") ===
                         "pending" &&
                       selectedProvider.badgeVerificationStatus !== "pending",
-                    isBlockedView: activeView === "blocked",
+                    isBlockedView:
+                      activeView === "blocked" || activeView === "past_due",
                   })}
                 </div>
               </div>

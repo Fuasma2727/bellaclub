@@ -9,6 +9,7 @@ import {
   guardMutationRequest,
   securityErrorResponse,
 } from "@/lib/requestSecurity";
+import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 
 type MediaItem = {
   id?: string;
@@ -65,7 +66,8 @@ export async function POST(req: Request) {
       sellerData.role !== "prestador" ||
       sellerData.profileVisible !== true ||
       sellerData.verificationStatus !== "approved" ||
-      sellerData.blocked === true
+      sellerData.blocked === true ||
+      !isProviderSubscriptionPubliclyActive(sellerData)
     ) {
       return NextResponse.json(
         { error: "Perfil no disponible" },

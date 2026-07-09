@@ -10,6 +10,7 @@ import {
   getVerificationLevelFromBadge,
   getVerificationRank,
 } from "@/lib/providerPromotion";
+import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 
 type RawMediaItem = {
   id?: string;
@@ -48,7 +49,7 @@ const PUBLIC_PROVIDER_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 const PUBLIC_PROVIDER_DISK_CACHE_PATH = path.join(
   process.cwd(),
   ".runtime-cache",
-  "public-providers.json"
+  "public-providers-v2.json"
 );
 
 const globalForPublicProviderCache = globalThis as typeof globalThis & {
@@ -212,13 +213,14 @@ const sanitizeMediaForProfile = (media?: RawMediaItem[]) => {
     : [];
 };
 
-const isPublicProvider = (data: RawProviderData) => {
+const isPublicProvider = (data: RawProviderData, now = new Date()) => {
   return (
     data.role === "prestador" &&
     data.profileVisible === true &&
     data.verificationStatus === "approved" &&
     Boolean(data.photoUrl) &&
-    data.blocked !== true
+    data.blocked !== true &&
+    isProviderSubscriptionPubliclyActive(data, now)
   );
 };
 
@@ -227,7 +229,7 @@ const toPublicProviderCard = (
   data: RawProviderData,
   now = Date.now()
 ): PublicProviderCard | null => {
-  if (!isPublicProvider(data)) return null;
+  if (!isPublicProvider(data, new Date(now))) return null;
 
   const publicVerificationBadge = getPublicVerificationBadge(
     data.verificationBadge || null,

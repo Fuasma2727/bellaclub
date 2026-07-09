@@ -7,6 +7,7 @@ import {
   PROVIDER_PROMOTION_DAYS,
   PROVIDER_PROMOTION_PRICE,
 } from "@/lib/providerPromotion";
+import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 import {
   guardMutationRequest,
   securityErrorResponse,
@@ -37,6 +38,9 @@ export async function POST(request: Request) {
       if (user.blocked === true) throw new Error("PROVIDER_BLOCKED");
       if (user.verificationStatus !== "approved") {
         throw new Error("PROVIDER_NOT_APPROVED");
+      }
+      if (!isProviderSubscriptionPubliclyActive(user)) {
+        throw new Error("SUBSCRIPTION_NOT_ACTIVE");
       }
 
       const balance = Number(user.balance || 0);
@@ -120,6 +124,10 @@ export async function POST(request: Request) {
         },
         PROVIDER_NOT_APPROVED: {
           message: "Tu perfil debe estar aprobado para promocionarlo",
+          status: 403,
+        },
+        SUBSCRIPTION_NOT_ACTIVE: {
+          message: "Debes tener la mensualidad al dia para promocionar tu perfil",
           status: 403,
         },
         INSUFFICIENT_BALANCE: {

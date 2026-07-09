@@ -8,6 +8,7 @@ import {
   guardMutationRequest,
   securityErrorResponse,
 } from "@/lib/requestSecurity";
+import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 
 const allowedAmounts = [50000, 100000, 300000, 500000];
 
@@ -65,7 +66,8 @@ export async function POST(req: Request) {
       sellerData.role !== "prestador" ||
       sellerData.profileVisible !== true ||
       sellerData.verificationStatus !== "approved" ||
-      sellerData.blocked === true
+      sellerData.blocked === true ||
+      !isProviderSubscriptionPubliclyActive(sellerData)
     ) {
       return NextResponse.json(
         { error: "Perfil no disponible" },

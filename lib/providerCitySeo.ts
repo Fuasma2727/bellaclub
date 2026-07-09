@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebaseAdmin";
+import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 
 export type ProviderCitySeo = {
   city: string;
@@ -91,6 +92,7 @@ const isFirestoreQuotaError = (error: unknown) => {
 };
 
 async function fetchPublicProviderCities(): Promise<ProviderCitySeo[]> {
+  const now = new Date();
   const snapshot = await adminDb
     .collection("users")
     .where("role", "==", "prestador")
@@ -104,6 +106,7 @@ async function fetchPublicProviderCities(): Promise<ProviderCitySeo[]> {
     const data = doc.data();
 
     if (data.blocked === true) return;
+    if (!isProviderSubscriptionPubliclyActive(data, now)) return;
 
     const city = String(data.city || "").trim();
     const department = String(data.department || "").trim();
