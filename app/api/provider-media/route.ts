@@ -8,6 +8,7 @@ import {
 import {
   getProviderVideoSecondsLimit,
   getProviderVideoSecondsUsed,
+  isAllowedPrivateContentPrice,
   ProviderMediaItem,
 } from "@/lib/providerMediaLimits";
 
@@ -121,12 +122,18 @@ export async function POST(request: Request) {
             incomingVideoSeconds += incomingDuration;
           }
 
+          const privatePrice = Number(item.price || 0);
+
+          if (item.private && !isAllowedPrivateContentPrice(privatePrice)) {
+            throw new Error("INVALID_PRIVATE_PRICE");
+          }
+
           return {
             id: item.id,
             type: item.type,
             url: item.url,
             private: Boolean(item.private),
-            price: item.private ? Number(item.price || 0) : null,
+            price: item.private ? privatePrice : null,
             duration: item.type === "video" ? incomingDuration : null,
             description: item.private
               ? String(item.description || "").trim()
@@ -165,6 +172,12 @@ export async function POST(request: Request) {
         }
       }
 
+      const privatePrice = Number(body.item.price || 0);
+
+      if (body.item.private && !isAllowedPrivateContentPrice(privatePrice)) {
+        throw new Error("INVALID_PRIVATE_PRICE");
+      }
+
       const updated = [
         ...media,
         {
@@ -172,7 +185,7 @@ export async function POST(request: Request) {
           type: body.item.type,
           url: body.item.url,
           private: Boolean(body.item.private),
-          price: body.item.private ? Number(body.item.price || 0) : null,
+          price: body.item.private ? privatePrice : null,
           duration: body.item.type === "video" ? incomingDuration : null,
           description: body.item.private
             ? String(body.item.description || "").trim()
@@ -200,6 +213,10 @@ export async function POST(request: Request) {
         NOT_PROVIDER: { message: "Solo las escorts pueden subir contenido", status: 403 },
         MEDIA_REQUIRED: { message: "Contenido requerido", status: 400 },
         INVALID_MEDIA: { message: "Contenido invalido", status: 400 },
+        INVALID_PRIVATE_PRICE: {
+          message: "Precio privado invalido",
+          status: 400,
+        },
         INVALID_VIDEO_DURATION: {
           message: "No pudimos leer la duracion del video",
           status: 400,

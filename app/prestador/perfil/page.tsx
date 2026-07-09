@@ -16,6 +16,8 @@ import { app } from "@/lib/firebase";
 import { colombia } from "@/lib/colombia";
 import {
   EXTRA_VIDEO_TIME_PRICE,
+  PRIVATE_CONTENT_PRICE_OPTIONS,
+  isAllowedPrivateContentPrice,
   getProviderVideoSecondsLimit,
   getProviderVideoSecondsUsed,
 } from "@/lib/providerMediaLimits";
@@ -180,7 +182,7 @@ const fieldBaseClass =
 const readOnlyFieldClass =
   "rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-sm text-neutral-200";
 
-const privatePriceOptions = [10000, 50000, 100000, 200000];
+const privatePriceOptions = PRIVATE_CONTENT_PRICE_OPTIONS;
 
 const verificationOptions = [
   {
@@ -1793,7 +1795,7 @@ export default function PerfilPrestador() {
     const priceNum = Number(contentPrice);
     const description = contentDescription.trim();
 
-    if (!priceNum || priceNum <= 0) {
+    if (!isAllowedPrivateContentPrice(priceNum)) {
       const text = "Ingresa un precio valido para el contenido privado";
       setError(text);
       setMediaUploadError(text);

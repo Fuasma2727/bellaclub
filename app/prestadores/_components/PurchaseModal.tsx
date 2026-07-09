@@ -16,6 +16,8 @@ export default function PurchaseModal({
   onClose,
   onPurchase,
 }: PurchaseModalProps) {
+  const privateDescription = pendingPurchase.item.description?.trim();
+
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-3 backdrop-blur-sm sm:px-4"
@@ -33,6 +35,17 @@ export default function PurchaseModal({
           </span>
           .
         </p>
+
+        {privateDescription && (
+          <div className="mt-4 rounded-md border border-white/[0.08] bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+              Descripcion
+            </p>
+            <p className="mt-1 text-sm leading-6 text-neutral-200">
+              {privateDescription}
+            </p>
+          </div>
+        )}
 
         {purchaseError && (
           <div className="mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-100">

@@ -272,6 +272,8 @@ export default function ProviderProfileModal({
                         item.type === "video"
                           ? formatDuration(item.duration)
                           : "";
+                      const privateDescription = item.description?.trim() || "";
+                      const priceLabel = formatMoney(item.price);
 
                       return (
                         <button
@@ -337,30 +339,40 @@ export default function ProviderProfileModal({
 
                           {isPrivate && (
                             <>
-                              <div className="absolute inset-0 bg-black/35 transition group-hover:bg-black/25" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10 transition group-hover:from-black/80 group-hover:via-black/38" />
                               <span
                                 aria-label="Contenido bloqueado"
                                 className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white shadow-lg shadow-black/40 backdrop-blur"
                               >
                                 <LockIcon />
                               </span>
-                              <span className="absolute left-1/2 top-1/2 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/45 text-white shadow-xl shadow-black/40 backdrop-blur transition group-hover:scale-105 sm:h-14 sm:w-14">
+                              <span className="absolute left-2 top-2 z-10 rounded-full border border-white/10 bg-white/[0.08] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/90 shadow-lg shadow-black/30 backdrop-blur">
+                                Privado
+                              </span>
+                              <span className="absolute left-1/2 top-[40%] z-10 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/45 text-white shadow-xl shadow-black/40 backdrop-blur transition group-hover:scale-105 sm:h-14 sm:w-14">
                                 {item.type === "video" ? (
                                   <VideoIcon />
                                 ) : (
                                   <PhotoIcon />
                                 )}
                               </span>
-                              {formatMoney(item.price) && (
-                                <span className="absolute bottom-2 left-2 z-10 max-w-[calc(100%-64px)] truncate rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[11px] font-semibold text-white shadow-lg shadow-black/30 backdrop-blur">
-                                  {formatMoney(item.price)}
-                                </span>
-                              )}
-                              {item.type === "video" && durationLabel && (
-                                <span className="absolute bottom-2 right-2 z-10 rounded-full border border-white/10 bg-black/65 px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-lg shadow-black/30 backdrop-blur">
-                                  {durationLabel}
-                                </span>
-                              )}
+                              <div className="absolute inset-x-2 bottom-2 z-10 rounded-md border border-white/10 bg-black/62 p-2 text-left shadow-xl shadow-black/35 backdrop-blur">
+                                <p className="line-clamp-2 min-h-[2rem] text-[11px] font-medium leading-4 text-white sm:text-xs sm:leading-5">
+                                  {privateDescription || "Contenido privado"}
+                                </p>
+                                <div className="mt-1.5 flex min-h-6 items-center justify-between gap-2">
+                                  {priceLabel && (
+                                    <span className="min-w-0 truncate rounded-full border border-emerald-300/20 bg-emerald-400/12 px-2 py-1 text-[11px] font-semibold text-emerald-100">
+                                      {priceLabel}
+                                    </span>
+                                  )}
+                                  {item.type === "video" && durationLabel && (
+                                    <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.08] px-2 py-1 text-[11px] font-semibold tabular-nums text-white">
+                                      {durationLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </>
                           )}
                         </button>

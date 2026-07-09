@@ -116,6 +116,17 @@ export default function PrestadoresPage({
     useState<PendingPurchase | null>(null);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState("");
+  const hasPageIntroContent = Boolean(initialCity || pageTitle);
+  const resolvedPageTitle = pageTitle || `Escorts en ${initialCity}`;
+  const resolvedPageDescription =
+    pageDescription ||
+    (showPageIntro
+      ? `Explora perfiles aprobados en ${initialCity}${
+          initialDepartment ? `, ${initialDepartment}` : ""
+        }, revisa galerias publicas y contacta directamente por WhatsApp.`
+      : `Perfiles aprobados en ${initialCity}${
+          initialDepartment ? `, ${initialDepartment}` : ""
+        }, con galerias publicas y contacto directo por WhatsApp.`);
 
   const departments = useMemo(() => {
     return Array.from(
@@ -694,81 +705,6 @@ export default function PrestadoresPage({
       <Header />
 
       <main>
-        {showPageIntro && (initialCity || pageTitle) && (
-          <section className="border-b border-white/[0.08] bg-[#080809]">
-            <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 lg:px-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
-                {pageEyebrow}
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">
-                {pageTitle || `Escorts en ${initialCity}`}
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
-                {pageDescription ||
-                  `Explora perfiles aprobados en ${initialCity}${
-                    initialDepartment ? `, ${initialDepartment}` : ""
-                  }, revisa galerias publicas y contacta directamente por WhatsApp.`}
-              </p>
-              {seoCityLinks.length > 0 && (
-                <nav
-                  aria-label="Ciudades populares"
-                  className="mt-4 flex flex-wrap gap-2"
-                >
-                  {seoCityLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </nav>
-              )}
-            </div>
-          </section>
-        )}
-
-        {!showPageIntro && (initialCity || pageTitle) && (
-          <section className="border-b border-white/[0.08] bg-[#080809]">
-            <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-4 lg:px-8">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-3xl">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-300">
-                    {pageEyebrow}
-                  </p>
-                  <h1 className="mt-1 text-xl font-semibold text-white sm:text-2xl">
-                    {pageTitle || `Escorts en ${initialCity}`}
-                  </h1>
-                  <p className="mt-1 text-sm leading-6 text-neutral-400">
-                    {pageDescription ||
-                      `Perfiles aprobados en ${initialCity}${
-                        initialDepartment ? `, ${initialDepartment}` : ""
-                      }, con galerias publicas y contacto directo por WhatsApp.`}
-                  </p>
-                </div>
-
-                {seoCityLinks.length > 0 && (
-                  <nav
-                    aria-label="Busquedas relacionadas"
-                    className="flex flex-wrap gap-2 lg:max-w-xl lg:justify-end"
-                  >
-                    {seoCityLinks.map((link) => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
-                  </nav>
-                )}
-              </div>
-            </div>
-          </section>
-        )}
-
         <FiltersBar
           departmentFilter={departmentFilter}
           cityFilter={cityFilter}
@@ -826,6 +762,39 @@ export default function PrestadoresPage({
                 />
               ))}
             </div>
+          )}
+
+          {hasPageIntroContent && !loading && !pageError && (
+            <section className="mt-7 border-t border-white/[0.08] pt-6">
+              <div className="max-w-4xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+                  {pageEyebrow}
+                </p>
+                <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+                  {resolvedPageTitle}
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
+                  {resolvedPageDescription}
+                </p>
+              </div>
+
+              {seoCityLinks.length > 0 && (
+                <nav
+                  aria-label="Ciudades populares"
+                  className="mt-4 flex flex-wrap gap-2"
+                >
+                  {seoCityLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              )}
+            </section>
           )}
 
           {seoContent && !loading && !pageError && (

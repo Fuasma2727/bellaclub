@@ -25,16 +25,24 @@ function WhatsAppIcon() {
       aria-hidden="true"
       viewBox="0 0 24 24"
       className="h-[15px] w-[15px] sm:h-4 sm:w-4"
-      fill="none"
+      fill="currentColor"
     >
       <path
-        d="M4.7 19.5 6 15.7a7.8 7.8 0 1 1 2.9 2.8l-4.2 1Z"
-        fill="#fff"
+        d="M19.1 4.9A9.9 9.9 0 0 0 3.4 16.8L2 22l5.3-1.4A9.9 9.9 0 0 0 19.1 4.9Zm-7.1 14a7.5 7.5 0 0 1-3.8-1l-.27-.16-3.1.82.83-3.02-.18-.3A7.48 7.48 0 1 1 12 18.9Zm4.1-5.6c-.23-.12-1.35-.67-1.56-.74-.21-.08-.36-.12-.52.12-.15.23-.6.74-.73.9-.14.15-.27.17-.5.06-.23-.12-.98-.36-1.87-1.15-.69-.62-1.16-1.38-1.3-1.61-.13-.23-.01-.36.1-.48.1-.1.23-.27.34-.4.12-.14.16-.23.23-.39.08-.15.04-.29-.02-.4-.06-.12-.52-1.25-.71-1.71-.19-.45-.38-.39-.52-.4h-.44c-.15 0-.4.06-.6.29-.22.23-.8.78-.8 1.9s.82 2.2.93 2.35c.12.15 1.62 2.47 3.92 3.46.55.24.98.38 1.31.49.55.17 1.05.15 1.45.09.44-.07 1.35-.55 1.54-1.08.19-.53.19-.98.13-1.08-.06-.1-.21-.16-.44-.28Z"
       />
-      <path
-        d="M9.1 7.7c.18-.4.38-.42.68-.42h.52c.23 0 .46.05.62.46l.62 1.48c.1.25.08.48-.08.68l-.46.55c-.12.15-.15.32-.04.5.48.86 1.2 1.6 2.08 2.08.18.1.36.08.5-.06l.7-.72c.18-.18.42-.22.66-.1l1.48.7c.34.16.48.34.46.62-.02.42-.28 1.18-.92 1.66-.58.44-1.55.56-2.96-.02-2.42-.98-4.02-2.86-4.62-4.44-.42-1.08-.32-2.06.26-2.96Z"
-        fill="#16a34a"
-      />
+    </svg>
+  );
+}
+
+function ProfileVideoIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="ml-0.5 h-4 w-4 sm:h-[18px] sm:w-[18px]"
+      fill="currentColor"
+    >
+      <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
     </svg>
   );
 }
@@ -141,27 +149,30 @@ export default function ProviderCard({
       ? {
           shell:
             "border-[#b7784d]/45 bg-[#b7784d]/12 text-[#d79263] shadow-[#4a2415]/20 hover:bg-[#b7784d]/18",
-          gem: "h-4 w-4 sm:h-[18px] sm:w-[18px]",
+          gem: "h-3.5 w-3.5 sm:h-4 sm:w-4",
         }
       : verificationBadge === "silver"
         ? {
             shell:
               "border-slate-100/50 bg-slate-200/12 text-slate-100 shadow-slate-950/20 hover:bg-slate-100/18",
-            gem: "h-4 w-4 sm:h-[18px] sm:w-[18px]",
+            gem: "h-3.5 w-3.5 sm:h-4 sm:w-4",
           }
         : verificationBadge === "gold"
           ? {
               shell:
                 "border-amber-200/60 bg-amber-300/14 text-amber-200 shadow-[0_0_16px_rgba(251,191,36,0.22)] hover:bg-amber-300/22",
-              gem: "h-[17px] w-[17px] sm:h-5 sm:w-5",
+              gem: "h-[15px] w-[15px] sm:h-[17px] sm:w-[17px]",
             }
           : {
               shell:
                 "border-white/90 bg-[radial-gradient(circle_at_28%_16%,rgba(255,255,255,0.9),rgba(186,230,253,0.34)_34%,rgba(125,211,252,0.24)_58%,rgba(139,92,246,0.22)_100%)] text-white shadow-[0_0_28px_rgba(125,211,252,0.62)] ring-1 ring-white/35 hover:border-white hover:shadow-[0_0_40px_rgba(125,211,252,0.9)]",
-              gem: "h-5 w-5 sm:h-[22px] sm:w-[22px]",
+              gem: "h-4 w-4 sm:h-[18px] sm:w-[18px]",
             };
   const privateCount = (provider.media || []).filter((item) => item.private)
     .length;
+  const hasProfileVideo = (provider.media || []).some(
+    (item) => item.type === "video"
+  );
   const hasDailyVideo = Boolean(provider.dailyVideo?.url);
 
   return (
@@ -256,7 +267,7 @@ export default function ProviderCard({
             {provider.price ? formatMoney(provider.price) : "Sin precio"}
           </p>
 
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-[5px]">
             {rating > 0 && (
               <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-xs font-semibold text-amber-100">
                 {rating.toFixed(1)}
@@ -280,6 +291,16 @@ export default function ProviderCard({
               </button>
             )}
 
+            {hasProfileVideo && (
+              <span
+                aria-label="Tiene videos en el perfil"
+                title="Tiene videos en el perfil"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-sky-200/30 bg-sky-400/10 text-sky-100 shadow-lg shadow-sky-950/15 transition hover:-translate-y-0.5 hover:border-sky-100/50 hover:bg-sky-400/18 sm:h-7 sm:w-7"
+              >
+                <ProfileVideoIcon />
+              </span>
+            )}
+
             {whatsappUrl && (
               <a
                 href={whatsappUrl}
@@ -287,7 +308,7 @@ export default function ProviderCard({
                 rel="noopener noreferrer"
                 aria-label={`Contactar a ${name} por WhatsApp`}
                 onClick={(event) => event.stopPropagation()}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-200/30 bg-[#16a34a] text-white shadow-lg shadow-emerald-950/25 transition hover:-translate-y-0.5 hover:border-emerald-100/50 hover:bg-[#22c55e] sm:h-7 sm:w-7"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-200/45 bg-[linear-gradient(135deg,#21d366,#128c55)] text-white shadow-lg shadow-emerald-950/25 ring-1 ring-emerald-100/10 transition hover:-translate-y-0.5 hover:border-emerald-50/65 hover:brightness-110 sm:h-7 sm:w-7"
               >
                 <WhatsAppIcon />
               </a>

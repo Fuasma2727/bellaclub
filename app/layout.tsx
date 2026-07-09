@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/context/AuthContext";
+import AgeGate from "@/components/AgeGate";
 import JsonLd from "@/components/JsonLd";
 
 const geistSans = Geist({
@@ -139,7 +140,10 @@ export default function RootLayout({
         </Script>
 
         <JsonLd data={siteSchema} />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <AgeGate />
+        </AuthProvider>
       </body>
     </html>
   );
