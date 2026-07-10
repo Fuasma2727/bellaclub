@@ -76,13 +76,11 @@ const getMaxSizeMb = (contentType: string) => {
 
 const uploadToBunny = async ({
   body,
-  contentLength,
   contentType,
   filename,
   uid,
 }: {
-  body: BodyInit;
-  contentLength?: number;
+  body: ArrayBuffer;
   contentType: string;
   filename: string;
   uid: string;
@@ -96,16 +94,33 @@ const uploadToBunny = async ({
     AccessKey: BUNNY_API_KEY || "",
     "Content-Type": contentType || "application/octet-stream",
   };
+  const uploadBody = Buffer.from(body);
 
-  if (contentLength) {
-    headers["Content-Length"] = contentLength.toString();
+  let upload: Response;
+
+  try {
+    upload = await fetch(uploadUrl, {
+      method: "PUT",
+      headers,
+      body: uploadBody,
+    });
+  } catch (error) {
+    console.error("Bunny upload request error:", {
+      filename,
+      contentType,
+      bytes: uploadBody.byteLength,
+      error,
+    });
+
+    return NextResponse.json(
+      {
+        error: "No pudimos subir el archivo",
+        details:
+          "La conexion con el almacenamiento fallo. Intenta de nuevo en unos minutos.",
+      },
+      { status: 502 }
+    );
   }
-
-  const upload = await fetch(uploadUrl, {
-    method: "PUT",
-    headers,
-    body,
-  });
 
   if (!upload.ok) {
     const errorText = await upload.text();
@@ -195,7 +210,6 @@ export async function POST(request: Request) {
 
       return uploadToBunny({
         body,
-        contentLength: body.byteLength || contentLength,
         contentType,
         filename,
         uid: decoded.uid,
@@ -232,7 +246,6 @@ export async function POST(request: Request) {
 
     return uploadToBunny({
       body: await file.arrayBuffer(),
-      contentLength: file.size,
       contentType,
       filename: file.name,
       uid: decoded.uid,
