@@ -37,7 +37,7 @@ export const createPrivateMediaToken = (input: {
 };
 
 export const createPrivateMediaUrl = (
-  request: Request,
+  _request: Request,
   input: {
     buyerId: string;
     sellerId: string;
@@ -45,7 +45,7 @@ export const createPrivateMediaUrl = (
   }
 ) => {
   const { expiresAt, signature } = createPrivateMediaToken(input);
-  const url = new URL("/api/private-media", request.url);
+  const url = new URL("/api/private-media", "https://belaclub.local");
 
   url.searchParams.set("buyerId", input.buyerId);
   url.searchParams.set("sellerId", input.sellerId);
@@ -53,7 +53,7 @@ export const createPrivateMediaUrl = (
   url.searchParams.set("expiresAt", String(expiresAt));
   url.searchParams.set("signature", signature);
 
-  return url.toString();
+  return `${url.pathname}${url.search}`;
 };
 
 export const verifyPrivateMediaToken = (input: {
