@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-const TOKEN_TTL_SECONDS = 5 * 60;
+const TOKEN_TTL_SECONDS = 30 * 60;
 
 const getSecret = () => {
   const secret =

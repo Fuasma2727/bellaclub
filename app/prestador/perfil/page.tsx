@@ -111,7 +111,7 @@ type MediaUploadProgressItem = {
 };
 
 const MAX_IMAGE_UPLOAD_MB = 12;
-const MAX_VIDEO_UPLOAD_MB = 80;
+const MAX_VIDEO_UPLOAD_MB = 150;
 
 const uploadContentTypeByExtension: Record<string, string> = {
   jpg: "image/jpeg",
@@ -292,7 +292,7 @@ const parseUploadResponse = async (res: Response): Promise<UploadResponse> => {
 
 const uploadWithTimeout = async (
   request: () => Promise<Response>,
-  timeoutMs = 5 * 60 * 1000
+  timeoutMs = 10 * 60 * 1000
 ) => {
   const timeout = new Promise<never>((_, reject) => {
     window.setTimeout(
@@ -482,7 +482,7 @@ const uploadFileWithProgress = (
     const progress = createUploadProgressSmoother(onProgress);
 
     xhr.open("POST", "/api/upload-profile-photo");
-    xhr.timeout = 5 * 60 * 1000;
+    xhr.timeout = 10 * 60 * 1000;
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.setRequestHeader("Content-Type", contentType || "application/octet-stream");
     xhr.setRequestHeader("x-file-name", encodeURIComponent(file.name));
@@ -1570,6 +1570,8 @@ export default function PerfilPrestador() {
       setMediaUploadError("");
 
       let progressItems: MediaUploadProgressItem[] = [];
+      let savedCount = 0;
+      const completedProgressIds = new Set<string>();
 
       try {
         const token = await user.getIdToken();
@@ -1621,7 +1623,6 @@ export default function PerfilPrestador() {
           return 0;
         }
 
-        const uploadedItems: MediaItem[] = [];
         const hasVideos = preparedFiles.some((item) => item.type === "video");
         const uploadBatchSize = hasVideos ? 1 : 4;
 
@@ -1631,7 +1632,7 @@ export default function PerfilPrestador() {
             index,
             index + uploadBatchSize
           );
-          const groupItems = await Promise.all(
+          const uploadResults = await Promise.allSettled(
             group.map(async (item, groupIndex) => {
               const progressItem = groupProgressItems[groupIndex];
 
@@ -1672,51 +1673,97 @@ export default function PerfilPrestador() {
               };
             })
           );
+          const groupItems: MediaItem[] = [];
+          const successfulProgressIds: string[] = [];
+          const failedProgressIds: string[] = [];
+          let firstUploadError: unknown = null;
 
-          uploadedItems.push(...groupItems);
+          uploadResults.forEach((result, resultIndex) => {
+            const progressItemId = groupProgressItems[resultIndex]?.id;
+
+            if (result.status === "fulfilled") {
+              groupItems.push(result.value);
+              if (progressItemId) successfulProgressIds.push(progressItemId);
+              return;
+            }
+
+            if (progressItemId) failedProgressIds.push(progressItemId);
+            firstUploadError = firstUploadError || result.reason;
+          });
+
+          if (groupItems.length > 0) {
+            const res = await fetch("/api/provider-media", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                action: "addMany",
+                items: groupItems,
+              }),
+            });
+            const data = (await res.json()) as ProviderMediaResponse;
+
+            if (!res.ok || !data.media) {
+              throw new Error(data.error || "No pudimos guardar el contenido");
+            }
+
+            setMedia(data.media);
+            savedCount += groupItems.length;
+
+            updateMediaUploadItems(successfulProgressIds, {
+              progress: 100,
+              status: "complete",
+            });
+            successfulProgressIds.forEach((id) => completedProgressIds.add(id));
+            removeMediaUploadItems(successfulProgressIds, 900);
+          }
+
+          if (firstUploadError) {
+            const text =
+              firstUploadError instanceof Error
+                ? firstUploadError.message
+                : "No pudimos subir uno de los archivos";
+
+            updateMediaUploadItems(failedProgressIds, {
+              error: text,
+              status: "error",
+            });
+            throw new Error(text);
+          }
         }
 
-        const res = await fetch("/api/provider-media", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "addMany",
-            items: uploadedItems,
-          }),
-        });
-        const data = (await res.json()) as ProviderMediaResponse;
-
-        if (!res.ok || !data.media) {
-          throw new Error(data.error || "No pudimos guardar el contenido");
-        }
-
-        setMedia(data.media);
-        updateMediaUploadItems(progressIds, {
-          progress: 100,
-          status: "complete",
-        });
-        removeMediaUploadItems(progressIds, 900);
-        return uploadedItems.length;
+        return savedCount;
       } catch (uploadError) {
         const text =
           uploadError instanceof Error
             ? uploadError.message
             : "No pudimos subir el contenido";
-        setError(text);
-        setMediaUploadError(text);
+
+        const partialText =
+          savedCount > 0
+            ? `${savedCount} archivo${
+                savedCount === 1 ? "" : "s"
+              } subido${savedCount === 1 ? "" : "s"}. ${text}`
+            : text;
+
+        setError(partialText);
+        setMediaUploadError(partialText);
         if (progressItems.length > 0) {
+          const failedProgressIds = progressItems
+            .filter((item) => !completedProgressIds.has(item.id))
+            .map((item) => item.id);
+
           updateMediaUploadItems(
-            progressItems.map((item) => item.id),
+            failedProgressIds,
             {
-              error: text,
+              error: partialText,
               status: "error",
             }
           );
         }
-        return 0;
+        return savedCount;
       } finally {
         setUploadingMedia(false);
       }

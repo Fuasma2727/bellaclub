@@ -71,7 +71,7 @@ const getSafeFilename = (filename: string) => {
 };
 
 const getMaxSizeMb = (contentType: string) => {
-  return contentType.startsWith("video") ? 80 : 12;
+  return contentType.startsWith("video") ? 150 : 12;
 };
 
 const uploadToBunny = async ({
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       rateLimitKey: "upload-profile-photo",
       limit: 30,
       windowMs: 10 * 60 * 1000,
-      maxBodyBytes: 90 * 1024 * 1024,
+      maxBodyBytes: 170 * 1024 * 1024,
     });
 
     const decoded = await requireAuthenticatedUser(request);
