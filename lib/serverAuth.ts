@@ -15,7 +15,7 @@ export const requireAuthenticatedUser = async (request: Request) => {
   }
 
   try {
-    return await adminAuth.verifyIdToken(token);
+    return await adminAuth.verifyIdToken(token, true);
   } catch {
     throw new Error("INVALID_TOKEN");
   }

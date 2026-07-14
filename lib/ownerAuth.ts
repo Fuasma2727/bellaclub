@@ -28,11 +28,13 @@ export const requireOwner = async (request: Request): Promise<OwnerUser> => {
     throw new Error("MISSING_TOKEN");
   }
 
-  const decoded = await adminAuth.verifyIdToken(token);
+  const decoded = await adminAuth.verifyIdToken(token, true);
   const decodedEmail = decoded.email?.toLowerCase();
 
   const matchesUid = ownerUid ? decoded.uid === ownerUid : false;
-  const matchesEmail = ownerEmail ? decodedEmail === ownerEmail : false;
+  const matchesEmail = ownerEmail
+    ? decodedEmail === ownerEmail && decoded.email_verified === true
+    : false;
 
   if (!matchesUid && !matchesEmail) {
     throw new Error("FORBIDDEN");

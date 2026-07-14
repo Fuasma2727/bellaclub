@@ -29,6 +29,12 @@ const accountTypes = [
   { value: "ahorros", label: "Ahorros" },
   { value: "corriente", label: "Corriente" },
 ];
+const publicSearchLinks = [
+  { href: "/escorts/rionegro", label: "Escorts Rionegro" },
+  { href: "/prepagos/rionegro", label: "Prepagos Rionegro" },
+  { href: "/escorts/medellin", label: "Escorts Medellin" },
+  { href: "/escorts/la-ceja", label: "Escorts La Ceja" },
+];
 
 type NotificationItem = {
   id: string;
@@ -138,6 +144,22 @@ export default function Header() {
     0
   );
   const supportHref = supportInstagramUrl;
+  const publicSearchNav = (
+    <nav
+      aria-label="Busquedas populares"
+      className="hidden flex-1 items-center justify-center gap-1 lg:flex"
+    >
+      {publicSearchLinks.map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          className="rounded-full px-3 py-2 text-xs font-semibold text-neutral-300 transition hover:bg-white/[0.07] hover:text-white"
+        >
+          {link.label}
+        </Link>
+      ))}
+    </nav>
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -408,6 +430,7 @@ export default function Header() {
                 BelaClub
               </span>
             </Link>
+            {publicSearchNav}
             <div className="h-8 w-28 rounded-full border border-white/[0.08] bg-white/[0.03]" />
           </div>
         </div>
@@ -440,6 +463,7 @@ export default function Header() {
                 BelaClub
               </span>
             </Link>
+            {publicSearchNav}
 
             {!user && (
               <div className="flex shrink-0 items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] p-1 shadow-lg shadow-black/20 sm:gap-2">

@@ -6,8 +6,10 @@ export type ProviderCitySeo = {
   department: string;
   slug: string;
   count: number;
+  priority?: number;
   zones?: string[];
   seoIntro?: string;
+  searchFocus?: string[];
   nearbyCities?: string[];
 };
 
@@ -23,10 +25,36 @@ const PROVIDER_CITY_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const targetSeoCities: ProviderCitySeo[] = [
   {
+    city: "Rionegro",
+    department: "Antioquia",
+    slug: "rionegro",
+    count: 0,
+    priority: 1,
+    nearbyCities: ["La Ceja", "Marinilla", "Guarne", "El Carmen de Viboral"],
+    zones: [
+      "San Antonio de Pereira",
+      "Centro",
+      "Llanogrande",
+      "Aeropuerto Jose Maria Cordova",
+      "Porvenir",
+    ],
+    searchFocus: [
+      "escorts rionegro",
+      "escorts en rionegro",
+      "prepagos rionegro",
+      "prepagos en rionegro",
+      "putas rionegro",
+      "putas en rionegro",
+    ],
+    seoIntro:
+      "Rionegro es una ciudad prioritaria para BelaClub en el oriente antioqueño. La pagina agrupa perfiles aprobados para busquedas como escorts rionegro, escorts en rionegro, prepagos rionegro y putas rionegro, con foco en San Antonio de Pereira, Centro, Llanogrande y el sector del Aeropuerto Jose Maria Cordova.",
+  },
+  {
     city: "Medellín",
     department: "Antioquia",
     slug: "medellin",
     count: 0,
+    priority: 0.85,
     nearbyCities: ["Envigado", "Itagui", "Sabaneta", "Rionegro"],
     zones: [
       "El Poblado",
@@ -44,20 +72,11 @@ export const targetSeoCities: ProviderCitySeo[] = [
     department: "Antioquia",
     slug: "la-ceja",
     count: 0,
+    priority: 0.9,
     nearbyCities: ["Rionegro", "El Retiro", "El Carmen de Viboral"],
     zones: ["Centro", "zonas cercanas", "oriente antioqueno"],
     seoIntro:
       "La Ceja conecta usuarios que buscan perfiles en el oriente antioqueño con opciones cercanas y contacto directo.",
-  },
-  {
-    city: "Rionegro",
-    department: "Antioquia",
-    slug: "rionegro",
-    count: 0,
-    nearbyCities: ["La Ceja", "Marinilla", "Guarne", "El Carmen de Viboral"],
-    zones: ["San Antonio", "Centro", "Llanogrande", "Aeropuerto JMC"],
-    seoIntro:
-      "Rionegro concentra busquedas en zonas como San Antonio y Centro, con perfiles visibles y contacto directo por WhatsApp.",
   },
 ];
 
@@ -132,8 +151,10 @@ async function fetchPublicProviderCities(): Promise<ProviderCitySeo[]> {
       city: current?.city || city.city,
       department: current?.department || city.department,
       count: current?.count || city.count,
+      priority: city.priority,
       zones: current?.zones || city.zones,
       seoIntro: current?.seoIntro || city.seoIntro,
+      searchFocus: city.searchFocus,
       nearbyCities: current?.nearbyCities || city.nearbyCities,
     });
   });
@@ -208,4 +229,8 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
 export async function findProviderCityBySlug(slug: string) {
   const cities = await getPublicProviderCities();
   return cities.find((city) => city.slug === slug) || null;
+}
+
+export function getProviderCityPriority(slug: string) {
+  return targetSeoCities.find((city) => city.slug === slug)?.priority || 0.7;
 }

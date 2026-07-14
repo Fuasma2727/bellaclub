@@ -3,11 +3,14 @@ import crypto from "crypto";
 const TOKEN_TTL_SECONDS = 30 * 60;
 
 const getSecret = () => {
-  const secret =
-    process.env.PRIVATE_MEDIA_SECRET ||
+  const dedicatedSecret = process.env.PRIVATE_MEDIA_SECRET;
+  const fallbackSecret =
     process.env.WOMPI_INTEGRITY_SECRET ||
     process.env.FIREBASE_PRIVATE_KEY ||
     process.env.BUNNY_API_KEY;
+  const secret =
+    dedicatedSecret ||
+    (process.env.NODE_ENV === "production" ? "" : fallbackSecret);
 
   if (!secret) {
     throw new Error("PRIVATE_MEDIA_SECRET_NOT_CONFIGURED");
@@ -64,6 +67,10 @@ export const verifyPrivateMediaToken = (input: {
   signature: string;
 }) => {
   if (!input.expiresAt || input.expiresAt < Math.floor(Date.now() / 1000)) {
+    return false;
+  }
+
+  if (!/^[a-f0-9]{64}$/i.test(input.signature)) {
     return false;
   }
 

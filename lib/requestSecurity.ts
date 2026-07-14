@@ -16,7 +16,12 @@ const getAllowedOrigins = (request: Request) => {
     : "";
 
   return new Set(
-    [requestOrigin, configuredUrl, vercelUrl, "http://localhost:3000"]
+    [
+      requestOrigin,
+      configuredUrl,
+      vercelUrl,
+      process.env.NODE_ENV !== "production" ? "http://localhost:3000" : "",
+    ]
       .filter(Boolean)
       .map((origin) => origin!.replace(/\/$/, ""))
   );

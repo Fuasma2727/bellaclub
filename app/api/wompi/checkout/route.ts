@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const decoded = await adminAuth.verifyIdToken(token);
+    const decoded = await adminAuth.verifyIdToken(token, true);
     const { amountInCents } = (await request.json()) as {
       amountInCents?: number;
     };

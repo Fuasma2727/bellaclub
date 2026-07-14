@@ -58,12 +58,13 @@ const citySlugValue = (value: string) => {
 };
 
 const footerSeoLinks: CitySeoLink[] = [
+  { href: "/escorts/rionegro", label: "Escorts Rionegro" },
+  { href: "/prepagos/rionegro", label: "Prepagos Rionegro" },
+  { href: "/putas/rionegro", label: "Putas Rionegro" },
   { href: "/escorts/medellin", label: "Escorts en Medellin" },
   { href: "/prepagos/medellin", label: "Prepagos en Medellin" },
   { href: "/escorts/la-ceja", label: "Escorts en La Ceja" },
   { href: "/prepagos/la-ceja", label: "Prepagos en La Ceja" },
-  { href: "/escorts/rionegro", label: "Escorts en Rionegro" },
-  { href: "/prepagos/rionegro", label: "Prepagos en Rionegro" },
 ];
 
 export default function PrestadoresPage({

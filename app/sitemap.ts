@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import {
   citySlug,
+  getProviderCityPriority,
   getPublicProviderCities,
   targetSeoCities,
 } from "@/lib/providerCitySeo";
@@ -11,6 +12,25 @@ const getBaseUrl = () =>
   process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
 export const dynamic = "force-dynamic";
+
+const rionegroFocusRouteKeys = new Set(["escorts", "prepagos", "putas"]);
+
+const getSearchCityRoutePriority = (
+  routeKey: string,
+  city: { slug: string }
+) => {
+  if (city.slug === "rionegro") {
+    return rionegroFocusRouteKeys.has(routeKey) ? 1 : 0.96;
+  }
+
+  const cityPriority = getProviderCityPriority(city.slug);
+
+  if (cityPriority >= 0.85) {
+    return routeKey === "escorts" ? 0.96 : 0.9;
+  }
+
+  return routeKey === "escorts" ? 0.84 : 0.8;
+};
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = getBaseUrl();
@@ -70,22 +90,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${baseUrl}/${route.segment}/${city.slug}`,
         lastModified: now,
         changeFrequency: "daily" as const,
-        priority: targetCitySlugs.has(city.slug)
-          ? route.key === "escorts"
-            ? 0.98
-            : 0.94
-          : route.key === "escorts"
-            ? 0.84
-            : 0.8,
+        priority: getSearchCityRoutePriority(route.key, city),
       }))
   );
   const profileRoutes: MetadataRoute.Sitemap = providers.map((provider) => ({
     url: `${baseUrl}${provider.profilePath}`,
     lastModified: provider.updatedAt ? new Date(provider.updatedAt) : now,
     changeFrequency: "weekly",
-    priority: targetCitySlugs.has(citySlug(provider.city || ""))
-      ? 0.86
-      : 0.72,
+    priority:
+      citySlug(provider.city || "") === "rionegro"
+        ? 0.9
+        : targetCitySlugs.has(citySlug(provider.city || ""))
+          ? 0.84
+          : 0.72,
   }));
 
   return [

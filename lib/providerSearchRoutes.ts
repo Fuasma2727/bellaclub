@@ -97,6 +97,21 @@ export const providerSearchRoutesByKey = Object.fromEntries(
   providerSearchRoutes.map((route) => [route.key, route])
 ) as Record<ProviderSearchRouteKey, ProviderSearchRoute>;
 
+export const formatProviderSearchRouteList = (items: string[]) => {
+  if (items.length <= 1) return items[0] || "";
+
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+};
+
+export const getRelatedProviderSearchText = (
+  routeKey: ProviderSearchRouteKey
+) =>
+  formatProviderSearchRouteList(
+    providerSearchRoutes
+      .filter((route) => route.key !== routeKey)
+      .map((route) => route.pluralNoun)
+  );
+
 export const getProviderSearchKeywords = (
   route: ProviderSearchRoute,
   city: string

@@ -64,7 +64,7 @@ const getRequesterId = async (request: Request) => {
   if (!token) return null;
 
   try {
-    const decoded = await adminAuth.verifyIdToken(token);
+    const decoded = await adminAuth.verifyIdToken(token, true);
     return decoded.uid;
   } catch {
     return null;

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { assertBodySize, securityErrorResponse } from "@/lib/requestSecurity";
 import { creditApprovedRecharge } from "@/lib/wompiRecharge";
 
 export const runtime = "nodejs";
@@ -89,8 +90,17 @@ const isWompiTransaction = (value: unknown): value is WompiTransaction => {
 
 export async function POST(request: Request) {
   try {
+    assertBodySize(request, 64 * 1024);
+
     const event = (await request.json()) as WompiEvent;
     const headerChecksum = request.headers.get("x-event-checksum");
+
+    if (!isValidWompiEvent(event, headerChecksum)) {
+      return NextResponse.json(
+        { error: "Firma de evento invalida" },
+        { status: 401 }
+      );
+    }
 
     await adminDb.collection("wompiEvents").doc().set({
       event: event?.event || null,
@@ -110,13 +120,6 @@ export async function POST(request: Request) {
       receivedAt: new Date().toISOString(),
     });
 
-    if (!isValidWompiEvent(event, headerChecksum)) {
-      return NextResponse.json(
-        { error: "Firma de evento invalida" },
-        { status: 401 }
-      );
-    }
-
     const transaction = event?.data?.transaction;
 
     if (event?.event !== "transaction.updated" || !isWompiTransaction(transaction)) {
@@ -127,6 +130,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ received: true, credited: result.credited });
   } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
     console.error("Error procesando webhook Wompi:", error);
     return NextResponse.json(
       { error: "Error procesando webhook" },

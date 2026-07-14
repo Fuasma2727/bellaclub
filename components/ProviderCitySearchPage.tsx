@@ -5,10 +5,13 @@ import JsonLd from "@/components/JsonLd";
 import {
   findProviderCityBySlug,
   targetSeoCities,
+  type ProviderCitySeo,
 } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 import {
+  getRelatedProviderSearchText,
   getProviderSearchKeywords,
+  type ProviderSearchRoute,
   providerSearchRoutes,
   providerSearchRoutesByKey,
   type ProviderSearchRouteKey,
@@ -31,6 +34,67 @@ type CityFaq = {
 
 const uniqueTexts = (items: string[]) =>
   Array.from(new Set(items.filter(Boolean)));
+
+const rionegroFocusRouteKeys = new Set<ProviderSearchRouteKey>([
+  "escorts",
+  "prepagos",
+  "putas",
+]);
+
+const isRionegroFocusRoute = (
+  routeKey: ProviderSearchRouteKey,
+  citySlug: string
+) => citySlug === "rionegro" && rionegroFocusRouteKeys.has(routeKey);
+
+const buildCityMetaTitle = (
+  route: ProviderSearchRoute,
+  city: ProviderCitySeo
+) => {
+  const title = `${route.title} en ${city.city}`;
+
+  if (isRionegroFocusRoute(route.key, city.slug)) {
+    return `${route.title} ${city.city} | ${title}`;
+  }
+
+  return `${title} | Perfiles aprobados`;
+};
+
+const buildCityMetaDescription = (
+  route: ProviderSearchRoute,
+  city: ProviderCitySeo,
+  place: string
+) => {
+  if (isRionegroFocusRoute(route.key, city.slug)) {
+    return `Encuentra ${route.pluralNoun} en ${place}: perfiles aprobados, fotos publicas, zonas como San Antonio de Pereira, Centro y Llanogrande, y contacto directo por WhatsApp. Busquedas relacionadas: escorts rionegro, escorts en rionegro, prepagos rionegro y putas rionegro en BelaClub.`;
+  }
+
+  const relatedSearchText = getRelatedProviderSearchText(route.key);
+
+  return `Encuentra perfiles de ${route.pluralNoun} en ${place}. Revisa fotos públicas, zonas disponibles y contacto por WhatsApp en BelaClub. También puedes explorar ${relatedSearchText} en ${city.city}.`;
+};
+
+const buildCitySearchTerms = (
+  route: ProviderSearchRoute,
+  city: ProviderCitySeo
+) =>
+  uniqueTexts([
+    `${route.title} en ${city.city}`,
+    `${route.title} ${city.city}`,
+    `${route.pluralNoun} en ${city.city}`,
+    `${route.pluralNoun} ${city.city}`,
+    ...(city.searchFocus || []),
+    `escorts en ${city.city}`,
+    `escorts ${city.city}`,
+    `prepagos en ${city.city}`,
+    `prepagos ${city.city}`,
+    `putas en ${city.city}`,
+    `putas ${city.city}`,
+    `acompanantes en ${city.city}`,
+    `damas de compania en ${city.city}`,
+    `chicas en ${city.city}`,
+    `masajistas en ${city.city}`,
+    `universitarias en ${city.city}`,
+  ]);
 
 const buildCityFaqs = (
   routeTitle: string,
@@ -55,8 +119,8 @@ const buildCityFaqs = (
         "Si. La pagina usa los perfiles activos, visibles y aprobados dentro de BelaClub, por eso el listado puede cambiar cuando se aprueban, pausan o actualizan perfiles.",
     },
     {
-      question: `Tambien sirve para buscar prepagos, acompanantes o damas de compania en ${cityName}?`,
-      answer: `Si. BelaClub conecta busquedas relacionadas como escorts, prepagos, acompanantes, damas de compania, chicas, masajistas y universitarias en ${cityName} con paginas filtradas por ciudad.`,
+      question: `Tambien sirve para buscar escorts, prepagos o putas en ${cityName}?`,
+      answer: `Si. BelaClub conecta busquedas relacionadas como escorts, prepagos, putas, acompanantes, damas de compania, chicas, masajistas y universitarias en ${cityName} con paginas filtradas por ciudad.`,
     },
   ];
 };
@@ -87,12 +151,16 @@ export async function generateProviderCityMetadata(
     ? `${city.city}, ${city.department}`
     : city.city;
   const title = `${route.title} en ${city.city}`;
-  const description = `Encuentra ${route.pluralNoun}, escorts, prepagos, acompañantes, damas de compañía, chicas, masajistas y universitarias en ${place}. Revisa perfiles aprobados, fotos públicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
+  const description = buildCityMetaDescription(route, city, place);
+  const keywords = uniqueTexts([
+    ...getProviderSearchKeywords(route, city.city),
+    ...(city.searchFocus || []),
+  ]);
 
   return {
-    title: `${title} | Perfiles aprobados en BelaClub`,
+    title: buildCityMetaTitle(route, city),
     description,
-    keywords: getProviderSearchKeywords(route, city.city),
+    keywords,
     alternates: {
       canonical: `/${route.segment}/${city.slug}`,
     },
@@ -138,7 +206,10 @@ export default async function ProviderCitySearchPage({
     ? `${city.city}, ${city.department}`
     : city.city;
   const pageUrl = `${siteUrl}/${route.segment}/${city.slug}`;
-  const keywords = getProviderSearchKeywords(route, city.city);
+  const keywords = uniqueTexts([
+    ...getProviderSearchKeywords(route, city.city),
+    ...(city.searchFocus || []),
+  ]);
   const cityProviders = await getPublicProviderCards({ citySlug: city.slug });
   const faqs = buildCityFaqs(
     route.title,
@@ -160,22 +231,19 @@ export default async function ProviderCitySearchPage({
     href: `/${route.segment}/${item.slug}`,
     label: `${route.title} en ${item.city}`,
   }));
-  const cityDescription = `Perfiles aprobados en ${city.city}${
-    city.department ? `, ${city.department}` : ""
-  }, con fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
+  const cityDescription = isRionegroFocusRoute(route.key, city.slug)
+    ? `Perfiles aprobados en Rionegro, Antioquia, para busquedas como escorts rionegro, escorts en rionegro, prepagos rionegro y putas rionegro, con fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`
+    : `Perfiles aprobados en ${city.city}${
+        city.department ? `, ${city.department}` : ""
+      }, con fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
   const cityIntro =
     city.seoIntro ||
     `BelaClub organiza perfiles aprobados en ${city.city} para facilitar busquedas por ciudad, zonas disponibles y contacto directo.`;
-  const searchTerms = uniqueTexts([
-    `${route.title} en ${city.city}`,
-    `escorts en ${city.city}`,
-    `prepagos en ${city.city}`,
-    `acompanantes en ${city.city}`,
-    `damas de compania en ${city.city}`,
-    `chicas en ${city.city}`,
-    `masajistas en ${city.city}`,
-    `universitarias en ${city.city}`,
-  ]);
+  const searchTerms = buildCitySearchTerms(route, city);
+  const relatedSearchText = getRelatedProviderSearchText(route.key);
+  const rionegroFocusText = isRionegroFocusRoute(route.key, city.slug)
+    ? "En Rionegro muchos usuarios comparan opciones en San Antonio de Pereira, Centro, Llanogrande y el sector del aeropuerto. Por eso esta vista mantiene el foco en perfiles visibles de la ciudad y categorias relacionadas."
+    : "";
   const nearbyText =
     city.nearbyCities && city.nearbyCities.length > 0
       ? `Tambien se conectan busquedas cercanas desde ${city.nearbyCities.join(
@@ -191,9 +259,9 @@ export default async function ProviderCitySearchPage({
             "@context": "https://schema.org",
             "@type": "CollectionPage",
             name: title,
-            description: `${route.title}, escorts, prepagos, acompañantes, damas de compañía, chicas, masajistas y universitarias con perfiles aprobados en ${city.city}${
+            description: `${route.title} con perfiles aprobados en ${city.city}${
               city.department ? `, ${city.department}` : ""
-            }, fotos públicas, zonas disponibles y contacto por WhatsApp dentro de BelaClub.`,
+            }, fotos públicas, zonas disponibles y contacto por WhatsApp dentro de BelaClub. Búsquedas relacionadas: ${relatedSearchText}.`,
             url: pageUrl,
             keywords: keywords.join(", "),
             about: keywords.map((keyword) => ({
@@ -301,7 +369,8 @@ export default async function ProviderCitySearchPage({
             cityProviders.length > 0
               ? `Actualmente se muestran ${cityProviders.length} perfiles activos para ${city.city}. El listado se alimenta de perfiles aprobados, visibles y actualizados dentro de BelaClub.`
               : `Esta pagina queda preparada para mostrar perfiles activos en ${city.city} tan pronto sean aprobados y visibles dentro de BelaClub.`,
-            `En esta pagina se agrupan perfiles de ${route.pluralNoun} en ${city.city} junto con busquedas relacionadas como escorts, prepagos, acompanantes, damas de compania, chicas, masajistas y universitarias.`,
+            rionegroFocusText,
+            `En esta pagina se agrupan perfiles de ${route.pluralNoun} en ${city.city} junto con busquedas relacionadas como ${relatedSearchText}.`,
             nearbyText,
             `La disponibilidad de perfiles en ${city.city} se mantiene alineada con los perfiles activos y aprobados dentro de BelaClub.`,
           ].filter(Boolean),

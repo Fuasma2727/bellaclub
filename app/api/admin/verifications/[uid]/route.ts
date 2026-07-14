@@ -399,6 +399,7 @@ export async function PATCH(request: Request, { params }: Params) {
       const level = Number(userData.badgeVerificationLevel || 0);
       const badge = badgeByLevel(level);
       const hasProfilePhoto = Boolean(userData.photoUrl);
+      const profileAlreadyApproved = userData.verificationStatus === "approved";
 
       if (!badge || userData.badgeVerificationStatus !== "pending") {
         return NextResponse.json(
@@ -408,9 +409,13 @@ export async function PATCH(request: Request, { params }: Params) {
       }
 
       await userRef.update({
-        isVerified: true,
-        profileVisible: hasProfilePhoto,
-        verificationStatus: "approved",
+        isVerified: profileAlreadyApproved,
+        profileVisible:
+          profileAlreadyApproved &&
+          hasProfilePhoto &&
+          !userData.blocked &&
+          !userData.profilePaused,
+        verificationStatus: userData.verificationStatus || "pending",
         blocked: false,
         blockedReason: adminFieldValue.delete(),
         visitVerified: level >= 3,
@@ -420,16 +425,22 @@ export async function PATCH(request: Request, { params }: Params) {
         badgeVerifiedAt: adminFieldValue.serverTimestamp(),
         badgeVerifiedBy: owner.uid,
         subscriptionStatus:
-          userData.subscriptionStatus || "pending_payment",
+          profileAlreadyApproved
+            ? userData.subscriptionStatus || "pending_payment"
+            : userData.subscriptionStatus || null,
         subscriptionAmount: PROVIDER_MONTHLY_FEE,
         subscriptionManualOverride: false,
         subscriptionNextChargeAt:
-          userData.subscriptionNextChargeAt ||
-          adminFieldValue.serverTimestamp(),
+          profileAlreadyApproved
+            ? userData.subscriptionNextChargeAt ||
+              adminFieldValue.serverTimestamp()
+            : userData.subscriptionNextChargeAt || null,
         subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
       });
 
-      const subscriptionResult = await processProviderSubscription(uid);
+      const subscriptionResult = profileAlreadyApproved
+        ? await processProviderSubscription(uid)
+        : null;
       const badgeLabel = badgeLabelByLevel(level);
 
       await adminDb.collection("notifications").doc().set({
@@ -458,7 +469,10 @@ export async function PATCH(request: Request, { params }: Params) {
 
       return NextResponse.json({
         success: true,
+        verificationStatus: userData.verificationStatus || "pending",
         verificationBadge: badge,
+        badgeVerificationLevel: level,
+        badgeVerificationStatus: "approved",
         subscriptionResult,
         referralResult,
       });
@@ -838,10 +852,6 @@ export async function PATCH(request: Request, { params }: Params) {
       verificationStatus: "rejected",
       verificationPhotoUrl: adminFieldValue.delete(),
       blocked: false,
-      visitVerified: false,
-      visitVerificationStatus: "none",
-      verificationBadge: null,
-      badgeVerificationStatus: "none",
       rejectedAt: adminFieldValue.serverTimestamp(),
       rejectedBy: owner.uid,
     });
@@ -851,7 +861,7 @@ export async function PATCH(request: Request, { params }: Params) {
       type: "provider_verification_rejected",
       title: "Verificacion no aprobada",
       message:
-        "Tu foto de verificacion no fue aprobada. Puedes enviar una nueva solicitud desde tu perfil con una foto o video mas claro.",
+        "Tu perfil no fue aprobado. Puedes revisar tus datos y enviar una nueva solicitud desde tu perfil.",
       read: false,
       createdAt: adminFieldValue.serverTimestamp(),
     });

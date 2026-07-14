@@ -9,13 +9,10 @@ const isAuthorizedCron = (request: Request) => {
   const vercelCron = request.headers.get("x-vercel-cron");
 
   if (cronSecret) {
-    return authHeader === `Bearer ${cronSecret}` || vercelCron === "1";
+    return authHeader === `Bearer ${cronSecret}`;
   }
 
-  return (
-    process.env.NODE_ENV !== "production" ||
-    vercelCron === "1"
-  );
+  return process.env.NODE_ENV !== "production" || vercelCron === "1";
 };
 
 export async function GET(request: Request) {

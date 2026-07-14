@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Escorts en Colombia",
   description:
-    "Encuentra escorts, prepagos, acompañantes y damas de compañía en Medellín, La Ceja, Rionegro y otras ciudades de Colombia. Perfiles aprobados, galerías públicas y contacto por WhatsApp en BelaClub.",
+    "Encuentra escorts en Rionegro, Medellín, La Ceja y otras ciudades de Colombia. Perfiles aprobados, galerías públicas, zonas disponibles y contacto por WhatsApp en BelaClub.",
   keywords: [
     "escorts en Medellín",
      "escorts en Medellin",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Escorts en Colombia | BelaClub",
     description:
-      "Escorts, prepagos y acompañantes en Medellín, La Ceja y Rionegro con perfiles aprobados y contacto directo por WhatsApp.",
+      "Escorts en Rionegro, Medellín y La Ceja con perfiles aprobados y contacto directo por WhatsApp.",
     url: "/escorts",
     siteName: "BelaClub",
     images: [
@@ -107,7 +107,7 @@ export default async function EscortsPage() {
       <PrestadoresPage
         pageTitle="Escorts en Colombia"
         pageEyebrow="Explora por ciudad"
-        pageDescription="Encuentra escorts verificadas en Medellín, La Ceja, Rionegro y otras ciudades. Revisa galerías públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
+        pageDescription="Encuentra escorts verificadas en Rionegro, Medellín, La Ceja y otras ciudades. Revisa galerías públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
         initialProviders={initialProviders}
         seoCityLinks={[
           ...cityLinks,
@@ -119,10 +119,11 @@ export default async function EscortsPage() {
         seoContent={{
           heading: "Escorts por ciudad en BelaClub",
           paragraphs: [
-            "BelaClub organiza perfiles aprobados por ciudad para facilitar búsquedas como escorts Medellín, prepagos Medellín, acompañantes, damas de compañía, chicas, masajistas y universitarias.",
+            "BelaClub organiza perfiles aprobados por ciudad para facilitar búsquedas como escorts rionegro, escorts en rionegro, prepagos rionegro, putas rionegro, escorts Medellín y prepagos Medellín.",
+            "Rionegro concentra busquedas del oriente antioqueño en zonas como San Antonio de Pereira, Centro, Llanogrande y el sector del Aeropuerto Jose Maria Cordova.",
             "Cada página de ciudad permite revisar perfiles, fotos públicas, ubicación, zonas disponibles y contacto directo por WhatsApp.",
           ],
-          zones: ["Medellín", "Rionegro", "La Ceja", "El Poblado", "Laureles", "San Antonio"],
+          zones: ["Rionegro", "San Antonio de Pereira", "Llanogrande", "Centro", "Medellín", "La Ceja"],
           relatedLinks: relatedCitySearchLinks,
         }}
       />

@@ -23,6 +23,8 @@ type AdminMediaItem = {
 
 type ProviderVerification = {
   id: string;
+  requestId?: string;
+  requestKind?: VerificationRequestKind;
   email?: string;
   name?: string;
   price?: string | number;
@@ -148,6 +150,8 @@ type VerificationAction =
   | "disableSubscription"
   | "enableSubscription";
 
+type VerificationRequestKind = "profile" | "badge";
+
 const statusClass: Record<VerificationStatus, string> = {
   pending: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200",
   approved: "border-blue-500/30 bg-blue-500/10 text-blue-200",
@@ -223,6 +227,46 @@ const isPastDueProvider = (provider: ProviderVerification) => {
   }
 
   return !provider.subscriptionStatus;
+};
+
+const isInitialVerificationPending = (provider: ProviderVerification) =>
+  !provider.verificationStatus || provider.verificationStatus === "pending";
+
+const isBadgeVerificationPending = (provider: ProviderVerification) =>
+  provider.badgeVerificationStatus === "pending";
+
+const getRequestId = (
+  provider: ProviderVerification,
+  requestKind?: VerificationRequestKind
+) => (requestKind ? `${provider.id}:${requestKind}` : provider.id);
+
+const getProviderRequestItems = (
+  provider: ProviderVerification,
+  includeSearchFallback: boolean
+): ProviderVerification[] => {
+  const requests: ProviderVerification[] = [];
+
+  if (isInitialVerificationPending(provider)) {
+    requests.push({
+      ...provider,
+      requestKind: "profile",
+      requestId: getRequestId(provider, "profile"),
+    });
+  }
+
+  if (isBadgeVerificationPending(provider)) {
+    requests.push({
+      ...provider,
+      requestKind: "badge",
+      requestId: getRequestId(provider, "badge"),
+    });
+  }
+
+  if (requests.length > 0) return requests;
+
+  return includeSearchFallback
+    ? [{ ...provider, requestId: getRequestId(provider) }]
+    : [];
 };
 
 export default function AdminVerificationsPage() {
@@ -582,6 +626,7 @@ export default function AdminVerificationsPage() {
         error?: string;
         photoUrl?: string;
         profileVisible?: boolean;
+        verificationStatus?: VerificationStatus;
         verificationBadge?: VerificationBadge | null;
         badgeVerificationLevel?: 1 | 2 | 3 | 4 | null;
         badgeVerificationStatus?: BadgeVerificationStatus;
@@ -683,6 +728,67 @@ export default function AdminVerificationsPage() {
                   badgeVerificationStatus:
                     data.badgeVerificationStatus ||
                     (data.verificationBadge ? "approved" : "none"),
+                  badgeVerificationVideoUrl: null,
+                  badgeVerificationEvidenceType: null,
+                  badgeVerificationRequestedAt: null,
+                }
+              : item
+          );
+        }
+
+        if (action === "approve") {
+          return current.map((item) =>
+            item.id === provider.id
+              ? {
+                  ...item,
+                  verificationStatus: "approved",
+                  blocked: false,
+                  blockedReason: null,
+                }
+              : item
+          );
+        }
+
+        if (action === "reject") {
+          return current.map((item) =>
+            item.id === provider.id
+              ? {
+                  ...item,
+                  verificationStatus: "rejected",
+                  verificationPhotoUrl: "",
+                }
+              : item
+          );
+        }
+
+        if (action === "verifyVisit") {
+          return current.map((item) =>
+            item.id === provider.id
+              ? {
+                  ...item,
+                  verificationStatus:
+                    data.verificationStatus || item.verificationStatus,
+                  verificationBadge: data.verificationBadge || null,
+                  badgeVerificationLevel:
+                    data.badgeVerificationLevel ||
+                    provider.badgeVerificationLevel ||
+                    null,
+                  badgeVerificationStatus:
+                    data.badgeVerificationStatus || "approved",
+                  badgeVerificationVideoUrl: null,
+                  badgeVerificationEvidenceType: null,
+                  badgeVerificationRequestedAt: null,
+                }
+              : item
+          );
+        }
+
+        if (action === "rejectBadgeVerification") {
+          return current.map((item) =>
+            item.id === provider.id
+              ? {
+                  ...item,
+                  badgeVerificationStatus: "rejected",
                   badgeVerificationVideoUrl: null,
                   badgeVerificationEvidenceType: null,
                   badgeVerificationRequestedAt: null,
@@ -1128,15 +1234,18 @@ export default function AdminVerificationsPage() {
     const subscriptionAction: VerificationAction = subscriptionDisabled
       ? "enableSubscription"
       : "disableSubscription";
-    const evidenceUrl =
-      provider.badgeVerificationVideoUrl || provider.verificationPhotoUrl || "";
-    const evidenceType =
-      provider.badgeVerificationEvidenceType ||
-      (provider.badgeVerificationLevel === 2 ? "video" : "photo");
-    const evidenceLabel =
-      evidenceType === "video"
+    const evidenceUrl = isBadgeRequest
+      ? provider.badgeVerificationVideoUrl || ""
+      : provider.verificationPhotoUrl || "";
+    const evidenceType = isBadgeRequest
+      ? provider.badgeVerificationEvidenceType ||
+        (provider.badgeVerificationLevel === 2 ? "video" : "photo")
+      : "photo";
+    const evidenceLabel = isBadgeRequest
+      ? evidenceType === "video"
         ? "Video de verificacion privado"
-        : "Foto de verificacion privada";
+        : "Foto de verificacion privada"
+      : "Foto enviada para aprobar el perfil";
 
     return (
       <div className="mt-3 space-y-3 border-t border-white/[0.08] pt-3">
@@ -1481,12 +1590,25 @@ export default function AdminVerificationsPage() {
     );
   };
 
+  const displayProviders =
+    activeView === "requests"
+      ? providers.flatMap((provider) =>
+          getProviderRequestItems(provider, Boolean(search.trim()))
+        )
+      : providers.map((provider) => ({
+          ...provider,
+          requestId: getRequestId(provider),
+        }));
   const selectedProvider =
     selectedProviderId &&
     activeView !== "reports" &&
     activeView !== "withdrawals" &&
     activeView !== "users"
-      ? providers.find((provider) => provider.id === selectedProviderId) || null
+      ? displayProviders.find(
+          (provider) =>
+            provider.requestId === selectedProviderId ||
+            provider.id === selectedProviderId
+        ) || null
       : null;
   const isLoading = authLoading || loading;
   const hasResults =
@@ -1496,7 +1618,7 @@ export default function AdminVerificationsPage() {
         ? withdrawals.length > 0
       : activeView === "users"
         ? adminUsers.length > 0
-        : providers.length > 0;
+        : displayProviders.length > 0;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -2085,15 +2207,39 @@ export default function AdminVerificationsPage() {
           </section>
         )}
 
-        {user && !isLoading && activeView !== "reports" && providers.length > 0 && (
+        {user &&
+          !isLoading &&
+          activeView !== "reports" &&
+          displayProviders.length > 0 && (
           <section className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {providers.map((provider) => {
+            {displayProviders.map((provider) => {
+              const requestLabel =
+                provider.requestKind === "profile"
+                  ? "Solicitud de perfil"
+                  : provider.requestKind === "badge"
+                    ? "Solicitud de verificacion"
+                    : "";
+
               return (
-                <ProviderCard
-                  key={provider.id}
-                  provider={toPublicProviderCard(provider)}
-                  onOpen={() => setSelectedProviderId(provider.id)}
-                />
+                <article key={provider.requestId || provider.id}>
+                  {requestLabel && (
+                    <div
+                      className={`mb-2 rounded-md border px-3 py-2 text-xs font-semibold ${
+                        provider.requestKind === "profile"
+                          ? "border-yellow-400/25 bg-yellow-400/10 text-yellow-100"
+                          : "border-emerald-400/25 bg-emerald-400/10 text-emerald-100"
+                      }`}
+                    >
+                      {requestLabel}
+                    </div>
+                  )}
+                  <ProviderCard
+                    provider={toPublicProviderCard(provider)}
+                    onOpen={() =>
+                      setSelectedProviderId(provider.requestId || provider.id)
+                    }
+                  />
+                </article>
               );
             })}
           </section>
@@ -2137,11 +2283,15 @@ export default function AdminVerificationsPage() {
                   {renderProviderAdminContent(selectedProvider, {
                     status: selectedProvider.verificationStatus || "pending",
                     isBadgeRequest:
-                      selectedProvider.badgeVerificationStatus === "pending",
+                      selectedProvider.requestKind === "badge" ||
+                      (!selectedProvider.requestKind &&
+                        selectedProvider.badgeVerificationStatus === "pending"),
                     isInitialRequest:
-                      (selectedProvider.verificationStatus || "pending") ===
-                        "pending" &&
-                      selectedProvider.badgeVerificationStatus !== "pending",
+                      selectedProvider.requestKind === "profile" ||
+                      (!selectedProvider.requestKind &&
+                        (selectedProvider.verificationStatus || "pending") ===
+                          "pending" &&
+                        selectedProvider.badgeVerificationStatus !== "pending"),
                     isBlockedView:
                       activeView === "blocked" || activeView === "past_due",
                   })}

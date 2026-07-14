@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     "abonos seguros",
   ],
   alternates: {
-    canonical: "/escorts",
+    canonical: "/",
   },
   icons: {
     icon: "/favicon.ico",
@@ -84,6 +84,9 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
+  },
+  other: {
+    rating: "adult",
   },
 };
 
