@@ -18,6 +18,7 @@ type VerificationAction =
   | "rejectBadgeVerification"
   | "verifyVisit"
   | "downgradeBadge"
+  | "upgradeBadge"
   | "removeVisit"
   | "block"
   | "unblock"
@@ -284,6 +285,7 @@ export async function PATCH(request: Request, { params }: Params) {
       "rejectBadgeVerification",
       "verifyVisit",
       "downgradeBadge",
+      "upgradeBadge",
       "removeVisit",
       "block",
       "unblock",
@@ -532,6 +534,71 @@ export async function PATCH(request: Request, { params }: Params) {
         verificationBadge: nextBadge,
         badgeVerificationLevel: nextLevel || null,
         badgeVerificationStatus: nextStatus,
+        visitVerified: nextLevel >= 3,
+      });
+    }
+
+    if (action === "upgradeBadge") {
+      const currentLevel =
+        Number(userData.badgeVerificationLevel || 0) ||
+        levelByBadge(userData.verificationBadge);
+      const currentBadge = badgeByLevel(currentLevel);
+
+      if (currentLevel >= 4) {
+        return NextResponse.json(
+          { error: "El prestador ya esta en el nivel maximo" },
+          { status: 400 }
+        );
+      }
+
+      const nextLevel = Math.min(currentLevel + 1, 4);
+      const nextBadge = badgeByLevel(nextLevel);
+
+      if (!nextBadge) {
+        return NextResponse.json(
+          { error: "No pudimos calcular el siguiente nivel" },
+          { status: 400 }
+        );
+      }
+
+      const previousLabel = currentBadge
+        ? badgeLabelByLevel(currentLevel)
+        : "sin nivel";
+      const nextLabel = badgeLabelByLevel(nextLevel);
+
+      await userRef.update({
+        verificationBadge: nextBadge,
+        badgeVerificationLevel: nextLevel,
+        badgeVerificationStatus: "approved",
+        badgeVerificationVideoUrl: adminFieldValue.delete(),
+        badgeVerificationEvidenceType: adminFieldValue.delete(),
+        badgeVerificationRequestedAt: adminFieldValue.delete(),
+        visitVerified: nextLevel >= 3,
+        visitVerificationStatus: nextLevel >= 3 ? "approved" : "none",
+        badgeUpgradedAt: adminFieldValue.serverTimestamp(),
+        badgeUpgradedBy: owner.uid,
+        previousVerificationBadge: currentBadge,
+        previousBadgeVerificationLevel: currentLevel || null,
+      });
+
+      await adminDb.collection("notifications").doc().set({
+        userId: uid,
+        type: "badge_verification_upgraded",
+        title: "Nivel actualizado",
+        message: `Tu nivel de verificacion fue ajustado de ${previousLabel} a ${nextLabel} por el administrador.`,
+        previousBadge: currentBadge,
+        previousBadgeLevel: currentLevel || null,
+        badge: nextBadge,
+        badgeLevel: nextLevel,
+        read: false,
+        createdAt: adminFieldValue.serverTimestamp(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        verificationBadge: nextBadge,
+        badgeVerificationLevel: nextLevel,
+        badgeVerificationStatus: "approved",
         visitVerified: nextLevel >= 3,
       });
     }

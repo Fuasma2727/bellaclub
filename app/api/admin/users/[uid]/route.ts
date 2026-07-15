@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
+import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
 import {
   guardMutationRequest,
@@ -194,6 +194,119 @@ type Params = {
     uid: string;
   }>;
 };
+
+const isStrongTemporaryPassword = (value: string) => {
+  return (
+    value.length >= 10 &&
+    value.length <= 128 &&
+    /[A-Za-z]/.test(value) &&
+    /\d/.test(value)
+  );
+};
+
+export async function PATCH(request: Request, { params }: Params) {
+  try {
+    guardMutationRequest(request, {
+      rateLimitKey: "admin-users-password",
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+      maxBodyBytes: 8 * 1024,
+    });
+
+    const owner = await requireOwner(request);
+    const { uid } = await params;
+    const body = (await request.json().catch(() => ({}))) as {
+      action?: "setPassword";
+      password?: string;
+    };
+
+    if (!uid) {
+      return NextResponse.json(
+        { error: "Usuario requerido" },
+        { status: 400 }
+      );
+    }
+
+    if (body.action !== "setPassword") {
+      return NextResponse.json(
+        { error: "Accion invalida" },
+        { status: 400 }
+      );
+    }
+
+    if (uid === owner.uid) {
+      return NextResponse.json(
+        { error: "No puedes cambiar la contraseña de la cuenta administradora" },
+        { status: 400 }
+      );
+    }
+
+    const password = String(body.password || "");
+
+    if (!isStrongTemporaryPassword(password)) {
+      return NextResponse.json(
+        {
+          error:
+            "La contraseña debe tener entre 10 y 128 caracteres, con letras y numeros.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const userRef = adminDb.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+
+    if (!userSnap.exists) {
+      return NextResponse.json(
+        { error: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    const userData = userSnap.data() || {};
+    const email = typeof userData.email === "string" ? userData.email : "";
+
+    if (owner.email && email.toLowerCase() === owner.email.toLowerCase()) {
+      return NextResponse.json(
+        { error: "No puedes cambiar la contraseña de la cuenta administradora" },
+        { status: 400 }
+      );
+    }
+
+    await adminAuth.updateUser(uid, { password });
+    await adminAuth.revokeRefreshTokens(uid);
+    await userRef.update({
+      passwordUpdatedAt: adminFieldValue.serverTimestamp(),
+      passwordUpdatedBy: owner.uid,
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const securityError = securityErrorResponse(error);
+    if (securityError) return securityError;
+
+    const code =
+      error &&
+      typeof error === "object" &&
+      "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+
+    if (code === "auth/user-not-found") {
+      return NextResponse.json(
+        { error: "Usuario no encontrado en Firebase Auth" },
+        { status: 404 }
+      );
+    }
+
+    const authError = ownerAuthError(error);
+
+    return NextResponse.json(
+      { error: authError.message },
+      { status: authError.status }
+    );
+  }
+}
 
 export async function DELETE(request: Request, { params }: Params) {
   try {

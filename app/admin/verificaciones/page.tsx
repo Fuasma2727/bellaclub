@@ -140,6 +140,7 @@ type VerificationAction =
   | "rejectBadgeVerification"
   | "verifyVisit"
   | "downgradeBadge"
+  | "upgradeBadge"
   | "removeVisit"
   | "block"
   | "unblock"
@@ -190,6 +191,12 @@ const lowerBadgeLabel = (badge: VerificationBadge) => {
   const nextBadge = badgeByLevel(badgeLevelByType[badge] - 1);
   return nextBadge ? badgeLabel[nextBadge] : "sin insignia";
 };
+
+const getProviderBadgeLevel = (provider: ProviderVerification) =>
+  Number(provider.badgeVerificationLevel || 0) ||
+  (provider.verificationBadge
+    ? badgeLevelByType[provider.verificationBadge]
+    : 0);
 
 const money = (value?: number | null) => {
   return `$${Number(value || 0).toLocaleString("es-CO")}`;
@@ -456,6 +463,29 @@ export default function AdminVerificationsPage() {
   const buildAdminMediaList = useCallback((provider: ProviderVerification) => {
     const items: MediaItem[] = [];
 
+    if (provider.verificationPhotoUrl) {
+      items.push({
+        id: "verification-photo",
+        type: "photo",
+        url: provider.verificationPhotoUrl,
+        private: true,
+        description: "Foto de verificacion",
+      });
+    }
+
+    if (provider.badgeVerificationVideoUrl) {
+      items.push({
+        id: "badge-verification-evidence",
+        type:
+          provider.badgeVerificationEvidenceType === "photo"
+            ? "photo"
+            : "video",
+        url: provider.badgeVerificationVideoUrl,
+        private: true,
+        description: "Evidencia de nivel",
+      });
+    }
+
     if (provider.photoUrl) {
       items.push({
         id: "profile-photo",
@@ -550,6 +580,7 @@ export default function AdminVerificationsPage() {
       action === "reject" ||
       action === "rejectBadgeVerification" ||
       action === "downgradeBadge" ||
+      action === "upgradeBadge" ||
       action === "block"
     ) {
       const confirmed = window.confirm(
@@ -559,6 +590,10 @@ export default function AdminVerificationsPage() {
             ? "Seguro que quieres no aprobar esta evidencia de verificacion?"
           : action === "downgradeBadge"
             ? `Seguro que quieres bajar de nivel a ${
+                provider.name || provider.email || "este prestador"
+              }?`
+          : action === "upgradeBadge"
+            ? `Seguro que quieres subir de nivel a ${
                 provider.name || provider.email || "este prestador"
               }?`
           : "Seguro que quieres rechazar esta solicitud?"
@@ -718,7 +753,7 @@ export default function AdminVerificationsPage() {
           });
         }
 
-        if (action === "downgradeBadge") {
+        if (action === "downgradeBadge" || action === "upgradeBadge") {
           return current.map((item) =>
             item.id === provider.id
               ? {
@@ -858,6 +893,61 @@ export default function AdminVerificationsPage() {
         error instanceof Error
           ? error.message
           : "No pudimos eliminar el usuario";
+      setMessage(errorMessage);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleSetAdminUserPassword = async (target: AdminUserItem) => {
+    if (!user || target.isOwner) return;
+
+    const password =
+      window.prompt(
+        `Escribe una contraseña temporal para ${
+          target.name || target.email || "este usuario"
+        }. Debe tener minimo 10 caracteres, letras y numeros.`
+      ) || "";
+
+    if (!password) return;
+
+    const confirmed = window.confirm(
+      `Vas a cambiar la contraseña de ${
+        target.email || target.name || "este usuario"
+      }. El usuario debera entrar con la nueva contraseña. Quieres continuar?`
+    );
+
+    if (!confirmed) return;
+
+    const actionKey = `password:${target.id}`;
+    setActionId(actionKey);
+    setMessage("");
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/users/${target.id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "setPassword",
+          password,
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+
+      if (!res.ok) {
+        throw new Error(data.error || "No pudimos cambiar la contraseña");
+      }
+
+      window.alert("Contraseña actualizada. Las sesiones anteriores fueron revocadas.");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "No pudimos cambiar la contraseña";
       setMessage(errorMessage);
     } finally {
       setActionId(null);
@@ -1042,7 +1132,43 @@ export default function AdminVerificationsPage() {
     provider: ProviderVerification,
     canDelete: boolean
   ) => {
-    const mediaCount = (provider.media || []).length + (provider.photoUrl ? 1 : 0);
+    const verificationEvidenceItems = [
+      provider.verificationPhotoUrl
+        ? {
+            id: "verification-photo",
+            type: "photo" as const,
+            url: provider.verificationPhotoUrl,
+            label: "Foto de verificacion",
+            description: "Foto enviada para aprobar el perfil",
+          }
+        : null,
+      provider.badgeVerificationVideoUrl
+        ? {
+            id: "badge-verification-evidence",
+            type:
+              provider.badgeVerificationEvidenceType === "photo"
+                ? ("photo" as const)
+                : ("video" as const),
+            url: provider.badgeVerificationVideoUrl,
+            label: "Evidencia de nivel",
+            description: "Evidencia enviada para subir de nivel",
+          }
+        : null,
+    ].filter(
+      (
+        item
+      ): item is {
+        id: string;
+        type: "photo" | "video";
+        url: string;
+        label: string;
+        description: string;
+      } => Boolean(item)
+    );
+    const mediaCount =
+      verificationEvidenceItems.length +
+      (provider.media || []).length +
+      (provider.photoUrl ? 1 : 0);
 
     return (
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
@@ -1053,12 +1179,67 @@ export default function AdminVerificationsPage() {
           <span className="text-xs text-neutral-600">{mediaCount}</span>
         </div>
 
-        {!provider.photoUrl && (!provider.media || provider.media.length === 0) ? (
+        {!provider.photoUrl &&
+        verificationEvidenceItems.length === 0 &&
+        (!provider.media || provider.media.length === 0) ? (
           <p className="text-sm text-neutral-500">
             Este prestador no tiene contenido en su perfil.
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-3">
+            {verificationEvidenceItems.map((item) => (
+              <div
+                key={item.id}
+                className="overflow-hidden rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06]"
+              >
+                <div className="relative aspect-square bg-black">
+                  {item.type === "video" ? (
+                    <>
+                      <video
+                        src={item.url}
+                        className="h-full w-full object-cover"
+                        controls
+                        muted
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openAdminMedia(provider, item.id)}
+                        className="absolute bottom-2 left-2 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/10"
+                      >
+                        Ampliar
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openAdminMedia(provider, item.id)}
+                      className="group/media relative block h-full w-full overflow-hidden text-left"
+                      aria-label={`Ampliar ${item.label}`}
+                    >
+                      <Image
+                        src={item.url}
+                        alt={item.description}
+                        fill
+                        className="object-cover transition duration-300 group-hover/media:scale-105"
+                        sizes="180px"
+                      />
+                      <span className="absolute inset-x-2 bottom-2 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-center text-[11px] font-semibold text-white opacity-0 backdrop-blur transition group-hover/media:opacity-100">
+                        Ampliar
+                      </span>
+                    </button>
+                  )}
+                  <span className="absolute right-2 top-2 rounded-full bg-emerald-500/90 px-2 py-1 text-[10px] font-semibold text-white">
+                    Verificacion
+                  </span>
+                </div>
+                <div className="p-2">
+                  <p className="truncate text-xs text-emerald-100">
+                    {item.label}
+                  </p>
+                </div>
+              </div>
+            ))}
+
             {provider.photoUrl && (
               <div className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
                 <button
@@ -1246,6 +1427,12 @@ export default function AdminVerificationsPage() {
         ? "Video de verificacion privado"
         : "Foto de verificacion privada"
       : "Foto enviada para aprobar el perfil";
+    const currentBadgeLevel = getProviderBadgeLevel(provider);
+    const currentBadge = badgeByLevel(currentBadgeLevel);
+    const nextBadge = badgeByLevel(currentBadgeLevel + 1);
+    const canAdjustBadge = !isBadgeRequest && !isInitialRequest;
+    const canUpgradeBadge = canAdjustBadge && currentBadgeLevel < 4;
+    const canDowngradeBadge = canAdjustBadge && currentBadgeLevel > 0;
 
     return (
       <div className="mt-3 space-y-3 border-t border-white/[0.08] pt-3">
@@ -1479,26 +1666,45 @@ export default function AdminVerificationsPage() {
               : "Bloquear perfil"}
         </button>
 
-        {provider.verificationBadge && !isBadgeRequest && (
+        {canAdjustBadge && (
           <div className="rounded-lg border border-amber-400/25 bg-amber-400/[0.06] p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/80">
               Nivel de verificacion
             </p>
             <p className="mt-1 text-xs leading-5 text-amber-50/75">
-              Actual: {badgeLabel[provider.verificationBadge]}. Al bajar quedara{" "}
-              {lowerBadgeLabel(provider.verificationBadge)}.
+              Actual:{" "}
+              {currentBadge ? badgeLabel[currentBadge] : "Sin nivel"}.
+              {canUpgradeBadge && nextBadge
+                ? ` Al subir quedara ${badgeLabel[nextBadge]}.`
+                : " Ya esta en el nivel maximo."}
+              {canDowngradeBadge && currentBadge
+                ? ` Al bajar quedara ${lowerBadgeLabel(currentBadge)}.`
+                : ""}
             </p>
-            <button
-              type="button"
-              disabled={actionId === provider.id}
-              onClick={(event) => {
-                event.stopPropagation();
-                handleAction(provider, "downgradeBadge");
-              }}
-              className="mt-3 w-full rounded-lg border border-amber-400/35 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {actionId === provider.id ? "Procesando..." : "Bajar de nivel"}
-            </button>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={actionId === provider.id || !canUpgradeBadge}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleAction(provider, "upgradeBadge");
+                }}
+                className="w-full rounded-lg border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {actionId === provider.id ? "Procesando..." : "Subir de nivel"}
+              </button>
+              <button
+                type="button"
+                disabled={actionId === provider.id || !canDowngradeBadge}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleAction(provider, "downgradeBadge");
+                }}
+                className="w-full rounded-lg border border-amber-400/35 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {actionId === provider.id ? "Procesando..." : "Bajar de nivel"}
+              </button>
+            </div>
           </div>
         )}
 
@@ -1917,12 +2123,13 @@ export default function AdminVerificationsPage() {
           <section className="mt-8 overflow-hidden rounded-lg border border-white/10 bg-neutral-950">
             <div className="grid grid-cols-[1fr_auto] border-b border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
               <span>Usuario</span>
-              <span>Accion</span>
+              <span>Acciones</span>
             </div>
 
             <div className="divide-y divide-white/10">
               {adminUsers.map((adminUser) => {
-                const actionKey = `user:${adminUser.id}`;
+                const deleteActionKey = `user:${adminUser.id}`;
+                const passwordActionKey = `password:${adminUser.id}`;
 
                 return (
                   <article
@@ -1960,18 +2167,36 @@ export default function AdminVerificationsPage() {
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={adminUser.isOwner || actionId === actionKey}
-                      onClick={() => void handleDeleteAdminUser(adminUser)}
-                      className="rounded-md border border-red-500/35 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {actionId === actionKey
-                        ? "Eliminando..."
-                        : adminUser.isOwner
-                          ? "Protegido"
-                          : "Eliminar"}
-                    </button>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        disabled={
+                          adminUser.isOwner || actionId === passwordActionKey
+                        }
+                        onClick={() =>
+                          void handleSetAdminUserPassword(adminUser)
+                        }
+                        className="rounded-md border border-blue-400/35 bg-blue-400/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {actionId === passwordActionKey
+                          ? "Cambiando..."
+                          : adminUser.isOwner
+                            ? "Protegido"
+                            : "Contraseña"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={adminUser.isOwner || actionId === deleteActionKey}
+                        onClick={() => void handleDeleteAdminUser(adminUser)}
+                        className="rounded-md border border-red-500/35 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {actionId === deleteActionKey
+                          ? "Eliminando..."
+                          : adminUser.isOwner
+                            ? "Protegido"
+                            : "Eliminar"}
+                      </button>
+                    </div>
                   </article>
                 );
               })}
