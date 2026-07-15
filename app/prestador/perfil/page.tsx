@@ -26,6 +26,11 @@ import {
   PROVIDER_PROMOTION_PRICE,
 } from "@/lib/providerPromotion";
 import {
+  DAILY_VIDEO_MAX_SECONDS,
+  DAILY_VIDEO_REWARD_AMOUNT,
+  canReceiveDailyVideoReward,
+} from "@/lib/providerDailyVideo";
+import {
   PROVIDER_REFERRAL_REWARD,
 } from "@/lib/referralCodes";
 import { getProviderZoneOptions } from "@/lib/providerZones";
@@ -171,10 +176,11 @@ type DailyVideoResponse = {
     duration?: number | null;
     expiresAt?: string | null;
   };
+  rewardAmount?: number;
+  rewardEligible?: boolean;
+  rewardGranted?: boolean;
   error?: string;
 };
-
-const DAILY_VIDEO_MAX_SECONDS = 30;
 
 const fieldBaseClass =
   "w-full rounded-lg border border-white/10 bg-[#09090a] px-3 py-2 text-[13px] text-neutral-100 outline-none transition placeholder:text-neutral-600 focus:border-blue-400/70 focus:ring-2 focus:ring-blue-500/15";
@@ -968,6 +974,8 @@ export default function PerfilPrestador() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [showDailyVideoUploadModal, setShowDailyVideoUploadModal] =
+    useState(false);
   const [showDailyVideoModal, setShowDailyVideoModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showQuickGuide, setShowQuickGuide] = useState(false);
@@ -1169,6 +1177,11 @@ export default function PerfilPrestador() {
   const currentVerificationLevel = effectiveVerificationBadge
     ? badgeLevelByType[effectiveVerificationBadge]
     : 0;
+  const dailyVideoRewardEligible = canReceiveDailyVideoReward({
+    verificationBadge,
+    badgeVerificationStatus,
+    badgeVerificationLevel,
+  });
   const availableVerificationOptions = verificationOptions.filter(
     (option) => option.level > currentVerificationLevel
   );
@@ -1372,6 +1385,7 @@ export default function PerfilPrestador() {
       showVerificationModal ||
       showPauseModal ||
       showPromotionModal ||
+      showDailyVideoUploadModal ||
       showDailyVideoModal ||
       showInviteModal
         ? "hidden"
@@ -1386,6 +1400,7 @@ export default function PerfilPrestador() {
     showVerificationModal,
     showPauseModal,
     showPromotionModal,
+    showDailyVideoUploadModal,
     showDailyVideoModal,
     showInviteModal,
   ]);
@@ -1994,7 +2009,16 @@ export default function PerfilPrestador() {
 
       setDailyVideoUrl(data.dailyVideo.url);
       setDailyVideoExpiresAt(data.dailyVideo.expiresAt || null);
-      showSuccess("Video del dia publicado por 4 horas");
+      setShowDailyVideoUploadModal(false);
+      showSuccess(
+        data.rewardEligible === false
+          ? "Video del dia publicado por 4 horas. El bono se activa desde verificacion bronce."
+          : data.rewardGranted
+          ? `Video del dia publicado por 4 horas. Bono de $${Number(
+              data.rewardAmount || DAILY_VIDEO_REWARD_AMOUNT
+            ).toLocaleString("es-CO")} agregado a tu saldo.`
+          : "Video del dia publicado por 4 horas. El bono de hoy ya fue pagado."
+      );
     } catch (dailyVideoError) {
       const text =
         dailyVideoError instanceof Error
@@ -3065,8 +3089,15 @@ export default function PerfilPrestador() {
                 </button>
               )}
 
-              <label
+              <button
+                type="button"
                 id="video-del-dia"
+                disabled={
+                  uploadingDailyVideo ||
+                  verificationStatus !== "approved" ||
+                  !hasProfilePhoto
+                }
+                onClick={() => setShowDailyVideoUploadModal(true)}
                 className={`group flex h-12 scroll-mt-24 items-center justify-center gap-2 rounded-md border px-4 text-center text-xs font-semibold transition ${
                   uploadingDailyVideo ||
                   verificationStatus !== "approved" ||
@@ -3093,25 +3124,16 @@ export default function PerfilPrestador() {
                         : "Video del dia"}
                   </span>
                   <span className="text-[10px] font-medium text-sky-100/60">
-                    {dailyVideoActive ? "Activo 4 horas" : "Max 30 segundos"}
+                    {dailyVideoActive
+                      ? "Activo 4 horas"
+                      : dailyVideoRewardEligible
+                        ? `Bono $${DAILY_VIDEO_REWARD_AMOUNT.toLocaleString(
+                            "es-CO"
+                          )}`
+                        : "Bono desde bronce"}
                   </span>
                 </span>
-                <input
-                  type="file"
-                  accept="video/*"
-                  hidden
-                  disabled={
-                    uploadingDailyVideo ||
-                    verificationStatus !== "approved" ||
-                    !hasProfilePhoto
-                  }
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = "";
-                    if (file) void uploadDailyVideo(file);
-                  }}
-                />
-              </label>
+              </button>
 
               <label className="group flex h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.035] px-4 text-center text-xs font-semibold text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition group-hover:border-white/20 group-hover:text-white">
@@ -3406,6 +3428,103 @@ export default function PerfilPrestador() {
               >
                 {buyingPromotion ? "Procesando..." : "Confirmar"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDailyVideoUploadModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4"
+          onClick={() => {
+            if (!uploadingDailyVideo) {
+              setShowDailyVideoUploadModal(false);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-lg border border-white/[0.08] bg-[#101012] shadow-2xl shadow-black/40"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-white/[0.08] bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_42%),#111113] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">
+                Video del dia
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-white">
+                Publica y gana visibilidad
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-neutral-400">
+                El video aparecera destacado durante 4 horas y debe durar maximo{" "}
+                {DAILY_VIDEO_MAX_SECONDS} segundos.
+              </p>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div
+                className={`rounded-lg border p-4 ${
+                  dailyVideoRewardEligible
+                    ? "border-emerald-300/20 bg-emerald-400/[0.08]"
+                    : "border-amber-300/20 bg-amber-400/[0.08]"
+                }`}
+              >
+                <p
+                  className={`text-xs font-semibold uppercase tracking-[0.14em] ${
+                    dailyVideoRewardEligible
+                      ? "text-emerald-200"
+                      : "text-amber-100"
+                  }`}
+                >
+                  Bono diario
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-white">
+                  {dailyVideoRewardEligible
+                    ? `+$${DAILY_VIDEO_REWARD_AMOUNT.toLocaleString("es-CO")}`
+                    : "Desde nivel bronce"}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-neutral-300">
+                  {dailyVideoRewardEligible
+                    ? "Se paga solo por el primer video que publiques cada dia. Puedes subir o reemplazar mas videos hoy, pero no generan otro bono."
+                    : "Puedes publicar video del dia, pero el bono de saldo solo se paga a perfiles con verificacion bronce o superior."}
+                </p>
+              </div>
+
+              {dailyVideoActive && (
+                <div className="rounded-md border border-sky-300/20 bg-sky-400/[0.08] px-3 py-2 text-xs leading-5 text-sky-100">
+                  Ya tienes un video activo. Si eliges otro archivo, el video
+                  actual se reemplazara.
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={uploadingDailyVideo}
+                  onClick={() => setShowDailyVideoUploadModal(false)}
+                  className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <label
+                  className={`rounded-md px-4 py-3 text-center text-sm font-semibold text-white transition ${
+                    uploadingDailyVideo
+                      ? "cursor-not-allowed bg-sky-700 opacity-70"
+                      : "cursor-pointer bg-sky-600 hover:bg-sky-500"
+                  }`}
+                >
+                  {uploadingDailyVideo ? "Subiendo..." : "Elegir video"}
+                  <input
+                    type="file"
+                    accept="video/*"
+                    hidden
+                    disabled={uploadingDailyVideo}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void uploadDailyVideo(file);
+                    }}
+                  />
+                </label>
+              </div>
             </div>
           </div>
         </div>

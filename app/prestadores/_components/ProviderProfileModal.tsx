@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import { MediaItem, Prestador } from "./types";
 import {
   formatMoney,
@@ -39,6 +40,23 @@ function WhatsAppIcon() {
         d="M9.3 8.2c.2-.4.4-.4.7-.4h.5c.2 0 .4.1.5.4l.5 1.2c.1.2.1.4 0 .6l-.4.5c-.1.2-.1.3 0 .5.4.8 1.2 1.5 2 1.9.2.1.3.1.5-.1l.6-.7c.1-.2.3-.2.6-.1l1.3.6c.2.1.4.3.4.5 0 .4-.2 1.2-.8 1.6-.5.4-1.4.5-2.7 0-2.4-.9-4-2.8-4.5-4.4-.3-.9-.2-1.6.2-2.1Z"
         fill="#101012"
       />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.4 2.1L8 9.6a16 16 0 0 0 6.4 6.4l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2Z" />
     </svg>
   );
 }
@@ -125,6 +143,12 @@ export default function ProviderProfileModal({
   );
   const providerName = getDisplayName(provider);
   const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
+  const phoneSeo = getPhoneSeoValues(provider.whatsapp);
+  const displayPhone = phoneSeo.canonicalDigits
+    ? phoneSeo.formattedLocal ||
+      phoneSeo.formattedInternational ||
+      phoneSeo.canonicalDigits
+    : "";
   const isPrivateMediaUrl = (url?: string) =>
     Boolean(url?.includes("/api/private-media"));
 
@@ -205,20 +229,40 @@ export default function ProviderProfileModal({
               Abonar al servicio
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (!userLoggedIn) {
-                  onRequestAuth();
-                  return;
-                }
-
-                onReport();
-              }}
-              className="mt-3 w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-5 py-3 text-sm font-semibold text-neutral-300 transition hover:bg-white/[0.07] hover:text-white"
+            <div
+              className={`mt-3 grid gap-2 ${
+                displayPhone ? "sm:grid-cols-[minmax(0,1fr)_150px]" : ""
+              }`}
             >
-              Reportar perfil
-            </button>
+              {displayPhone && (
+                <div
+                  aria-label={`Telefono de ${providerName}: ${displayPhone}`}
+                  className="flex min-h-[48px] min-w-0 items-center gap-3 rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-left text-neutral-200"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-400/10 text-emerald-100">
+                    <PhoneIcon />
+                  </span>
+                  <span className="min-w-0 whitespace-nowrap text-sm font-semibold leading-5 text-white">
+                    {displayPhone}
+                  </span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!userLoggedIn) {
+                    onRequestAuth();
+                    return;
+                  }
+
+                  onReport();
+                }}
+                className="min-h-[48px] rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-neutral-300 transition hover:bg-white/[0.07] hover:text-white"
+              >
+                Reportar perfil
+              </button>
+            </div>
 
           </div>
 
