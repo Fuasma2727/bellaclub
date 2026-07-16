@@ -21,6 +21,14 @@ type AdminMediaItem = {
   description?: string;
 };
 
+type AdminDailyVideo = {
+  url: string;
+  duration?: number | null;
+  createdAt?: string | null;
+  expiresAt?: string | null;
+  active?: boolean;
+};
+
 type ProviderVerification = {
   id: string;
   requestId?: string;
@@ -52,6 +60,7 @@ type ProviderVerification = {
   subscriptionAmount?: number | null;
   subscriptionManualOverride?: boolean;
   adminQualityRank?: number | null;
+  dailyVideo?: AdminDailyVideo | null;
   media?: AdminMediaItem[];
   createdAt?: string | null;
 };
@@ -202,6 +211,23 @@ const money = (value?: number | null) => {
   return `$${Number(value || 0).toLocaleString("es-CO")}`;
 };
 
+const formatDuration = (seconds?: number | null) => {
+  const safeSeconds = Math.max(0, Math.ceil(Number(seconds || 0)));
+
+  if (!safeSeconds) return "";
+
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "";
+
+  return new Date(value).toLocaleString("es-CO");
+};
+
 const userRoleLabel = (role?: string) => {
   if (role === "prestador") return "Prestador";
   if (role === "cliente") return "Cliente";
@@ -274,6 +300,79 @@ const getProviderRequestItems = (
   return includeSearchFallback
     ? [{ ...provider, requestId: getRequestId(provider) }]
     : [];
+};
+
+const ProviderBalanceBadge = ({ balance }: { balance?: number }) => {
+  const safeBalance = Number(balance || 0);
+  const hasBalance = safeBalance > 0;
+
+  return (
+    <div
+      aria-label={`Saldo del prestador: ${money(safeBalance)}`}
+      className={`pointer-events-none absolute right-2 top-2 z-20 rounded-md border px-2.5 py-1.5 text-right shadow-xl backdrop-blur-md ${
+        hasBalance
+          ? "border-emerald-200/35 bg-emerald-950/75 text-emerald-50 shadow-emerald-950/35"
+          : "border-white/12 bg-black/70 text-neutral-200 shadow-black/40"
+      }`}
+    >
+      <p className="text-[9px] font-semibold uppercase leading-none tracking-[0.14em] opacity-70">
+        Saldo
+      </p>
+      <p className="mt-1 text-[12px] font-bold leading-none tabular-nums sm:text-[13px]">
+        {money(safeBalance)}
+      </p>
+    </div>
+  );
+};
+
+const ProviderDailyVideoButton = ({
+  video,
+  onOpen,
+}: {
+  video?: AdminDailyVideo | null;
+  onOpen: () => void;
+}) => {
+  if (!video?.url) return null;
+
+  const isActive = Boolean(video.active);
+  const durationLabel = formatDuration(video.duration);
+
+  return (
+    <button
+      type="button"
+      aria-label={`Ver video temporal ${isActive ? "activo" : "vencido"}`}
+      title={video.url}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen();
+      }}
+      className={`absolute left-2 top-2 z-20 flex min-h-11 max-w-[calc(100%-5.5rem)] items-center gap-2 rounded-md border px-2.5 py-1.5 text-left shadow-xl backdrop-blur-md transition hover:-translate-y-0.5 ${
+        isActive
+          ? "border-sky-200/45 bg-sky-950/78 text-sky-50 shadow-sky-950/35 hover:border-sky-100/70"
+          : "border-amber-200/35 bg-amber-950/75 text-amber-50 shadow-amber-950/30 hover:border-amber-100/60"
+      }`}
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="ml-0.5 h-3.5 w-3.5"
+          fill="currentColor"
+        >
+          <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
+        </svg>
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[11px] font-bold leading-3">
+          Video 4h
+        </span>
+        <span className="mt-0.5 block truncate text-[10px] font-semibold leading-3 opacity-75">
+          {isActive ? "Activo" : "Vencido"}
+          {durationLabel ? ` - ${durationLabel}` : ""}
+        </span>
+      </span>
+    </button>
+  );
 };
 
 export default function AdminVerificationsPage() {
@@ -538,6 +637,22 @@ export default function AdminVerificationsPage() {
     },
     []
   );
+
+  const openDailyVideo = useCallback((provider: ProviderVerification) => {
+    if (!provider.dailyVideo?.url) return;
+
+    const dailyVideoItem: MediaItem = {
+      id: `daily-video-${provider.id}`,
+      type: "video",
+      url: provider.dailyVideo.url,
+      private: false,
+      description: "Video temporal de 4 horas",
+      duration: provider.dailyVideo.duration || null,
+    };
+
+    setMediaList([dailyVideoItem]);
+    setExpandedMedia(dailyVideoItem);
+  }, []);
 
   const moveExpandedMedia = useCallback(
     (direction: 1 | -1) => {
@@ -1536,6 +1651,53 @@ export default function AdminVerificationsPage() {
           )}
         </div>
 
+        {provider.dailyVideo?.url && (
+          <div className="rounded-lg border border-sky-300/20 bg-sky-400/[0.07] p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-100/85">
+                  Video temporal 4 horas
+                </p>
+                <p className="mt-1 truncate text-xs text-sky-50/70">
+                  {provider.dailyVideo.url}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-sky-50/75">
+                  {provider.dailyVideo.expiresAt && (
+                    <span>
+                      {provider.dailyVideo.active ? "Activo" : "Vencido"}
+                      : {formatDateTime(provider.dailyVideo.expiresAt)}
+                    </span>
+                  )}
+                  {provider.dailyVideo.duration && (
+                    <span>{formatDuration(provider.dailyVideo.duration)}</span>
+                  )}
+                </div>
+              </div>
+              <div className="grid shrink-0 grid-cols-2 gap-2 sm:w-40 sm:grid-cols-1">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openDailyVideo(provider);
+                  }}
+                  className="rounded-md border border-sky-200/35 bg-sky-300/12 px-3 py-2 text-xs font-semibold text-sky-50 transition hover:bg-sky-300/18"
+                >
+                  Ver video
+                </button>
+                <a
+                  href={provider.dailyVideo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-xs font-semibold text-neutral-100 transition hover:bg-white/[0.08]"
+                >
+                  Abrir URL
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.06] p-3">
           <label
             htmlFor={`quality-${provider.id}`}
@@ -2458,12 +2620,19 @@ export default function AdminVerificationsPage() {
                       {requestLabel}
                     </div>
                   )}
-                  <ProviderCard
-                    provider={toPublicProviderCard(provider)}
-                    onOpen={() =>
-                      setSelectedProviderId(provider.requestId || provider.id)
-                    }
-                  />
+                  <div className="relative">
+                    <ProviderBalanceBadge balance={provider.balance} />
+                    <ProviderDailyVideoButton
+                      video={provider.dailyVideo}
+                      onOpen={() => openDailyVideo(provider)}
+                    />
+                    <ProviderCard
+                      provider={toPublicProviderCard(provider)}
+                      onOpen={() =>
+                        setSelectedProviderId(provider.requestId || provider.id)
+                      }
+                    />
+                  </div>
                 </article>
               );
             })}

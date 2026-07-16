@@ -11,6 +11,7 @@ import {
   isAllowedPrivateContentPrice,
   ProviderMediaItem,
 } from "@/lib/providerMediaLimits";
+import { isSupportedVideoUrl } from "@/lib/mediaCompatibility";
 
 export const runtime = "nodejs";
 
@@ -115,6 +116,10 @@ export async function POST(request: Request) {
             item.type === "video" ? Math.ceil(Number(item.duration || 0)) : 0;
 
           if (item.type === "video") {
+            if (!isSupportedVideoUrl(item.url)) {
+              throw new Error("INVALID_VIDEO_FORMAT");
+            }
+
             if (!incomingDuration || incomingDuration <= 0) {
               throw new Error("INVALID_VIDEO_DURATION");
             }
@@ -163,6 +168,10 @@ export async function POST(request: Request) {
       const incomingDuration = Math.ceil(Number(body.item.duration || 0));
 
       if (body.item.type === "video") {
+        if (!isSupportedVideoUrl(body.item.url)) {
+          throw new Error("INVALID_VIDEO_FORMAT");
+        }
+
         if (!incomingDuration || incomingDuration <= 0) {
           throw new Error("INVALID_VIDEO_DURATION");
         }
@@ -219,6 +228,11 @@ export async function POST(request: Request) {
         },
         INVALID_VIDEO_DURATION: {
           message: "No pudimos leer la duracion del video",
+          status: 400,
+        },
+        INVALID_VIDEO_FORMAT: {
+          message:
+            "Formato de video no compatible. Sube un MP4 compatible antes de publicarlo.",
           status: 400,
         },
         VIDEO_TIME_LIMIT_REACHED: {

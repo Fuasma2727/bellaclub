@@ -98,19 +98,15 @@ function PhotoIcon() {
   );
 }
 
-function VideoIcon() {
+function PlayIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      className="h-6 w-6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      className={className}
+      fill="currentColor"
     >
-      <path d="M15 10.5 21 7v10l-6-3.5V17H3V7h12v3.5Z" />
+      <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
     </svg>
   );
 }
@@ -381,6 +377,24 @@ export default function ProviderProfileModal({
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.08),_rgba(0,0,0,0.15))]" />
                           )}
 
+                          {item.type === "video" && !isPrivate && (
+                            <>
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/36 via-transparent to-black/10 opacity-90 transition group-hover:from-black/45" />
+                              <span
+                                aria-hidden="true"
+                                className="absolute left-1/2 top-1/2 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-2xl shadow-black/45 backdrop-blur-md ring-1 ring-white/10 transition duration-300 group-hover:scale-105 group-hover:border-sky-200/55 group-hover:bg-black/62 sm:h-14 sm:w-14"
+                              >
+                                <span className="absolute inset-0 rounded-full bg-sky-300/10 blur-md" />
+                                <PlayIcon className="relative ml-0.5 h-5 w-5 drop-shadow sm:h-6 sm:w-6" />
+                              </span>
+                              {durationLabel && (
+                                <span className="absolute bottom-2 right-2 z-10 rounded-full border border-white/10 bg-black/65 px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-lg shadow-black/35 backdrop-blur">
+                                  {durationLabel}
+                                </span>
+                              )}
+                            </>
+                          )}
+
                           {isPrivate && (
                             <>
                               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10 transition group-hover:from-black/80 group-hover:via-black/38" />
@@ -395,7 +409,7 @@ export default function ProviderProfileModal({
                               </span>
                               <span className="absolute left-1/2 top-[40%] z-10 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/45 text-white shadow-xl shadow-black/40 backdrop-blur transition group-hover:scale-105 sm:h-14 sm:w-14">
                                 {item.type === "video" ? (
-                                  <VideoIcon />
+                                  <PlayIcon className="ml-0.5 h-6 w-6" />
                                 ) : (
                                   <PhotoIcon />
                                 )}

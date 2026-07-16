@@ -16,6 +16,14 @@ type AdminMediaItem = {
   description?: string;
 };
 
+type AdminDailyVideo = {
+  url: string;
+  duration?: number | null;
+  createdAt?: string | null;
+  expiresAt?: string | null;
+  active?: boolean;
+};
+
 type ProviderVerification = {
   id: string;
   email?: string;
@@ -45,12 +53,19 @@ type ProviderVerification = {
   subscriptionAmount?: number | null;
   subscriptionManualOverride?: boolean;
   adminQualityRank?: number | null;
+  dailyVideo?: AdminDailyVideo | null;
   media?: AdminMediaItem[];
   createdAt?: string | null;
 };
 
-const toDateString = (value: FirebaseFirestore.Timestamp | undefined) => {
-  return value?.toDate?.().toISOString() ?? null;
+const toDateString = (value: unknown) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+
+  const maybeTimestamp = value as { toDate?: () => Date };
+
+  return maybeTimestamp.toDate?.().toISOString() ?? null;
 };
 
 const sanitizeMediaForAdmin = (value: unknown): AdminMediaItem[] => {
@@ -75,6 +90,25 @@ const sanitizeMediaForAdmin = (value: unknown): AdminMediaItem[] => {
     });
 
   return items.filter((item): item is AdminMediaItem => Boolean(item));
+};
+
+const sanitizeDailyVideoForAdmin = (value: unknown): AdminDailyVideo | null => {
+  if (!value || typeof value !== "object") return null;
+
+  const video = value as Record<string, unknown>;
+  const url = typeof video.url === "string" ? video.url : "";
+
+  if (!url) return null;
+
+  const expiresAt = toDateString(video.expiresAt);
+
+  return {
+    url,
+    duration: Number(video.duration || 0) || null,
+    createdAt: toDateString(video.createdAt),
+    expiresAt,
+    active: expiresAt ? new Date(expiresAt).getTime() > Date.now() : false,
+  };
 };
 
 const matchesProviderSearch = (
@@ -147,6 +181,7 @@ export async function GET(request: Request) {
           subscriptionAmount: data.subscriptionAmount || null,
           subscriptionManualOverride: Boolean(data.subscriptionManualOverride),
           adminQualityRank: getAdminQualityRank(data.adminQualityRank) || null,
+          dailyVideo: sanitizeDailyVideoForAdmin(data.dailyVideo),
           media: sanitizeMediaForAdmin(data.media),
           createdAt: toDateString(data.createdAt),
         };

@@ -6,6 +6,10 @@ import {
   getVerificationLevelFromBadge,
 } from "@/lib/providerPromotion";
 import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
+import {
+  isSupportedMediaUrl,
+  isSupportedVideoUrl,
+} from "@/lib/mediaCompatibility";
 
 type MediaItem = {
   id?: string;
@@ -38,7 +42,12 @@ const getActiveDailyVideo = (dailyVideo: unknown) => {
         ? video.expiresAt
         : video.expiresAt?.toDate?.() || null;
 
-  if (!video.url || !expiresAt || expiresAt.getTime() <= Date.now()) {
+  if (
+    !video.url ||
+    !isSupportedVideoUrl(video.url) ||
+    !expiresAt ||
+    expiresAt.getTime() <= Date.now()
+  ) {
     return null;
   }
 
@@ -133,30 +142,36 @@ export async function GET(request: Request, { params }: Params) {
       });
     }
 
-    const safeMedia = media.map((item, index) => {
+    const safeMedia = media.flatMap((item, index) => {
+      if (!isSupportedMediaUrl(item.type || "photo", item.url)) {
+        return [];
+      }
+
       const mediaId = item.id || `legacy-${index}`;
       const unlocked = !item.private || purchasedIds.has(mediaId);
 
-      return {
-        id: mediaId,
-        type: item.type || "photo",
-        url:
-          unlocked && item.private && requesterId
-            ? createPrivateMediaUrl(request, {
-                buyerId: requesterId,
-                sellerId: id,
-                mediaId,
-              })
-            : unlocked
-              ? item.url || ""
-              : "",
-        private: Boolean(item.private),
-        price: item.private ? item.price || 0 : null,
-        description: item.private ? item.description || "" : "",
-        previewUrl: item.private ? item.previewUrl || item.url || "" : "",
-        duration:
-          item.type === "video" ? Number(item.duration || 0) || null : null,
-      };
+      return [
+        {
+          id: mediaId,
+          type: item.type || "photo",
+          url:
+            unlocked && item.private && requesterId
+              ? createPrivateMediaUrl(request, {
+                  buyerId: requesterId,
+                  sellerId: id,
+                  mediaId,
+                })
+              : unlocked
+                ? item.url || ""
+                : "",
+          private: Boolean(item.private),
+          price: item.private ? item.price || 0 : null,
+          description: item.private ? item.description || "" : "",
+          previewUrl: item.private ? item.previewUrl || item.url || "" : "",
+          duration:
+            item.type === "video" ? Number(item.duration || 0) || null : null,
+        },
+      ];
     });
 
     return NextResponse.json({

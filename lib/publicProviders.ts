@@ -11,6 +11,10 @@ import {
   getVerificationRank,
 } from "@/lib/providerPromotion";
 import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
+import {
+  isSupportedMediaUrl,
+  isSupportedVideoUrl,
+} from "@/lib/mediaCompatibility";
 
 type RawMediaItem = {
   id?: string;
@@ -49,7 +53,7 @@ const PUBLIC_PROVIDER_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 const PUBLIC_PROVIDER_DISK_CACHE_PATH = path.join(
   process.cwd(),
   ".runtime-cache",
-  "public-providers-v2.json"
+  "public-providers-v3.json"
 );
 
 const globalForPublicProviderCache = globalThis as typeof globalThis & {
@@ -139,7 +143,14 @@ const getActiveDailyVideo = (dailyVideo: unknown, now = Date.now()) => {
         ? video.expiresAt
         : video.expiresAt?.toDate?.() || null;
 
-  if (!video.url || !expiresAt || expiresAt.getTime() <= now) return null;
+  if (
+    !video.url ||
+    !isSupportedVideoUrl(video.url) ||
+    !expiresAt ||
+    expiresAt.getTime() <= now
+  ) {
+    return null;
+  }
 
   return {
     url: video.url,
@@ -186,29 +197,43 @@ export const getProviderProfilePath = (provider: {
 
 const sanitizeMediaForCard = (media?: RawMediaItem[]) => {
   return Array.isArray(media)
-    ? media.map((item, index) => ({
-        id: item.id || `legacy-${index}`,
-        type: item.type || "photo",
-        private: Boolean(item.private),
-        price: item.private ? item.price || 0 : null,
-        description: item.private ? item.description || "" : "",
-      }))
+    ? media.flatMap((item, index) => {
+        if (!isSupportedMediaUrl(item.type || "photo", item.url)) {
+          return [];
+        }
+
+        return [
+          {
+            id: item.id || `legacy-${index}`,
+            type: item.type || "photo",
+            private: Boolean(item.private),
+            price: item.private ? item.price || 0 : null,
+            description: item.private ? item.description || "" : "",
+          },
+        ];
+      })
     : [];
 };
 
 const sanitizeMediaForProfile = (media?: RawMediaItem[]) => {
   return Array.isArray(media)
-    ? media.map((item, index) => {
+    ? media.flatMap((item, index) => {
+        if (!isSupportedMediaUrl(item.type || "photo", item.url)) {
+          return [];
+        }
+
         const isPrivate = Boolean(item.private);
 
-        return {
-          id: item.id || `legacy-${index}`,
-          type: item.type || "photo",
-          url: isPrivate ? "" : item.url || "",
-          private: isPrivate,
-          price: isPrivate ? item.price || 0 : null,
-          description: isPrivate ? item.description || "" : "",
-        };
+        return [
+          {
+            id: item.id || `legacy-${index}`,
+            type: item.type || "photo",
+            url: isPrivate ? "" : item.url || "",
+            private: isPrivate,
+            price: isPrivate ? item.price || 0 : null,
+            description: isPrivate ? item.description || "" : "",
+          },
+        ];
       })
     : [];
 };

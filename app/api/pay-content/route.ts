@@ -10,9 +10,11 @@ import {
   securityErrorResponse,
 } from "@/lib/requestSecurity";
 import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
+import { isSupportedVideoUrl } from "@/lib/mediaCompatibility";
 
 type MediaItem = {
   id?: string;
+  type?: "photo" | "video";
   url?: string;
   private?: boolean;
   price?: number | string | null;
@@ -87,6 +89,16 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Contenido privado no encontrado" },
         { status: 404 }
+      );
+    }
+
+    if (targetMedia.type === "video" && !isSupportedVideoUrl(targetMedia.url)) {
+      return NextResponse.json(
+        {
+          error:
+            "Este video no esta disponible porque el formato no es compatible. No se realizo ningun cobro.",
+        },
+        { status: 409 }
       );
     }
 

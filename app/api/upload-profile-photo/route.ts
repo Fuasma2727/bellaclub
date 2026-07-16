@@ -4,6 +4,11 @@ import {
   guardMutationRequest,
   securityErrorResponse,
 } from "@/lib/requestSecurity";
+import {
+  SUPPORTED_UPLOAD_FORMAT_LABEL,
+  inferUploadContentType,
+  isSupportedUploadContentType,
+} from "@/lib/mediaCompatibility";
 
 export const runtime = "nodejs";
 
@@ -15,49 +20,8 @@ const BUNNY_CDN_HOST =
   process.env.BUNNY_CDN_HOST || "pp-profile-photos-cdn.b-cdn.net";
 const BUNNY_API_KEY = process.env.BUNNY_API_KEY;
 
-const allowedTypes = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "video/mp4",
-  "video/webm",
-  "video/quicktime",
-  "video/x-m4v",
-  "video/3gpp",
-  "video/3gpp2",
-];
-
-const contentTypeByExtension: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  gif: "image/gif",
-  mp4: "video/mp4",
-  webm: "video/webm",
-  mov: "video/quicktime",
-  qt: "video/quicktime",
-  m4v: "video/x-m4v",
-  "3gp": "video/3gpp",
-  "3gpp": "video/3gpp",
-  "3g2": "video/3gpp2",
-};
-
 const getHost = (value: string) => {
   return value.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-};
-
-const normalizeContentType = (value: string) => {
-  return value.split(";")[0]?.trim().toLowerCase() || "";
-};
-
-const inferContentType = (contentType: string, filename: string) => {
-  const normalized = normalizeContentType(contentType);
-  const extension = filename.split(".").pop()?.toLowerCase();
-  const extensionType = extension ? contentTypeByExtension[extension] || "" : "";
-
-  return allowedTypes.includes(normalized) ? normalized : extensionType || normalized;
 };
 
 const getSafeFilename = (filename: string) => {
@@ -162,7 +126,7 @@ export async function POST(request: Request) {
       const filename =
         decodeURIComponent(request.headers.get("x-file-name") || "") ||
         "upload.bin";
-      const contentType = inferContentType(
+      const contentType = inferUploadContentType(
         request.headers.get("x-file-type") || requestContentType,
         filename
       );
@@ -171,9 +135,11 @@ export async function POST(request: Request) {
       const fileSize = declaredSize || contentLength;
       const maxSize = getMaxSizeMb(contentType);
 
-      if (!allowedTypes.includes(contentType)) {
+      if (!isSupportedUploadContentType(contentType)) {
         return NextResponse.json(
-          { error: "Formato no permitido. Usa imagen o video compatible." },
+          {
+            error: `Formato no permitido. Usa ${SUPPORTED_UPLOAD_FORMAT_LABEL}.`,
+          },
           { status: 400 }
         );
       }
@@ -226,11 +192,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const contentType = inferContentType(file.type, file.name);
+    const contentType = inferUploadContentType(file.type, file.name);
 
-    if (!allowedTypes.includes(contentType)) {
+    if (!isSupportedUploadContentType(contentType)) {
       return NextResponse.json(
-        { error: "Formato no permitido. Usa imagen o video compatible." },
+        {
+          error: `Formato no permitido. Usa ${SUPPORTED_UPLOAD_FORMAT_LABEL}.`,
+        },
         { status: 400 }
       );
     }

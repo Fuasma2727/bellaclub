@@ -14,6 +14,7 @@ import {
   getDailyVideoRewardDateKey,
 } from "@/lib/providerDailyVideo";
 import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
+import { isSupportedVideoUrl } from "@/lib/mediaCompatibility";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,11 @@ type DailyVideoBody = {
 };
 
 const isValidVideoUrl = (url: unknown): url is string => {
-  return typeof url === "string" && url.startsWith("https://");
+  return (
+    typeof url === "string" &&
+    url.startsWith("https://") &&
+    isSupportedVideoUrl(url)
+  );
 };
 
 export async function POST(request: Request) {
@@ -41,7 +46,10 @@ export async function POST(request: Request) {
 
     if (!isValidVideoUrl(videoUrl)) {
       return NextResponse.json(
-        { error: "Video invalido. Vuelve a subir el archivo." },
+        {
+          error:
+            "Video invalido. Sube un MP4 compatible antes de publicarlo.",
+        },
         { status: 400 }
       );
     }

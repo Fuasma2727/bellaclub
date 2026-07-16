@@ -31,6 +31,15 @@ import {
   canReceiveDailyVideoReward,
 } from "@/lib/providerDailyVideo";
 import {
+  MEDIA_UPLOAD_ACCEPT,
+  SUPPORTED_UPLOAD_FORMAT_LABEL,
+  SUPPORTED_VIDEO_FORMAT_LABEL,
+  VIDEO_UPLOAD_ACCEPT,
+  getUploadMediaType,
+  inferUploadContentType as inferContentTypeFromUpload,
+  isSupportedUploadContentType,
+} from "@/lib/mediaCompatibility";
+import {
   PROVIDER_REFERRAL_REWARD,
 } from "@/lib/referralCodes";
 import { getProviderZoneOptions } from "@/lib/providerZones";
@@ -118,35 +127,6 @@ type MediaUploadProgressItem = {
 const MAX_IMAGE_UPLOAD_MB = 12;
 const MAX_VIDEO_UPLOAD_MB = 150;
 
-const uploadContentTypeByExtension: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  gif: "image/gif",
-  mp4: "video/mp4",
-  webm: "video/webm",
-  mov: "video/quicktime",
-  qt: "video/quicktime",
-  m4v: "video/x-m4v",
-  "3gp": "video/3gpp",
-  "3gpp": "video/3gpp",
-  "3g2": "video/3gpp2",
-};
-
-const supportedUploadTypes = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "video/mp4",
-  "video/webm",
-  "video/quicktime",
-  "video/x-m4v",
-  "video/3gpp",
-  "video/3gpp2",
-]);
-
 type ProviderMediaResponse = {
   media?: MediaItem[];
   error?: string;
@@ -232,37 +212,17 @@ const createMediaId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-const normalizeContentType = (value: string) => {
-  return value.split(";")[0]?.trim().toLowerCase() || "";
-};
-
 const inferUploadContentType = (file: File) => {
-  const browserType = normalizeContentType(file.type);
-  const extension = file.name.split(".").pop()?.toLowerCase();
-  const extensionType = extension
-    ? uploadContentTypeByExtension[extension] || ""
-    : "";
-
-  if (browserType && supportedUploadTypes.has(browserType)) {
-    return browserType;
-  }
-
-  return extensionType || browserType;
-};
-
-const getUploadMediaType = (contentType: string): MediaItem["type"] | null => {
-  if (contentType.startsWith("video/")) return "video";
-  if (contentType.startsWith("image/")) return "photo";
-  return null;
+  return inferContentTypeFromUpload(file.type, file.name);
 };
 
 const validateUploadFile = (file: File) => {
   const contentType = inferUploadContentType(file);
   const mediaType = getUploadMediaType(contentType);
 
-  if (!mediaType || !supportedUploadTypes.has(contentType)) {
+  if (!mediaType || !isSupportedUploadContentType(contentType)) {
     throw new Error(
-      `Formato no permitido para "${file.name}". Usa JPG, PNG, WEBP, GIF, MP4, WEBM, MOV, M4V o 3GP.`
+      `Formato no permitido para "${file.name}". Usa ${SUPPORTED_UPLOAD_FORMAT_LABEL}.`
     );
   }
 
@@ -609,7 +569,7 @@ const getVideoDuration = (file: File) => {
       URL.revokeObjectURL(objectUrl);
       reject(
         new Error(
-          "No pudimos leer la duracion del video. Intenta con un MP4 mas liviano."
+          `No pudimos leer la duracion del video. Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
         )
       );
     }, 15000);
@@ -628,7 +588,7 @@ const getVideoDuration = (file: File) => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) {
         reject(
           new Error(
-            "No pudimos leer la duracion del video. Intenta con un MP4 mas liviano."
+            `No pudimos leer la duracion del video. Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
           )
         );
         return;
@@ -640,7 +600,7 @@ const getVideoDuration = (file: File) => {
       cleanup();
       reject(
         new Error(
-          "No pudimos leer la duracion del video. Intenta con un MP4 mas liviano."
+          `No pudimos leer la duracion del video. Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
         )
       );
     };
@@ -1603,7 +1563,7 @@ export default function PerfilPrestador() {
               item.type === "video"
                 ? await getVideoDuration(item.file).catch(() => {
                     throw new Error(
-                      `No pudimos leer la duracion de "${item.file.name}". Intenta con un MP4 mas liviano o grabado en H.264.`
+                      `No pudimos leer la duracion de "${item.file.name}". Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
                     );
                   })
                 : null;
@@ -3159,7 +3119,7 @@ export default function PerfilPrestador() {
                 </span>
                 <input
                   type="file"
-                  accept="image/*,video/*"
+                  accept={MEDIA_UPLOAD_ACCEPT}
                   hidden
                   multiple
                   onChange={(e) => {
@@ -3183,7 +3143,7 @@ export default function PerfilPrestador() {
                 </span>
                 <input
                   type="file"
-                  accept="image/*,video/*"
+                  accept={MEDIA_UPLOAD_ACCEPT}
                   hidden
                   multiple
                   onChange={(e) => {
@@ -3514,7 +3474,7 @@ export default function PerfilPrestador() {
                   {uploadingDailyVideo ? "Subiendo..." : "Elegir video"}
                   <input
                     type="file"
-                    accept="video/*"
+                    accept={VIDEO_UPLOAD_ACCEPT}
                     hidden
                     disabled={uploadingDailyVideo}
                     onChange={(e) => {
@@ -3790,7 +3750,9 @@ export default function PerfilPrestador() {
                     <input
                       type="file"
                       accept={
-                        selectedVerificationLevel === 1 ? "image/*" : "video/*"
+                        selectedVerificationLevel === 1
+                          ? "image/*"
+                          : VIDEO_UPLOAD_ACCEPT
                       }
                       disabled={requestingBadgeVerification}
                       className="absolute inset-0 cursor-pointer opacity-0"
