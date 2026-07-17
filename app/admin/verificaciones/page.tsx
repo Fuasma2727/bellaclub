@@ -143,6 +143,45 @@ type AdminUsersResponse = {
   error?: string;
 };
 
+type AdminApiErrorResponse = {
+  error?: string;
+};
+
+const getResponsePath = (response: Response) => {
+  try {
+    const url = new URL(response.url);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return "la ruta solicitada";
+  }
+};
+
+const readAdminJson = async <T extends AdminApiErrorResponse>(
+  response: Response,
+  fallbackMessage: string
+): Promise<T> => {
+  const rawText = await response.text();
+  let payload = {} as T;
+
+  if (rawText.trim()) {
+    try {
+      payload = JSON.parse(rawText) as T;
+    } catch {
+      throw new Error(
+        `${fallbackMessage}: ${getResponsePath(
+          response
+        )} respondio ${response.status} con un formato inesperado`
+      );
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error || `${fallbackMessage} (${response.status})`);
+  }
+
+  return payload;
+};
+
 type VerificationAction =
   | "approve"
   | "reject"
@@ -413,7 +452,18 @@ export default function AdminVerificationsPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      });
+      })
+        .then((response) =>
+          readAdminJson<FinanceSummaryResponse>(
+            response,
+            "No pudimos cargar el resumen financiero"
+          )
+        )
+        .then((data) => data.summary || null)
+        .catch((error) => {
+          console.warn("Admin finance summary failed", error);
+          return null;
+        });
 
       if (search.trim()) params.set("q", search.trim());
 
@@ -428,14 +478,11 @@ export default function AdminVerificationsPage() {
           }),
           summaryPromise,
         ]);
-        const data = (await res.json()) as ReportsListResponse;
-        const summaryData =
-          (await summaryRes.json()) as FinanceSummaryResponse;
-
-        if (!res.ok) {
-          throw new Error(data.error || "No pudimos cargar los reportes");
-        }
-        if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
+        const data = await readAdminJson<ReportsListResponse>(
+          res,
+          "No pudimos cargar los reportes"
+        );
+        setFinanceSummary(summaryRes);
 
         setReports(data.reports || []);
         setProviders([]);
@@ -446,11 +493,8 @@ export default function AdminVerificationsPage() {
 
       if (activeView === "users") {
         if (!search.trim()) {
-          const summaryRes = await summaryPromise;
-          const summaryData =
-            (await summaryRes.json()) as FinanceSummaryResponse;
-
-          if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
+          const summaryData = await summaryPromise;
+          setFinanceSummary(summaryData);
 
           setAdminUsers([]);
           setProviders([]);
@@ -468,14 +512,11 @@ export default function AdminVerificationsPage() {
           }),
           summaryPromise,
         ]);
-        const data = (await res.json()) as AdminUsersResponse;
-        const summaryData =
-          (await summaryRes.json()) as FinanceSummaryResponse;
-
-        if (!res.ok) {
-          throw new Error(data.error || "No pudimos cargar los usuarios");
-        }
-        if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
+        const data = await readAdminJson<AdminUsersResponse>(
+          res,
+          "No pudimos cargar los usuarios"
+        );
+        setFinanceSummary(summaryRes);
 
         setAdminUsers(data.users || []);
         setProviders([]);
@@ -495,14 +536,11 @@ export default function AdminVerificationsPage() {
           }),
           summaryPromise,
         ]);
-        const data = (await res.json()) as WithdrawalsListResponse;
-        const summaryData =
-          (await summaryRes.json()) as FinanceSummaryResponse;
-
-        if (!res.ok) {
-          throw new Error(data.error || "No pudimos cargar los retiros");
-        }
-        if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
+        const data = await readAdminJson<WithdrawalsListResponse>(
+          res,
+          "No pudimos cargar los retiros"
+        );
+        setFinanceSummary(summaryRes);
 
         setWithdrawals(data.withdrawals || []);
         setReports([]);
@@ -523,13 +561,11 @@ export default function AdminVerificationsPage() {
         }),
         summaryPromise,
       ]);
-      const data = (await res.json()) as VerificationListResponse;
-      const summaryData = (await summaryRes.json()) as FinanceSummaryResponse;
-
-      if (!res.ok) {
-        throw new Error(data.error || "No pudimos cargar las solicitudes");
-      }
-      if (summaryRes.ok) setFinanceSummary(summaryData.summary || null);
+      const data = await readAdminJson<VerificationListResponse>(
+        res,
+        "No pudimos cargar las solicitudes"
+      );
+      setFinanceSummary(summaryRes);
 
       setProviders(data.providers || []);
       setReports([]);
@@ -772,7 +808,7 @@ export default function AdminVerificationsPage() {
         },
         body: JSON.stringify({ action, mediaId, confirmText }),
       });
-      const data = (await res.json()) as {
+      const data = await readAdminJson<{
         error?: string;
         photoUrl?: string;
         profileVisible?: boolean;
@@ -780,11 +816,7 @@ export default function AdminVerificationsPage() {
         verificationBadge?: VerificationBadge | null;
         badgeVerificationLevel?: 1 | 2 | 3 | 4 | null;
         badgeVerificationStatus?: BadgeVerificationStatus;
-      };
-
-      if (!res.ok) {
-        throw new Error(data.error || "No pudimos actualizar la solicitud");
-      }
+      }>(res, "No pudimos actualizar la solicitud");
 
       setProviders((current) => {
         if (action === "deleteProvider") {
@@ -994,11 +1026,10 @@ export default function AdminVerificationsPage() {
         },
         body: JSON.stringify({ confirmText }),
       });
-      const data = (await res.json()) as { error?: string };
-
-      if (!res.ok) {
-        throw new Error(data.error || "No pudimos eliminar el usuario");
-      }
+      await readAdminJson<{ error?: string }>(
+        res,
+        "No pudimos eliminar el usuario"
+      );
 
       setAdminUsers((current) =>
         current.filter((item) => item.id !== target.id)
@@ -1051,11 +1082,10 @@ export default function AdminVerificationsPage() {
           password,
         }),
       });
-      const data = (await res.json()) as { error?: string };
-
-      if (!res.ok) {
-        throw new Error(data.error || "No pudimos cambiar la contraseña");
-      }
+      await readAdminJson<{ error?: string }>(
+        res,
+        "No pudimos cambiar la contraseña"
+      );
 
       window.alert("Contraseña actualizada. Las sesiones anteriores fueron revocadas.");
     } catch (error) {
@@ -1094,14 +1124,10 @@ export default function AdminVerificationsPage() {
           qualityRank,
         }),
       });
-      const data = (await res.json()) as {
+      const data = await readAdminJson<{
         error?: string;
         adminQualityRank?: number | null;
-      };
-
-      if (!res.ok) {
-        throw new Error(data.error || "No pudimos actualizar la calidad");
-      }
+      }>(res, "No pudimos actualizar la calidad");
 
       setProviders((current) =>
         current.map((item) =>
@@ -1156,11 +1182,10 @@ export default function AdminVerificationsPage() {
             body: JSON.stringify({ action: "block" }),
           }
         );
-        const data = (await res.json()) as { error?: string };
-
-        if (!res.ok) {
-          throw new Error(data.error || "No pudimos bloquear el perfil");
-        }
+        await readAdminJson<{ error?: string }>(
+          res,
+          "No pudimos bloquear el perfil"
+        );
 
         setReports((current) =>
           current.map((item) =>
@@ -1178,11 +1203,10 @@ export default function AdminVerificationsPage() {
         },
         body: JSON.stringify({ reportId: report.id, action }),
       });
-      const data = (await res.json()) as { error?: string };
-
-      if (!res.ok) {
-        throw new Error(data.error || "No pudimos actualizar el reporte");
-      }
+      await readAdminJson<{ error?: string }>(
+        res,
+        "No pudimos actualizar el reporte"
+      );
 
       setReports((current) => current.filter((item) => item.id !== report.id));
     } catch (error) {
@@ -1223,11 +1247,10 @@ export default function AdminVerificationsPage() {
         },
         body: JSON.stringify({ withdrawalId: withdrawal.id, action }),
       });
-      const data = (await res.json()) as { error?: string };
-
-      if (!res.ok) {
-        throw new Error(data.error || "No pudimos actualizar el retiro");
-      }
+      await readAdminJson<{ error?: string }>(
+        res,
+        "No pudimos actualizar el retiro"
+      );
 
       setWithdrawals((current) =>
         current.filter((item) => item.id !== withdrawal.id)
