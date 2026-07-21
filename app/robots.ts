@@ -18,6 +18,7 @@ export default function robots(): MetadataRoute.Robots {
           "/masajistas",
           "/universitarias",
           "/putas",
+          "/telefono",
           "/terminos",
           "/privacidad",
           "/seguridad",

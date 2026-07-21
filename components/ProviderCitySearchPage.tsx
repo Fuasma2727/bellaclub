@@ -7,6 +7,7 @@ import {
   targetSeoCities,
   type ProviderCitySeo,
 } from "@/lib/providerCitySeo";
+import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 import {
   getRelatedProviderSearchText,
@@ -314,12 +315,28 @@ export default async function ProviderCitySearchPage({
             name: `Perfiles de ${route.pluralNoun} en ${city.city}`,
             itemListElement: cityProviders
               .slice(0, 30)
-              .map((provider, index) => ({
-                "@type": "ListItem",
-                position: index + 1,
-                name: provider.name || `Perfil en ${city.city}`,
-                url: `${siteUrl}${provider.profilePath}`,
-              })),
+              .map((provider, index) => {
+                const phoneSeo = getPhoneSeoValues(provider.whatsapp);
+
+                return {
+                  "@type": "ListItem",
+                  position: index + 1,
+                  name: phoneSeo.canonicalDigits
+                    ? `${provider.name || `Perfil en ${city.city}`} WhatsApp ${phoneSeo.canonicalDigits}`
+                    : provider.name || `Perfil en ${city.city}`,
+                  url: `${siteUrl}${provider.profilePath}`,
+                  item: {
+                    "@type": "Person",
+                    name: provider.name || `Perfil en ${city.city}`,
+                    telephone:
+                      phoneSeo.formattedInternational ||
+                      phoneSeo.raw ||
+                      undefined,
+                    identifier: phoneSeo.canonicalDigits || undefined,
+                    url: `${siteUrl}${provider.profilePath}`,
+                  },
+                };
+              }),
           },
           {
             "@context": "https://schema.org",

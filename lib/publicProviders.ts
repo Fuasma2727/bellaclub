@@ -195,6 +195,12 @@ export const getProviderProfilePath = (provider: {
   whatsapp?: string;
 }) => `/escorts/${citySlug(provider.city || "colombia")}/${getProviderProfileSlug(provider)}`;
 
+export const getProviderPhonePath = (provider: { whatsapp?: string }) => {
+  const phoneSlug = getPhoneSeoValues(provider.whatsapp).canonicalDigits;
+
+  return phoneSlug ? `/telefono/${phoneSlug}` : "";
+};
+
 const sanitizeMediaForCard = (media?: RawMediaItem[]) => {
   return Array.isArray(media)
     ? media.flatMap((item, index) => {
@@ -511,4 +517,34 @@ export async function getPublicProviderProfileBySlug(
   }
 
   return provider;
+}
+
+export async function getPublicProviderProfileByPhone(phoneSlug: string) {
+  const requestedPhone = getPhoneSeoValues(phoneSlug);
+  const requestedVariants = new Set(
+    [
+      requestedPhone.digits,
+      requestedPhone.localDigits,
+      requestedPhone.internationalDigits,
+      requestedPhone.canonicalDigits,
+    ].filter(Boolean)
+  );
+
+  if (requestedVariants.size === 0) return null;
+
+  const providers = await getPublicProviderCards();
+  const match = providers.find((provider) => {
+    const providerPhone = getPhoneSeoValues(provider.whatsapp);
+
+    return [
+      providerPhone.digits,
+      providerPhone.localDigits,
+      providerPhone.internationalDigits,
+      providerPhone.canonicalDigits,
+    ]
+      .filter(Boolean)
+      .some((value) => requestedVariants.has(value));
+  });
+
+  return match ? getPublicProviderProfileById(match.id) : null;
 }

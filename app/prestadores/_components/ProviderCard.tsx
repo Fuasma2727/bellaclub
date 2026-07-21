@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import { Prestador } from "./types";
 import {
   formatMoney,
@@ -134,6 +135,9 @@ export default function ProviderCard({
   const name = getDisplayName(provider);
   const location = getLocation(provider);
   const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
+  const phoneSeo = getPhoneSeoValues(provider.whatsapp);
+  const displayPhone =
+    phoneSeo.formattedLocal || phoneSeo.canonicalDigits || phoneSeo.raw;
   const rating = Number(provider.rating || 0);
   const verificationBadge = provider.verificationBadge || null;
   const badgeText =
@@ -260,6 +264,11 @@ export default function ProviderCard({
           <p className="truncate text-[11px] leading-[15px] text-neutral-500 sm:text-xs">
             {location || "Ubicacion por confirmar"}
           </p>
+          {displayPhone && (
+            <p className="truncate text-[11px] leading-[15px] text-neutral-400 sm:text-xs">
+              WhatsApp {displayPhone}
+            </p>
+          )}
         </div>
 
         <div className="mt-1 flex items-center justify-between gap-2">

@@ -6,7 +6,10 @@ import Header from "@/components/header";
 import JsonLd from "@/components/JsonLd";
 import { citySlug as toCitySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
-import { getPublicProviderProfileBySlug } from "@/lib/publicProviders";
+import {
+  getProviderPhonePath,
+  getPublicProviderProfileBySlug,
+} from "@/lib/publicProviders";
 import { formatMoney, getWhatsAppUrl } from "@/app/prestadores/_components/utils";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
@@ -117,6 +120,7 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
     `Hola, vi tu perfil en BelaClub: ${name}`
   );
   const phoneSeo = getPhoneSeoValues(provider.whatsapp);
+  const phonePath = getProviderPhonePath(provider);
   const gallery = [
     {
       id: "profile-photo",
@@ -144,6 +148,7 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
               "@type": "Person",
               name,
               image: provider.photoUrl,
+              sameAs: phonePath ? [`${siteUrl}${phonePath}`] : undefined,
               telephone:
                 phoneSeo.formattedInternational ||
                 phoneSeo.raw ||
@@ -275,6 +280,14 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
                         </span>
                       ))}
                   </div>
+                  {phonePath && (
+                    <Link
+                      href={phonePath}
+                      className="mt-2 inline-flex text-xs font-semibold text-blue-200 transition hover:text-white"
+                    >
+                      Ficha del numero {phoneSeo.canonicalDigits}
+                    </Link>
+                  )}
                 </div>
               )}
 

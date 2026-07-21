@@ -1,16 +1,17 @@
 export const getPhoneSeoValues = (value?: string) => {
   const raw = value?.trim() || "";
   const digits = raw.replace(/\D/g, "");
+  const normalizedDigits = digits.startsWith("00") ? digits.slice(2) : digits;
   const localDigits =
-    digits.length === 12 && digits.startsWith("57")
-      ? digits.slice(2)
-      : digits.length === 10 && digits.startsWith("3")
-        ? digits
+    normalizedDigits.length === 12 && normalizedDigits.startsWith("57")
+      ? normalizedDigits.slice(2)
+      : normalizedDigits.length === 10 && normalizedDigits.startsWith("3")
+        ? normalizedDigits
         : "";
   const internationalDigits = localDigits
     ? `57${localDigits}`
-    : digits.length >= 10
-      ? digits
+    : normalizedDigits.length >= 10
+      ? normalizedDigits
       : "";
   const formattedLocal =
     localDigits.length === 10
@@ -33,6 +34,7 @@ export const getPhoneSeoValues = (value?: string) => {
         [
           raw,
           digits,
+          normalizedDigits,
           localDigits,
           internationalDigits,
           formattedLocal,
