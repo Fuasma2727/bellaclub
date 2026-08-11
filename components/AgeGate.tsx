@@ -5,6 +5,11 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 const ageGateStorageKey = "belaclub_age_gate_until";
 const ageGateDurationMs = 30 * 24 * 60 * 60 * 1000;
+const searchCrawlerUserAgentPattern =
+  /\b(googlebot|googlebot-image|googlebot-video|google-inspectiontool|googleother|adsbot-google|mediapartners-google|storebot-google|bingbot|bingpreview|duckduckbot|slurp|yandexbot)\b/i;
+
+const isSearchCrawlerUserAgent = (userAgent: string) =>
+  searchCrawlerUserAgentPattern.test(userAgent);
 
 const getStoredAgeGateExpiry = () => {
   try {
@@ -46,7 +51,11 @@ export default function AgeGate() {
     getAgeGateServerSnapshot
   );
   const [confirmedThisSession, setConfirmedThisSession] = useState(false);
-  const visible = shouldShowAgeGate && !confirmedThisSession;
+  const crawlerExempt =
+    typeof navigator !== "undefined" &&
+    isSearchCrawlerUserAgent(navigator.userAgent || "");
+  const visible =
+    !crawlerExempt && shouldShowAgeGate && !confirmedThisSession;
 
   useEffect(() => {
     if (!visible) return;

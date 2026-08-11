@@ -15,9 +15,12 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { app } from "@/lib/firebase";
 import { logoutUser } from "@/lib/auth";
+import {
+  DEFAULT_PROVIDER_SUBSCRIPTION_PLAN,
+  PROVIDER_RECHARGE_AMOUNTS,
+  PROVIDER_SUBSCRIPTION_PLANS,
+} from "@/lib/providerSubscriptionPlans";
 
-const rechargeOptions = [100000, 200000, 500000];
-const providerMonthlyFee = 100000;
 const withdrawalCommissionRate = 0.05;
 const minWithdrawalAmount = 50000;
 const supportInstagramUrl = "https://www.instagram.com/belaclub_0/";
@@ -116,6 +119,9 @@ export default function Header() {
   const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<
     number | null
   >(null);
+  const [selectedSubscriptionPlanId, setSelectedSubscriptionPlanId] = useState<string>(
+    DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.id
+  );
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalHolder, setWithdrawalHolder] = useState("");
   const [withdrawalMethod, setWithdrawalMethod] = useState("");
@@ -132,6 +138,10 @@ export default function Header() {
     useState(false);
   const [mounted, setMounted] = useState(false);
 
+  const selectedSubscriptionPlan =
+    PROVIDER_SUBSCRIPTION_PLANS.find(
+      (plan) => plan.id === selectedSubscriptionPlanId
+    ) || DEFAULT_PROVIDER_SUBSCRIPTION_PLAN;
   const unreadCount = notifications.filter((notification) => !notification.read)
     .length;
   const isProvider = role === "prestador";
@@ -238,6 +248,7 @@ export default function Header() {
     setBalanceMessage("");
     setBalanceSubmitting(false);
     setBalanceContext(null);
+    setSelectedSubscriptionPlanId(DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.id);
   }, []);
 
   useEffect(() => {
@@ -247,16 +258,27 @@ export default function Header() {
           mode?: "recharge" | "withdraw";
           context?: "subscription";
           amount?: number;
+          providerSubscriptionPlanId?: string;
         }>
       ).detail;
       const mode =
         detail?.mode === "withdraw"
           ? "withdraw"
           : "recharge";
+      const eventPlanId = detail?.providerSubscriptionPlanId;
 
       resetBalanceModal();
       setBalanceMode(mode);
       setBalanceContext(detail?.context === "subscription" ? "subscription" : null);
+      if (
+        detail?.context === "subscription" &&
+        eventPlanId &&
+        PROVIDER_SUBSCRIPTION_PLANS.some(
+          (plan) => plan.id === eventPlanId
+        )
+      ) {
+        setSelectedSubscriptionPlanId(eventPlanId);
+      }
       if (mode === "recharge" && detail?.amount) {
         setSelectedRechargeAmount(detail.amount);
       }
@@ -306,6 +328,8 @@ export default function Header() {
       },
       body: JSON.stringify({
         amountInCents: selectedRechargeAmount * 100,
+        providerSubscriptionPlanId:
+          balanceContext === "subscription" ? selectedSubscriptionPlan.id : null,
       }),
     });
     const data = await res.json();
@@ -320,7 +344,8 @@ export default function Header() {
 
     if (providerSubscriptionPastDue) {
       setBalanceContext("subscription");
-      setSelectedRechargeAmount(providerMonthlyFee);
+      setSelectedSubscriptionPlanId(DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.id);
+      setSelectedRechargeAmount(DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.amount);
     } else {
       setBalanceContext(null);
     }
@@ -623,14 +648,14 @@ export default function Header() {
                   onClick={openBalanceModal}
                   title={
                     providerSubscriptionPastDue
-                      ? "Mensualidad vencida. Recarga saldo para reactivar tu perfil."
+                      ? "Plan vencido. Recarga saldo para reactivar tu perfil."
                       : "Abrir saldo"
                   }
                   aria-label={
                     providerSubscriptionPastDue
                       ? `Saldo ${balance.toLocaleString(
                           "es-CO"
-                        )}. Mensualidad vencida. Abrir recarga.`
+                        )}. Plan vencido. Abrir recarga.`
                       : `Saldo ${balance.toLocaleString(
                           "es-CO"
                         )}. Abrir saldo.`
@@ -849,10 +874,18 @@ export default function Header() {
 
               {balanceMode === "recharge" ? (
                 <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-xs text-zinc-500">Monto a recargar</p>
+                  <p className="text-xs text-zinc-500">
+                    {balanceContext === "subscription"
+                      ? "Plan seleccionado"
+                      : "Monto a recargar"}
+                  </p>
                   <p className="mt-1 text-xl font-semibold text-emerald-300 sm:text-2xl">
                     {selectedRechargeAmount
-                      ? `$${selectedRechargeAmount.toLocaleString("es-CO")}`
+                      ? balanceContext === "subscription"
+                        ? `${selectedSubscriptionPlan.label} - $${selectedRechargeAmount.toLocaleString(
+                            "es-CO"
+                          )}`
+                        : `$${selectedRechargeAmount.toLocaleString("es-CO")}`
                       : "Selecciona una opcion"}
                   </p>
                 </div>
@@ -898,47 +931,75 @@ export default function Header() {
                     <div className="mb-5 rounded-lg border border-amber-300/25 bg-amber-300/[0.08] p-4 text-sm leading-6 text-amber-50">
                       {providerSubscriptionPastDue && (
                         <p className="mb-3 rounded-md border border-red-300/25 bg-red-500/15 p-3 font-semibold text-red-50">
-                          Tu perfil esta vencido por mensualidad pendiente.
+                          Tu perfil esta vencido por publicacion pendiente.
                           Recarga saldo para que vuelva a estar activo.
                         </p>
                       )}
                       <p className="font-semibold text-amber-100">
-                        Mensualidad BelaClub: $
-                        {providerMonthlyFee.toLocaleString("es-CO")}
+                        Planes BelaClub desde $50.000
                       </p>
                       <p className="mt-1 text-amber-50/85">
-                        Cubre 30 dias de uso del perfil. Si pausas la pagina,
-                        esos dias no se consumen y siguen contando cuando la
-                        reactives.
+                        Puedes activar tu perfil por 10 dias o mantener el plan
+                        de 30 dias.
                       </p>
                       <p className="mt-1 text-amber-50/85">
-                        Al terminar los 30 dias de uso, la mensualidad se
-                        descuenta automaticamente de tu saldo. Si no tienes
-                        saldo suficiente, el perfil se bloquea hasta que
-                        recargues.
+                        Al vencer, el sistema intentara descontar
+                        automaticamente el mismo plan de tu saldo. Si no tienes
+                        saldo suficiente, el perfil se bloquea hasta que pagues.
                       </p>
                     </div>
                   )}
                   <p className="mb-3 text-sm font-medium text-zinc-300">
-                    Elige un paquete
+                    {balanceContext === "subscription"
+                      ? "Elige un plan"
+                      : "Elige un paquete"}
                   </p>
-                  <div className="mb-5 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
-                    {rechargeOptions.map((amount) => (
-                      <button
-                        key={amount}
-                        type="button"
-                        onClick={() => setSelectedRechargeAmount(amount)}
-                        className={`rounded-lg border px-3 py-4 text-center transition ${
-                          selectedRechargeAmount === amount
-                            ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200 shadow-lg shadow-emerald-950/20"
-                            : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
-                        }`}
-                      >
-                        <span className="block text-sm font-semibold">
-                          ${amount.toLocaleString("es-CO")}
-                        </span>
-                      </button>
-                    ))}
+                  <div
+                    className={`mb-5 grid grid-cols-1 gap-2 ${
+                      balanceContext === "subscription"
+                        ? "min-[380px]:grid-cols-2"
+                        : "min-[380px]:grid-cols-3"
+                    }`}
+                  >
+                    {balanceContext === "subscription"
+                      ? PROVIDER_SUBSCRIPTION_PLANS.map((plan) => (
+                          <button
+                            key={plan.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSubscriptionPlanId(plan.id);
+                              setSelectedRechargeAmount(plan.amount);
+                            }}
+                            className={`rounded-lg border px-3 py-4 text-center transition ${
+                              selectedSubscriptionPlan.id === plan.id
+                                ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200 shadow-lg shadow-emerald-950/20"
+                                : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
+                            }`}
+                          >
+                            <span className="block text-sm font-semibold">
+                              {plan.label}
+                            </span>
+                            <span className="mt-1 block text-xs text-current/75">
+                              ${plan.amount.toLocaleString("es-CO")}
+                            </span>
+                          </button>
+                        ))
+                      : PROVIDER_RECHARGE_AMOUNTS.map((amount) => (
+                          <button
+                            key={amount}
+                            type="button"
+                            onClick={() => setSelectedRechargeAmount(amount)}
+                            className={`rounded-lg border px-3 py-4 text-center transition ${
+                              selectedRechargeAmount === amount
+                                ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200 shadow-lg shadow-emerald-950/20"
+                                : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
+                            }`}
+                          >
+                            <span className="block text-sm font-semibold">
+                              ${amount.toLocaleString("es-CO")}
+                            </span>
+                          </button>
+                        ))}
                   </div>
                   <button
                     type="button"
@@ -946,7 +1007,9 @@ export default function Header() {
                     disabled={!selectedRechargeAmount}
                     className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Recargar saldo
+                    {balanceContext === "subscription"
+                      ? "Pagar plan"
+                      : "Recargar saldo"}
                   </button>
                 </>
               ) : (

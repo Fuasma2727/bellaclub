@@ -6,6 +6,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import AgeGate from "@/components/AgeGate";
 import JsonLd from "@/components/JsonLd";
+import { explicitContentMetadata } from "@/lib/explicitContentSeo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -85,9 +86,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  other: {
-    rating: "adult",
-  },
+  other: explicitContentMetadata,
 };
 
 export default function RootLayout({

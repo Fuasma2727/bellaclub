@@ -124,6 +124,8 @@ export async function GET(request: Request) {
       balance: Number(user.balance || 0),
       subscriptionStatus: user.subscriptionStatus || null,
       subscriptionAmount: user.subscriptionAmount || null,
+      subscriptionPlanId: user.subscriptionPlanId || null,
+      subscriptionPlanDays: user.subscriptionPlanDays || null,
       subscriptionNextChargeAt: toDateString(user.subscriptionNextChargeAt),
       summary: {
         ...summary,

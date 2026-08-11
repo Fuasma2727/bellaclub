@@ -43,6 +43,7 @@ import {
   PROVIDER_REFERRAL_REWARD,
 } from "@/lib/referralCodes";
 import { getProviderZoneOptions } from "@/lib/providerZones";
+import { DEFAULT_PROVIDER_SUBSCRIPTION_PLAN } from "@/lib/providerSubscriptionPlans";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
@@ -1027,11 +1028,11 @@ export default function PerfilPrestador() {
   ].filter(Boolean).length;
   const subscriptionLabel =
     subscriptionStatus === "active"
-      ? "Mensualidad activa"
+      ? "Plan activo"
       : subscriptionStatus === "paused"
-        ? "Mensualidad pausada"
+        ? "Plan pausado"
         : subscriptionStatus === "past_due"
-          ? "Mensualidad pendiente"
+          ? "Plan pendiente"
           : subscriptionStatus === "admin_override"
             ? "Activada por admin"
             : "Pendiente de activar";
@@ -1167,7 +1168,8 @@ export default function PerfilPrestador() {
         detail: {
           mode: "recharge",
           context: "subscription",
-          amount: 100000,
+          amount: DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.amount,
+          providerSubscriptionPlanId: DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.id,
         },
       })
     );
@@ -2446,7 +2448,7 @@ export default function PerfilPrestador() {
                           aria-label={`${subscriptionLabel}. Abrir recarga de saldo`}
                           className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
                         >
-                          <span>Mensualidad</span>
+                          <span>Plan</span>
                           <span
                             className={`h-2.5 w-2.5 rounded-full ${
                               subscriptionIsOk

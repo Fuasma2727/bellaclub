@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { explicitContentHeader } from "./lib/explicitContentSeo";
 
 const csp = [
   "default-src 'self'",
@@ -29,6 +30,20 @@ const noStorePrivateHeaders = [
     key: "X-Robots-Tag",
     value: "noindex, nofollow, noarchive",
   },
+];
+
+const explicitPublicRouteSources = [
+  "/",
+  "/escorts/:path*",
+  "/prepagos/:path*",
+  "/prestadores/:path*",
+  "/acompanantes/:path*",
+  "/damas-de-compania/:path*",
+  "/chicas/:path*",
+  "/masajistas/:path*",
+  "/universitarias/:path*",
+  "/putas/:path*",
+  "/telefono/:path*",
 ];
 
 const nextConfig: NextConfig = {
@@ -97,6 +112,10 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      ...explicitPublicRouteSources.map((source) => ({
+        source,
+        headers: [explicitContentHeader],
+      })),
       {
         source: "/api/private-media",
         headers: noStorePrivateHeaders,

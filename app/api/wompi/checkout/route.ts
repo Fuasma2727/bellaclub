@@ -2,6 +2,11 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import {
+  getProviderSubscriptionPlan,
+  isProviderSubscriptionPlanId,
+  PROVIDER_RECHARGE_AMOUNTS,
+} from "@/lib/providerSubscriptionPlans";
+import {
   guardMutationRequest,
   securityErrorResponse,
 } from "@/lib/requestSecurity";
@@ -11,7 +16,6 @@ export const runtime = "nodejs";
 const PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY?.trim();
 const INTEGRITY_SECRET = process.env.WOMPI_INTEGRITY_SECRET?.trim();
 const WOMPI_URL = "https://checkout.wompi.co/p/";
-const allowedAmounts = [100000, 200000, 500000];
 
 const getWompiEnvironment = (value: string) => {
   if (value.includes("_prod_")) return "prod";
@@ -87,16 +91,48 @@ export async function POST(request: Request) {
     }
 
     const decoded = await adminAuth.verifyIdToken(token, true);
-    const { amountInCents } = (await request.json()) as {
+    const { amountInCents, providerSubscriptionPlanId } =
+      (await request.json()) as {
       amountInCents?: number;
+      providerSubscriptionPlanId?: string;
     };
     const amount = Number(amountInCents || 0) / 100;
+    const selectedSubscriptionPlan = providerSubscriptionPlanId
+      ? getProviderSubscriptionPlan(providerSubscriptionPlanId)
+      : null;
 
-    if (!amountInCents || !allowedAmounts.includes(amount)) {
+    if (
+      providerSubscriptionPlanId &&
+      (!isProviderSubscriptionPlanId(providerSubscriptionPlanId) ||
+        selectedSubscriptionPlan?.amount !== amount)
+    ) {
+      return NextResponse.json(
+        { error: "Plan de publicacion invalido" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !amountInCents ||
+      (!selectedSubscriptionPlan &&
+        !(PROVIDER_RECHARGE_AMOUNTS as readonly number[]).includes(amount))
+    ) {
       return NextResponse.json(
         { error: "Monto de recarga invalido" },
         { status: 400 }
       );
+    }
+
+    if (selectedSubscriptionPlan) {
+      const userSnap = await adminDb.collection("users").doc(decoded.uid).get();
+      const userData = userSnap.data() || {};
+
+      if (userData.role !== "prestador") {
+        return NextResponse.json(
+          { error: "Solo las escorts pueden pagar planes de publicacion" },
+          { status: 403 }
+        );
+      }
     }
 
     const currency = "COP";
@@ -114,6 +150,13 @@ export async function POST(request: Request) {
       currency,
       status: "PENDING",
       provider: "wompi",
+      purpose: selectedSubscriptionPlan
+        ? "provider_subscription"
+        : "balance_recharge",
+      providerSubscriptionPlanId: selectedSubscriptionPlan?.id || null,
+      providerSubscriptionPlanAmount: selectedSubscriptionPlan?.amount || null,
+      providerSubscriptionPlanDays:
+        selectedSubscriptionPlan?.durationDays || null,
       createdAt: adminFieldValue.serverTimestamp(),
       updatedAt: adminFieldValue.serverTimestamp(),
     });

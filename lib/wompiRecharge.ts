@@ -77,7 +77,12 @@ export async function creditApprovedRecharge(transaction: WompiTransaction) {
     });
   });
 
-  await processProviderSubscription(recharge.userId);
+  await processProviderSubscription(recharge.userId, {
+    planId:
+      typeof recharge.providerSubscriptionPlanId === "string"
+        ? recharge.providerSubscriptionPlanId
+        : null,
+  });
 
   return { credited: true };
 }

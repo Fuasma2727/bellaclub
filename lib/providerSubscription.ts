@@ -1,8 +1,13 @@
 import admin from "firebase-admin";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { setLedgerEntry } from "@/lib/ledger";
+import {
+  DEFAULT_PROVIDER_SUBSCRIPTION_PLAN,
+  getProviderSubscriptionPlan,
+  type ProviderSubscriptionPlanId,
+} from "@/lib/providerSubscriptionPlans";
 
-export const PROVIDER_MONTHLY_FEE = 100000;
+export const PROVIDER_MONTHLY_FEE = DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.amount;
 
 type ProcessResult =
   | "not_provider"
@@ -12,9 +17,9 @@ type ProcessResult =
   | "blocked"
   | "manual_override";
 
-const addOneMonth = (date: Date) => {
+const addDays = (date: Date, days: number) => {
   const next = new Date(date);
-  next.setMonth(next.getMonth() + 1);
+  next.setDate(next.getDate() + days);
   return next;
 };
 
@@ -105,7 +110,8 @@ const shouldNotifyFailedPayment = (value: unknown) => {
 };
 
 export async function processProviderSubscription(
-  providerId: string
+  providerId: string,
+  options: { planId?: ProviderSubscriptionPlanId | string | null } = {}
 ): Promise<ProcessResult> {
   const userRef = adminDb.collection("users").doc(providerId);
   const paymentRef = adminDb.collection("providerSubscriptions").doc();
@@ -126,11 +132,16 @@ export async function processProviderSubscription(
     const nextChargeAt = toDate(user.subscriptionNextChargeAt);
     const isDue = !nextChargeAt || nextChargeAt.getTime() <= now.getTime();
     const manualOverride = Boolean(user.subscriptionManualOverride);
+    const selectedPlan = getProviderSubscriptionPlan(
+      options.planId || user.pendingSubscriptionPlanId || user.subscriptionPlanId
+    );
 
     if (manualOverride) {
       tx.update(userRef, {
         subscriptionStatus: user.subscriptionStatus || "admin_override",
-        subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionAmount: selectedPlan.amount,
+        subscriptionPlanId: selectedPlan.id,
+        subscriptionPlanDays: selectedPlan.durationDays,
         subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
       });
 
@@ -142,17 +153,19 @@ export async function processProviderSubscription(
     }
 
     const balance = Number(user.balance || 0);
-    const nextPaidChargeAt = addOneMonth(now);
+    const nextPaidChargeAt = addDays(now, selectedPlan.durationDays);
     const hasProfilePhoto = Boolean(user.photoUrl);
 
-    if (balance >= PROVIDER_MONTHLY_FEE) {
+    if (balance >= selectedPlan.amount) {
       tx.update(userRef, {
-        balance: admin.firestore.FieldValue.increment(-PROVIDER_MONTHLY_FEE),
+        balance: admin.firestore.FieldValue.increment(-selectedPlan.amount),
         blocked: false,
         blockedReason: admin.firestore.FieldValue.delete(),
         profileVisible: hasProfilePhoto,
         subscriptionStatus: "active",
-        subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionAmount: selectedPlan.amount,
+        subscriptionPlanId: selectedPlan.id,
+        subscriptionPlanDays: selectedPlan.durationDays,
         subscriptionManualOverride: false,
         subscriptionLastPaidAt: adminFieldValue.serverTimestamp(),
         subscriptionNextChargeAt: nextPaidChargeAt,
@@ -161,7 +174,9 @@ export async function processProviderSubscription(
 
       tx.set(paymentRef, {
         providerId,
-        amount: PROVIDER_MONTHLY_FEE,
+        amount: selectedPlan.amount,
+        planId: selectedPlan.id,
+        planDays: selectedPlan.durationDays,
         status: "paid",
         source: "balance",
         createdAt: adminFieldValue.serverTimestamp(),
@@ -172,20 +187,28 @@ export async function processProviderSubscription(
         userId: providerId,
         type: "provider_subscription",
         direction: "debit",
-        amount: PROVIDER_MONTHLY_FEE,
+        amount: selectedPlan.amount,
         status: "completed",
         sourceCollection: "providerSubscriptions",
         sourceId: paymentRef.id,
+        metadata: {
+          planId: selectedPlan.id,
+          planDays: selectedPlan.durationDays,
+        },
       });
 
       tx.set(successNotificationRef, {
         userId: providerId,
         type: "provider_subscription_paid",
-        title: "Mensualidad descontada",
-        message: `Se descontaron $${PROVIDER_MONTHLY_FEE.toLocaleString(
+        title: "Plan descontado",
+        message: `Se descontaron $${selectedPlan.amount.toLocaleString(
           "es-CO"
-        )} de tu saldo por la mensualidad de BelaClub. Tu perfil sigue activo.`,
-        amount: PROVIDER_MONTHLY_FEE,
+        )} de tu saldo por el plan BelaClub de ${
+          selectedPlan.durationDays
+        } dias. Tu perfil sigue activo.`,
+        amount: selectedPlan.amount,
+        planId: selectedPlan.id,
+        planDays: selectedPlan.durationDays,
         read: false,
         createdAt: adminFieldValue.serverTimestamp(),
       });
@@ -200,7 +223,9 @@ export async function processProviderSubscription(
       blockedReason: "subscription_unpaid",
       profileVisible: false,
       subscriptionStatus: "past_due",
-      subscriptionAmount: PROVIDER_MONTHLY_FEE,
+      subscriptionAmount: selectedPlan.amount,
+      subscriptionPlanId: selectedPlan.id,
+      subscriptionPlanDays: selectedPlan.durationDays,
       subscriptionLastFailedAt: adminFieldValue.serverTimestamp(),
       subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
       blockedAt: adminFieldValue.serverTimestamp(),
@@ -208,7 +233,9 @@ export async function processProviderSubscription(
 
     tx.set(paymentRef, {
       providerId,
-      amount: PROVIDER_MONTHLY_FEE,
+      amount: selectedPlan.amount,
+      planId: selectedPlan.id,
+      planDays: selectedPlan.durationDays,
       status: "failed",
       reason: "insufficient_balance",
       createdAt: adminFieldValue.serverTimestamp(),
@@ -218,11 +245,15 @@ export async function processProviderSubscription(
       tx.set(failedNotificationRef, {
         userId: providerId,
         type: "provider_subscription_failed",
-        title: "Mensualidad pendiente",
-        message: `No pudimos descontar la mensualidad de $${PROVIDER_MONTHLY_FEE.toLocaleString(
+        title: "Plan pendiente",
+        message: `No pudimos descontar $${selectedPlan.amount.toLocaleString(
           "es-CO"
-        )}. Recarga saldo para activar tu perfil nuevamente.`,
-        amount: PROVIDER_MONTHLY_FEE,
+        )} por el plan BelaClub de ${
+          selectedPlan.durationDays
+        } dias. Recarga saldo para activar tu perfil nuevamente.`,
+        amount: selectedPlan.amount,
+        planId: selectedPlan.id,
+        planDays: selectedPlan.durationDays,
         read: false,
         createdAt: adminFieldValue.serverTimestamp(),
       });

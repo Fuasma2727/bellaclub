@@ -5,6 +5,7 @@ import {
   processProviderSubscription,
   PROVIDER_MONTHLY_FEE,
 } from "@/lib/providerSubscription";
+import { DEFAULT_PROVIDER_SUBSCRIPTION_PLAN } from "@/lib/providerSubscriptionPlans";
 import { getAdminQualityRank } from "@/lib/providerPromotion";
 import { releaseReferralReward } from "@/lib/referrals";
 import {
@@ -381,6 +382,8 @@ export async function PATCH(request: Request, { params }: Params) {
         visitVerified: Boolean(userData.visitVerified),
         subscriptionStatus: "pending_payment",
         subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionPlanId: DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.id,
+        subscriptionPlanDays: DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.durationDays,
         subscriptionManualOverride: false,
         subscriptionNextChargeAt: adminFieldValue.serverTimestamp(),
         subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
@@ -431,6 +434,11 @@ export async function PATCH(request: Request, { params }: Params) {
             ? userData.subscriptionStatus || "pending_payment"
             : userData.subscriptionStatus || null,
         subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionPlanId:
+          userData.subscriptionPlanId || DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.id,
+        subscriptionPlanDays:
+          userData.subscriptionPlanDays ||
+          DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.durationDays,
         subscriptionManualOverride: false,
         subscriptionNextChargeAt:
           profileAlreadyApproved
@@ -702,6 +710,11 @@ export async function PATCH(request: Request, { params }: Params) {
         subscriptionStatus: "admin_override",
         subscriptionManualOverride: true,
         subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionPlanId:
+          userData.subscriptionPlanId || DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.id,
+        subscriptionPlanDays:
+          userData.subscriptionPlanDays ||
+          DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.durationDays,
         subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
         subscriptionOverrideAt: adminFieldValue.serverTimestamp(),
         subscriptionOverrideBy: owner.uid,
@@ -730,6 +743,11 @@ export async function PATCH(request: Request, { params }: Params) {
         subscriptionStatus: "pending_payment",
         subscriptionManualOverride: false,
         subscriptionAmount: PROVIDER_MONTHLY_FEE,
+        subscriptionPlanId:
+          userData.subscriptionPlanId || DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.id,
+        subscriptionPlanDays:
+          userData.subscriptionPlanDays ||
+          DEFAULT_PROVIDER_SUBSCRIPTION_PLAN.durationDays,
         subscriptionNextChargeAt: adminFieldValue.serverTimestamp(),
         subscriptionUpdatedAt: adminFieldValue.serverTimestamp(),
         subscriptionOverrideRemovedAt: adminFieldValue.serverTimestamp(),

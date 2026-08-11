@@ -35,6 +35,8 @@ type FinanceResponse = {
   balance: number;
   subscriptionStatus?: string | null;
   subscriptionAmount?: number | null;
+  subscriptionPlanId?: string | null;
+  subscriptionPlanDays?: number | null;
   subscriptionNextChargeAt?: string | null;
   summary: {
     income: number;
@@ -68,7 +70,7 @@ const ledgerLabel: Record<string, string> = {
   withdrawal_refund: "Retiro devuelto",
   provider_promotion: "Promocion de perfil",
   provider_video_time_purchase: "Tiempo extra de video",
-  provider_subscription: "Mensualidad BelaClub",
+  provider_subscription: "Plan BelaClub",
   daily_video_reward: "Bono por video del dia",
 };
 
@@ -235,10 +237,10 @@ export default function ProviderMoneyPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                    Mensualidad
+                    Plan BelaClub
                   </p>
                   <h2 className="mt-1 text-lg font-semibold text-white">
-                    Estado del cobro mensual
+                    Estado de publicacion
                   </h2>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-neutral-300">
@@ -252,6 +254,11 @@ export default function ProviderMoneyPage() {
                   {data.subscriptionAmount ? (
                     <span className="ml-2 text-neutral-500">
                       {money(data.subscriptionAmount)}
+                    </span>
+                  ) : null}
+                  {data.subscriptionPlanDays ? (
+                    <span className="ml-2 text-neutral-500">
+                      {data.subscriptionPlanDays} dias
                     </span>
                   ) : null}
                 </div>
