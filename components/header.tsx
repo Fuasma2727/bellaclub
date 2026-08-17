@@ -874,25 +874,61 @@ export default function Header() {
 
               {balanceMode === "recharge" ? (
                 <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-xs text-zinc-500">
-                    {balanceContext === "subscription"
-                      ? "Plan seleccionado"
-                      : "Monto a recargar"}
-                  </p>
-                  <p className="mt-1 text-xl font-semibold text-emerald-300 sm:text-2xl">
-                    {selectedRechargeAmount
-                      ? balanceContext === "subscription"
-                        ? `${selectedSubscriptionPlan.label} - $${selectedRechargeAmount.toLocaleString(
-                            "es-CO"
-                          )}`
-                        : `$${selectedRechargeAmount.toLocaleString("es-CO")}`
-                      : "Selecciona una opcion"}
-                  </p>
+                  {balanceContext === "subscription" ? (
+                    <>
+                      <p className="mb-3 text-sm font-medium text-zinc-300">
+                        Elige un plan
+                      </p>
+                      <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+                        {PROVIDER_SUBSCRIPTION_PLANS.map((plan) => (
+                          <button
+                            key={plan.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSubscriptionPlanId(plan.id);
+                              setSelectedRechargeAmount(plan.amount);
+                            }}
+                            className={`rounded-lg border px-3 py-3 text-center transition ${
+                              selectedSubscriptionPlan.id === plan.id
+                                ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200 shadow-lg shadow-emerald-950/20"
+                                : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
+                            }`}
+                          >
+                            <span className="flex items-baseline justify-center gap-1.5">
+                              <span className="text-base font-semibold">
+                                {plan.durationDays}
+                              </span>
+                              <span className="text-sm font-semibold">
+                                días
+                              </span>
+                              <span className="text-[11px] font-medium text-amber-100/80">
+                                hábiles
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-xs text-current/70">
+                              ${plan.amount.toLocaleString("es-CO")}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-zinc-500">
+                        Monto a recargar
+                      </p>
+                      <p className="mt-1 text-xl font-semibold text-emerald-300 sm:text-2xl">
+                        {selectedRechargeAmount
+                          ? `$${selectedRechargeAmount.toLocaleString("es-CO")}`
+                          : "Selecciona una opción"}
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="mt-5 rounded-lg border border-blue-400/20 bg-blue-400/10 p-4">
                   <p className="text-xs text-blue-100/70">
-                    Retiro por Wompi con comision BelaClub del 5%
+                    Retiro por Wompi con comisión BelaClub del 5%
                   </p>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                     <div className="rounded-md bg-black/25 p-2">
@@ -928,63 +964,58 @@ export default function Header() {
               {balanceMode === "recharge" ? (
                 <>
                   {balanceContext === "subscription" && (
-                    <div className="mb-5 rounded-lg border border-amber-300/25 bg-amber-300/[0.08] p-4 text-sm leading-6 text-amber-50">
-                      {providerSubscriptionPastDue && (
-                        <p className="mb-3 rounded-md border border-red-300/25 bg-red-500/15 p-3 font-semibold text-red-50">
-                          Tu perfil esta vencido por publicacion pendiente.
-                          Recarga saldo para que vuelva a estar activo.
-                        </p>
-                      )}
-                      <p className="font-semibold text-amber-100">
-                        Planes BelaClub desde $50.000
-                      </p>
-                      <p className="mt-1 text-amber-50/85">
-                        Puedes activar tu perfil por 10 dias o mantener el plan
-                        de 30 dias.
-                      </p>
-                      <p className="mt-1 text-amber-50/85">
-                        Al vencer, el sistema intentara descontar
-                        automaticamente el mismo plan de tu saldo. Si no tienes
-                        saldo suficiente, el perfil se bloquea hasta que pagues.
+                    <div className="mb-5 rounded-lg border border-amber-300/20 bg-amber-300/[0.07] p-4">
+                      <div className="flex gap-3">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-amber-200/30 bg-amber-200/10 text-xs font-bold text-amber-100">
+                          !
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-amber-100">
+                            {providerSubscriptionPastDue
+                              ? "Reactiva tu perfil"
+                              : "Plan de publicación"}
+                          </p>
+                          <p className="mt-1 text-sm leading-5 text-amber-50/80">
+                            {providerSubscriptionPastDue
+                              ? "Tu publicación está pendiente. Paga un plan para volver a estar visible."
+                              : "Elige cuánto tiempo quieres mantener visible tu perfil."}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="mt-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-amber-50/70">
+                        Renovación automática con tu saldo disponible.
                       </p>
                     </div>
                   )}
-                  <p className="mb-3 text-sm font-medium text-zinc-300">
-                    {balanceContext === "subscription"
-                      ? "Elige un plan"
-                      : "Elige un paquete"}
-                  </p>
-                  <div
-                    className={`mb-5 grid grid-cols-1 gap-2 ${
-                      balanceContext === "subscription"
-                        ? "min-[380px]:grid-cols-2"
-                        : "min-[380px]:grid-cols-3"
-                    }`}
-                  >
-                    {balanceContext === "subscription"
-                      ? PROVIDER_SUBSCRIPTION_PLANS.map((plan) => (
-                          <button
-                            key={plan.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedSubscriptionPlanId(plan.id);
-                              setSelectedRechargeAmount(plan.amount);
-                            }}
-                            className={`rounded-lg border px-3 py-4 text-center transition ${
-                              selectedSubscriptionPlan.id === plan.id
-                                ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200 shadow-lg shadow-emerald-950/20"
-                                : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
-                            }`}
-                          >
-                            <span className="block text-sm font-semibold">
-                              {plan.label}
+                  {balanceContext === "subscription" ? (
+                    <div className="mb-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-xs text-zinc-500">Plan a pagar</p>
+                      <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-xl font-semibold text-emerald-300 sm:text-2xl">
+                        {selectedRechargeAmount ? (
+                          <>
+                            <span>
+                              {selectedSubscriptionPlan.durationDays} días
                             </span>
-                            <span className="mt-1 block text-xs text-current/75">
-                              ${plan.amount.toLocaleString("es-CO")}
+                            <span className="text-sm font-medium text-amber-100/80 sm:text-base">
+                              hábiles
                             </span>
-                          </button>
-                        ))
-                      : PROVIDER_RECHARGE_AMOUNTS.map((amount) => (
+                            <span className="mx-1 text-zinc-500">·</span>
+                            <span>
+                              ${selectedRechargeAmount.toLocaleString("es-CO")}
+                            </span>
+                          </>
+                        ) : (
+                          "Selecciona una opción"
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mb-3 text-sm font-medium text-zinc-300">
+                        Elige un paquete
+                      </p>
+                      <div className="mb-5 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+                        {PROVIDER_RECHARGE_AMOUNTS.map((amount) => (
                           <button
                             key={amount}
                             type="button"
@@ -1000,7 +1031,9 @@ export default function Header() {
                             </span>
                           </button>
                         ))}
-                  </div>
+                      </div>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={handleRecharge}

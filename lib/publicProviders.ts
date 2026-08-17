@@ -40,6 +40,7 @@ export type PublicProviderProfile = PublicProviderCard & {
 };
 
 type PublicProviderCache = {
+  version: number;
   providers: PublicProviderCard[];
   expiresAt: number;
   staleUntil: number;
@@ -48,12 +49,13 @@ type PublicProviderCache = {
   diskLoaded?: boolean;
 };
 
+const PUBLIC_PROVIDER_CACHE_VERSION = 4;
 const PUBLIC_PROVIDER_CACHE_TTL_MS = 5 * 60 * 1000;
 const PUBLIC_PROVIDER_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 const PUBLIC_PROVIDER_DISK_CACHE_PATH = path.join(
   process.cwd(),
   ".runtime-cache",
-  "public-providers-v3.json"
+  "public-providers-v4.json"
 );
 
 const globalForPublicProviderCache = globalThis as typeof globalThis & {
@@ -62,12 +64,23 @@ const globalForPublicProviderCache = globalThis as typeof globalThis & {
 
 const publicProviderCache =
   globalForPublicProviderCache.__belaclubPublicProviderCache || {
+    version: PUBLIC_PROVIDER_CACHE_VERSION,
     providers: [],
     expiresAt: 0,
     staleUntil: 0,
     loaded: false,
     diskLoaded: false,
   };
+
+if (publicProviderCache.version !== PUBLIC_PROVIDER_CACHE_VERSION) {
+  publicProviderCache.version = PUBLIC_PROVIDER_CACHE_VERSION;
+  publicProviderCache.providers = [];
+  publicProviderCache.expiresAt = 0;
+  publicProviderCache.staleUntil = 0;
+  publicProviderCache.inFlight = undefined;
+  publicProviderCache.loaded = false;
+  publicProviderCache.diskLoaded = false;
+}
 
 globalForPublicProviderCache.__belaclubPublicProviderCache =
   publicProviderCache;

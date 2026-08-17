@@ -1,13 +1,13 @@
 export const PROVIDER_SUBSCRIPTION_PLANS = [
   {
     id: "ten_days",
-    label: "10 dias",
+    label: "10 días hábiles",
     amount: 50000,
     durationDays: 10,
   },
   {
     id: "monthly",
-    label: "30 dias",
+    label: "30 días hábiles",
     amount: 100000,
     durationDays: 30,
   },

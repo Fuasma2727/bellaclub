@@ -11,6 +11,10 @@ export type ProviderCitySeo = {
   seoIntro?: string;
   searchFocus?: string[];
   nearbyCities?: string[];
+  localContext?: string;
+  mobilityContext?: string;
+  trustContext?: string;
+  routeNotes?: Record<string, string>;
 };
 
 type ProviderCityCache = {
@@ -46,6 +50,20 @@ export const targetSeoCities: ProviderCitySeo[] = [
       "putas rionegro",
       "putas en rionegro",
     ],
+    localContext:
+      "Rionegro concentra busquedas del oriente antioqueno, especialmente cerca de San Antonio de Pereira, Llanogrande, el Centro y el corredor del aeropuerto.",
+    mobilityContext:
+      "La ciudad conecta rapido con La Ceja, Marinilla, Guarne y Medellin, por eso conviene revisar zona disponible y contacto directo antes de coordinar.",
+    trustContext:
+      "Los perfiles visibles pasan por aprobacion interna y muestran fotos publicas, ubicacion declarada y opciones de contacto para comparar con calma.",
+    routeNotes: {
+      escorts:
+        "Para escorts en Rionegro, la intencion suele ser encontrar perfiles activos por zona y contacto directo, no solo una lista generica de nombres.",
+      prepagos:
+        "Para prepagos en Rionegro, el contenido prioriza perfiles aprobados, zonas frecuentes y disponibilidad visible dentro de BelaClub.",
+      putas:
+        "Para busquedas como putas Rionegro, BelaClub mantiene una pagina local con perfiles visibles y alternativas relacionadas como escorts y prepagos.",
+    },
     seoIntro:
       "Rionegro es una ciudad prioritaria para BelaClub en el oriente antioqueño. La pagina agrupa perfiles aprobados para busquedas como escorts rionegro, escorts en rionegro, prepagos rionegro y putas rionegro, con foco en San Antonio de Pereira, Centro, Llanogrande y el sector del Aeropuerto Jose Maria Cordova.",
   },
@@ -56,6 +74,22 @@ export const targetSeoCities: ProviderCitySeo[] = [
     count: 0,
     priority: 0.85,
     nearbyCities: ["Envigado", "Itagui", "Sabaneta", "Rionegro"],
+    localContext:
+      "Medellin tiene busquedas repartidas por sectores; El Poblado, Laureles, Belen, Estadio, Centro y Ciudad del Rio concentran buena parte de la exploracion.",
+    mobilityContext:
+      "Como el area metropolitana conecta con Envigado, Itagui y Sabaneta, los filtros por ciudad y zona ayudan a evitar revisar perfiles fuera del sector deseado.",
+    trustContext:
+      "La pagina se alimenta de perfiles aprobados y visibles, con datos de ubicacion y galeria publica para que la comparacion sea mas clara desde movil.",
+    routeNotes: {
+      escorts:
+        "Para escorts en Medellin, el valor esta en diferenciar zonas y perfiles activos dentro de una ciudad con mucha oferta.",
+      prepagos:
+        "Para prepagos en Medellin, BelaClub organiza perfiles aprobados por ciudad y zonas principales para reducir busquedas repetidas.",
+      acompanantes:
+        "Para acompanantes en Medellin, la pagina conecta busquedas amplias con perfiles visibles y contacto directo.",
+      "damas-de-compania":
+        "Para damas de compania en Medellin, se prioriza una lectura ordenada por ciudad, zonas y perfiles aprobados.",
+    },
     zones: [
       "El Poblado",
       "Laureles",
@@ -74,6 +108,18 @@ export const targetSeoCities: ProviderCitySeo[] = [
     count: 0,
     priority: 0.9,
     nearbyCities: ["Rionegro", "El Retiro", "El Carmen de Viboral"],
+    localContext:
+      "La Ceja funciona como una busqueda local del oriente antioqueno, con usuarios que tambien revisan opciones cercanas en Rionegro, El Retiro y El Carmen de Viboral.",
+    mobilityContext:
+      "En esta ciudad es importante revisar disponibilidad y zona declarada porque muchas busquedas vienen de municipios cercanos.",
+    trustContext:
+      "BelaClub muestra perfiles aprobados y visibles para mantener una experiencia mas directa que un listado amplio sin contexto local.",
+    routeNotes: {
+      escorts:
+        "Para escorts en La Ceja, la pagina concentra perfiles locales y busquedas cercanas del oriente antioqueno.",
+      prepagos:
+        "Para prepagos en La Ceja, el foco esta en perfiles aprobados, contacto visible y zonas cercanas.",
+    },
     zones: ["Centro", "zonas cercanas", "oriente antioqueno"],
     seoIntro:
       "La Ceja conecta usuarios que buscan perfiles en el oriente antioqueño con opciones cercanas y contacto directo.",
@@ -156,6 +202,10 @@ async function fetchPublicProviderCities(): Promise<ProviderCitySeo[]> {
       seoIntro: current?.seoIntro || city.seoIntro,
       searchFocus: city.searchFocus,
       nearbyCities: current?.nearbyCities || city.nearbyCities,
+      localContext: current?.localContext || city.localContext,
+      mobilityContext: current?.mobilityContext || city.mobilityContext,
+      trustContext: current?.trustContext || city.trustContext,
+      routeNotes: current?.routeNotes || city.routeNotes,
     });
   });
 

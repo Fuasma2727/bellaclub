@@ -258,7 +258,7 @@ export default function ProviderMoneyPage() {
                   ) : null}
                   {data.subscriptionPlanDays ? (
                     <span className="ml-2 text-neutral-500">
-                      {data.subscriptionPlanDays} dias
+                      {data.subscriptionPlanDays} días hábiles
                     </span>
                   ) : null}
                 </div>

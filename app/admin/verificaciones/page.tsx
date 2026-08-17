@@ -45,6 +45,7 @@ type ProviderVerification = {
   blocked?: boolean;
   blockedReason?: string | null;
   balance?: number;
+  profileViews?: number;
   verificationPhotoUrl?: string;
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
@@ -364,6 +365,24 @@ const ProviderBalanceBadge = ({ balance }: { balance?: number }) => {
   );
 };
 
+const ProviderViewsBadge = ({ views }: { views?: number }) => {
+  const safeViews = Number(views || 0);
+
+  return (
+    <div
+      aria-label={`Visitas del perfil: ${safeViews.toLocaleString("es-CO")}`}
+      className="pointer-events-none absolute left-2 top-2 z-20 rounded-md border border-sky-200/25 bg-sky-950/75 px-2.5 py-1.5 text-left text-sky-50 shadow-xl shadow-sky-950/35 backdrop-blur-md"
+    >
+      <p className="text-[9px] font-semibold uppercase leading-none tracking-[0.14em] opacity-70">
+        Visitas
+      </p>
+      <p className="mt-1 text-[12px] font-bold leading-none tabular-nums sm:text-[13px]">
+        {safeViews.toLocaleString("es-CO")}
+      </p>
+    </div>
+  );
+};
+
 const ProviderDailyVideoButton = ({
   video,
   onOpen,
@@ -385,7 +404,7 @@ const ProviderDailyVideoButton = ({
         event.stopPropagation();
         onOpen();
       }}
-      className={`absolute left-2 top-2 z-20 flex min-h-11 max-w-[calc(100%-5.5rem)] items-center gap-2 rounded-md border px-2.5 py-1.5 text-left shadow-xl backdrop-blur-md transition hover:-translate-y-0.5 ${
+      className={`absolute left-2 top-14 z-20 flex min-h-11 max-w-[calc(100%-5.5rem)] items-center gap-2 rounded-md border px-2.5 py-1.5 text-left shadow-xl backdrop-blur-md transition hover:-translate-y-0.5 ${
         isActive
           ? "border-sky-200/45 bg-sky-950/78 text-sky-50 shadow-sky-950/35 hover:border-sky-100/70"
           : "border-amber-200/35 bg-amber-950/75 text-amber-50 shadow-amber-950/30 hover:border-amber-100/60"
@@ -1645,6 +1664,9 @@ export default function AdminVerificationsPage() {
           {typeof provider.balance === "number" && (
             <p>Saldo: ${provider.balance.toLocaleString("es-CO")}</p>
           )}
+          <p>
+            Visitas: {Number(provider.profileViews || 0).toLocaleString("es-CO")}
+          </p>
           {provider.subscriptionStatus && (
             <p>
               Mensualidad:{" "}
@@ -2644,6 +2666,7 @@ export default function AdminVerificationsPage() {
                     </div>
                   )}
                   <div className="relative">
+                    <ProviderViewsBadge views={provider.profileViews} />
                     <ProviderBalanceBadge balance={provider.balance} />
                     <ProviderDailyVideoButton
                       video={provider.dailyVideo}

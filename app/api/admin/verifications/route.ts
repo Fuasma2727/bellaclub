@@ -38,6 +38,7 @@ type ProviderVerification = {
   blocked?: boolean;
   blockedReason?: string | null;
   balance?: number;
+  profileViews?: number;
   verificationPhotoUrl?: string;
   verificationStatus?: VerificationStatus;
   verificationBadge?: VerificationBadge | null;
@@ -163,6 +164,7 @@ export async function GET(request: Request) {
           blocked: Boolean(data.blocked),
           blockedReason: data.blockedReason || null,
           balance: Number(data.balance || 0),
+          profileViews: Number(data.profileViews || 0),
           verificationPhotoUrl: data.verificationPhotoUrl,
           verificationStatus: data.verificationStatus,
           verificationBadge: data.verificationBadge || null,

@@ -17,9 +17,20 @@ type ProcessResult =
   | "blocked"
   | "manual_override";
 
-const addDays = (date: Date, days: number) => {
+const isBusinessDay = (date: Date) => {
+  const day = date.getDay();
+  return day !== 0 && day !== 6;
+};
+
+const addBusinessDays = (date: Date, days: number) => {
   const next = new Date(date);
-  next.setDate(next.getDate() + days);
+  let remainingDays = Math.max(0, days);
+
+  while (remainingDays > 0) {
+    next.setDate(next.getDate() + 1);
+    if (isBusinessDay(next)) remainingDays -= 1;
+  }
+
   return next;
 };
 
@@ -153,7 +164,7 @@ export async function processProviderSubscription(
     }
 
     const balance = Number(user.balance || 0);
-    const nextPaidChargeAt = addDays(now, selectedPlan.durationDays);
+    const nextPaidChargeAt = addBusinessDays(now, selectedPlan.durationDays);
     const hasProfilePhoto = Boolean(user.photoUrl);
 
     if (balance >= selectedPlan.amount) {
@@ -205,7 +216,7 @@ export async function processProviderSubscription(
           "es-CO"
         )} de tu saldo por el plan BelaClub de ${
           selectedPlan.durationDays
-        } dias. Tu perfil sigue activo.`,
+        } días hábiles. Tu perfil sigue activo.`,
         amount: selectedPlan.amount,
         planId: selectedPlan.id,
         planDays: selectedPlan.durationDays,
@@ -250,7 +261,7 @@ export async function processProviderSubscription(
           "es-CO"
         )} por el plan BelaClub de ${
           selectedPlan.durationDays
-        } dias. Recarga saldo para activar tu perfil nuevamente.`,
+        } días hábiles. Recarga saldo para activar tu perfil nuevamente.`,
         amount: selectedPlan.amount,
         planId: selectedPlan.id,
         planDays: selectedPlan.durationDays,

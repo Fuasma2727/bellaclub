@@ -47,6 +47,31 @@ const isRionegroFocusRoute = (
   citySlug: string
 ) => citySlug === "rionegro" && rionegroFocusRouteKeys.has(routeKey);
 
+const formatList = (items: string[]) => {
+  if (items.length <= 1) return items[0] || "";
+
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+};
+
+const routeIntentFallback: Record<ProviderSearchRouteKey, string> = {
+  escorts:
+    "Esta categoria ayuda a revisar perfiles activos por ciudad, zona y contacto directo, con una lectura rapida desde movil.",
+  prepagos:
+    "Esta busqueda se organiza para comparar perfiles aprobados, fotos publicas y zonas disponibles dentro de la misma ciudad.",
+  acompanantes:
+    "La pagina conecta busquedas de acompanantes con perfiles visibles y datos practicos de ubicacion.",
+  "damas-de-compania":
+    "La vista agrupa perfiles aprobados para quienes buscan damas de compania por ciudad y zonas cercanas.",
+  chicas:
+    "La categoria sirve para explorar perfiles activos con fotos publicas, ubicacion y contacto directo.",
+  masajistas:
+    "La pagina ordena perfiles por ciudad para que la busqueda sea mas precisa y menos repetitiva.",
+  universitarias:
+    "La vista concentra perfiles visibles y relacionados con busquedas locales dentro de BelaClub.",
+  putas:
+    "La pagina conecta esta busqueda con perfiles visibles y categorias relacionadas como escorts y prepagos.",
+};
+
 const buildCityMetaTitle = (
   route: ProviderSearchRoute,
   city: ProviderCitySeo
@@ -98,32 +123,80 @@ const buildCitySearchTerms = (
   ]);
 
 const buildCityFaqs = (
-  routeTitle: string,
-  routePluralNoun: string,
-  cityName: string,
+  route: ProviderSearchRoute,
+  city: ProviderCitySeo,
   place: string,
-  profileCount: number
+  profileCount: number,
+  relatedSearchText: string
 ): CityFaq[] => {
   const profileText =
     profileCount > 0
       ? `${profileCount} perfiles visibles y aprobados`
       : "perfiles visibles y aprobados cuando esten disponibles";
+  const zonesText =
+    city.zones && city.zones.length > 0
+      ? formatList(city.zones.slice(0, 5))
+      : "las zonas disponibles en cada perfil";
+  const nearbyText =
+    city.nearbyCities && city.nearbyCities.length > 0
+      ? `Tambien puedes revisar busquedas cercanas en ${formatList(
+          city.nearbyCities.slice(0, 4)
+        )}.`
+      : "Tambien puedes revisar otras ciudades disponibles dentro de BelaClub.";
 
   return [
     {
-      question: `Donde encontrar ${routePluralNoun} en ${cityName}?`,
-      answer: `En BelaClub puedes revisar ${profileText} en ${place}, filtrar por ciudad o zona cuando este disponible y abrir cada perfil para ver fotos publicas y opciones de contacto.`,
+      question: `Donde encontrar ${route.pluralNoun} en ${city.city}?`,
+      answer: `En BelaClub puedes revisar ${profileText} en ${place}. La pagina prioriza perfiles activos, fotos publicas y contacto directo por WhatsApp.`,
     },
     {
-      question: `La pagina de ${routeTitle} en ${cityName} se actualiza?`,
+      question: `Que zonas de ${city.city} se pueden revisar?`,
+      answer: `Las busquedas se organizan alrededor de ${zonesText}. ${nearbyText}`,
+    },
+    {
+      question: `La pagina de ${route.title} en ${city.city} se actualiza?`,
       answer:
         "Si. La pagina usa los perfiles activos, visibles y aprobados dentro de BelaClub, por eso el listado puede cambiar cuando se aprueban, pausan o actualizan perfiles.",
     },
     {
-      question: `Tambien sirve para buscar escorts, prepagos o putas en ${cityName}?`,
-      answer: `Si. BelaClub conecta busquedas relacionadas como escorts, prepagos, putas, acompanantes, damas de compania, chicas, masajistas y universitarias en ${cityName} con paginas filtradas por ciudad.`,
+      question: `Tambien sirve para buscar ${relatedSearchText} en ${city.city}?`,
+      answer:
+        "Si. BelaClub conecta busquedas relacionadas con paginas filtradas por ciudad para que el usuario pueda comparar categorias sin salir del contexto local.",
     },
   ];
+};
+
+const buildCityContentParagraphs = ({
+  route,
+  city,
+  profileCount,
+  relatedSearchText,
+}: {
+  route: ProviderSearchRoute;
+  city: ProviderCitySeo;
+  profileCount: number;
+  relatedSearchText: string;
+}) => {
+  const routeNote = city.routeNotes?.[route.key] || routeIntentFallback[route.key];
+  const zonesText =
+    city.zones && city.zones.length > 0
+      ? `Zonas utiles para comparar: ${formatList(city.zones.slice(0, 6))}.`
+      : "";
+  const profileText =
+    profileCount > 0
+      ? `Actualmente se muestran ${profileCount} perfiles activos en ${city.city}; el listado cambia cuando un perfil se aprueba, se pausa o actualiza su informacion.`
+      : `Esta pagina queda preparada para mostrar perfiles activos en ${city.city} tan pronto sean aprobados y visibles dentro de BelaClub.`;
+
+  return uniqueTexts([
+    city.seoIntro || "",
+    city.localContext || "",
+    routeNote,
+    profileText,
+    zonesText,
+    city.mobilityContext || "",
+    `Tambien se conectan busquedas relacionadas como ${relatedSearchText}, manteniendo el foco principal en perfiles de ${city.city}.`,
+    city.trustContext || "",
+  ]);
 };
 
 export async function generateProviderCityStaticParams() {
@@ -212,12 +285,13 @@ export default async function ProviderCitySearchPage({
     ...(city.searchFocus || []),
   ]);
   const cityProviders = await getPublicProviderCards({ citySlug: city.slug });
+  const relatedSearchText = getRelatedProviderSearchText(route.key);
   const faqs = buildCityFaqs(
-    route.title,
-    route.pluralNoun,
-    city.city,
+    route,
+    city,
     place,
-    cityProviders.length
+    cityProviders.length,
+    relatedSearchText
   );
   const relatedRoutes = targetSeoCities
     .filter((item) => item.slug !== city.slug)
@@ -237,20 +311,13 @@ export default async function ProviderCitySearchPage({
     : `Perfiles aprobados en ${city.city}${
         city.department ? `, ${city.department}` : ""
       }, con fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;
-  const cityIntro =
-    city.seoIntro ||
-    `BelaClub organiza perfiles aprobados en ${city.city} para facilitar busquedas por ciudad, zonas disponibles y contacto directo.`;
   const searchTerms = buildCitySearchTerms(route, city);
-  const relatedSearchText = getRelatedProviderSearchText(route.key);
-  const rionegroFocusText = isRionegroFocusRoute(route.key, city.slug)
-    ? "En Rionegro muchos usuarios comparan opciones en San Antonio de Pereira, Centro, Llanogrande y el sector del aeropuerto. Por eso esta vista mantiene el foco en perfiles visibles de la ciudad y categorias relacionadas."
-    : "";
-  const nearbyText =
-    city.nearbyCities && city.nearbyCities.length > 0
-      ? `Tambien se conectan busquedas cercanas desde ${city.nearbyCities.join(
-          ", "
-        )}, manteniendo el foco principal en perfiles de ${city.city}.`
-      : "";
+  const cityContentParagraphs = buildCityContentParagraphs({
+    route,
+    city,
+    profileCount: cityProviders.length,
+    relatedSearchText,
+  });
 
   return (
     <>
@@ -380,17 +447,8 @@ export default async function ProviderCitySearchPage({
         seoCityLinks={sameCityLinks.slice(0, 6)}
         initialProviders={cityProviders}
         seoContent={{
-          heading: `${route.title} en ${city.city}: perfiles y busquedas relacionadas`,
-          paragraphs: [
-            cityIntro,
-            cityProviders.length > 0
-              ? `Actualmente se muestran ${cityProviders.length} perfiles activos para ${city.city}. El listado se alimenta de perfiles aprobados, visibles y actualizados dentro de BelaClub.`
-              : `Esta pagina queda preparada para mostrar perfiles activos en ${city.city} tan pronto sean aprobados y visibles dentro de BelaClub.`,
-            rionegroFocusText,
-            `En esta pagina se agrupan perfiles de ${route.pluralNoun} en ${city.city} junto con busquedas relacionadas como ${relatedSearchText}.`,
-            nearbyText,
-            `La disponibilidad de perfiles en ${city.city} se mantiene alineada con los perfiles activos y aprobados dentro de BelaClub.`,
-          ].filter(Boolean),
+          heading: `${route.title} en ${city.city}: perfiles, zonas y contexto local`,
+          paragraphs: cityContentParagraphs,
           searchTerms,
           faqs,
           zones: city.zones,

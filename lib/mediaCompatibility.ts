@@ -34,7 +34,7 @@ const supportedUploadTypes = new Set<string>([
 ]);
 
 const supportedVideoTypes = new Set<string>(VIDEO_UPLOAD_CONTENT_TYPES);
-const supportedVideoExtensions = new Set(["mp4"]);
+const supportedVideoExtensions = new Set(["mp4", "mov"]);
 
 export const normalizeContentType = (value: string) => {
   return value.split(";")[0]?.trim().toLowerCase() || "";

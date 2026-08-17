@@ -756,7 +756,7 @@ export default function PrestadoresPage({
                   key={provider.id}
                   provider={provider}
                   isOpening={openingProfileId === provider.id}
-                  imagePriority={index < 6}
+                  imagePriority={index < 2}
                   profileHref={provider.profilePath}
                   onOpen={(id) => void openModal(id)}
                   onOpenDailyVideo={setDailyVideoProvider}

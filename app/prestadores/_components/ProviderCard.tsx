@@ -203,7 +203,8 @@ export default function ProviderCard({
           draggable={false}
           onContextMenu={(event) => event.preventDefault()}
           className="object-cover transition duration-300 group-hover:scale-105"
-          sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
+          sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+          quality={72}
           priority={imagePriority}
         />
 
