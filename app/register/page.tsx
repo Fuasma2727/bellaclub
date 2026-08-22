@@ -65,7 +65,9 @@ export default function RegisterPage() {
       if (referralCode) {
         window.localStorage.removeItem("belaclub_ref");
       }
-      router.push(role === "prestador" ? "/prestador/perfil" : "/escorts");
+      router.push(
+        role === "prestador" ? "/prestador/perfil" : "/usuario/perfil"
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "No pudimos crear la cuenta";
