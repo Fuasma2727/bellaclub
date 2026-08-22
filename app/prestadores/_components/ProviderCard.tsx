@@ -18,6 +18,7 @@ type ProviderCardProps = {
   onOpen?: (id: string) => void;
   onOpenDailyVideo?: (provider: Prestador) => void;
   profileHref?: string;
+  highlightPrivateCount?: boolean;
   afterContent?: ReactNode;
 };
 
@@ -130,6 +131,7 @@ export default function ProviderCard({
   onOpen,
   onOpenDailyVideo,
   profileHref,
+  highlightPrivateCount = false,
   afterContent,
 }: ProviderCardProps) {
   const [showBadgeInfo, setShowBadgeInfo] = useState(false);
@@ -235,9 +237,21 @@ export default function ProviderCard({
         )}
 
         {privateCount > 0 && (
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent p-2">
+          <div
+            className={`absolute inset-x-0 bottom-0 bg-gradient-to-t p-2 ${
+              highlightPrivateCount
+                ? "from-emerald-950/95 via-emerald-500/25 to-transparent"
+                : "from-black/80 via-black/25 to-transparent"
+            }`}
+          >
             <div className="flex items-center justify-end">
-              <span className="rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[11px] font-medium text-white backdrop-blur">
+              <span
+                className={`rounded-full px-2 py-1 text-[11px] font-semibold text-white backdrop-blur transition ${
+                  highlightPrivateCount
+                    ? "border border-emerald-100/70 bg-emerald-500/85 shadow-[0_0_22px_rgba(16,185,129,0.95)] ring-2 ring-emerald-200/35"
+                    : "border border-white/10 bg-black/60"
+                }`}
+              >
                 {privateCount} privado{privateCount === 1 ? "" : "s"}
               </span>
             </div>

@@ -940,6 +940,8 @@ export default function PerfilPrestador() {
   const [showDailyVideoModal, setShowDailyVideoModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showQuickGuide, setShowQuickGuide] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [onboardingError, setOnboardingError] = useState("");
   const [inviteCopyMessage, setInviteCopyMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [contentPrice, setContentPrice] = useState("");
@@ -960,6 +962,7 @@ export default function PerfilPrestador() {
     null
   );
   const [uploadingDailyVideo, setUploadingDailyVideo] = useState(false);
+  const onboardingInitializedRef = useRef(false);
 
   const mediaList = useMemo<MediaItem[]>(() => {
     return [
@@ -1010,6 +1013,36 @@ export default function PerfilPrestador() {
   const zoneOptions = useMemo(() => getProviderZoneOptions(city), [city]);
 
   const hasProfilePhoto = Boolean(photoUrl);
+  const whatsappDigits = whatsapp.replace(/\D/g, "");
+  const onboardingPriceNumber = Number(price);
+  const hasRequiredIdentity = Boolean(
+    name.trim().length >= 2 && whatsappDigits.length >= 10
+  );
+  const hasRequiredService = Boolean(
+    department &&
+      city &&
+      price &&
+      Number.isFinite(onboardingPriceNumber) &&
+      onboardingPriceNumber > 0
+  );
+  const hasRequiredProfileInfo =
+    hasRequiredIdentity && hasRequiredService && hasProfilePhoto;
+  const firstIncompleteOnboardingStep = !hasRequiredIdentity
+    ? 0
+    : !hasRequiredService
+      ? 1
+      : 2;
+  const onboardingProgress = [
+    hasRequiredIdentity,
+    hasRequiredService,
+    hasProfilePhoto,
+  ].filter(Boolean).length;
+  const onboardingStepValid =
+    onboardingStep === 0
+      ? hasRequiredIdentity
+      : onboardingStep === 1
+        ? hasRequiredService
+        : hasProfilePhoto;
   const visiblePublicly = profileVisible && hasProfilePhoto;
   const hasBasicInfo = Boolean(
     name.trim() &&
@@ -1243,6 +1276,19 @@ export default function PerfilPrestador() {
   }, [authLoading, user, router]);
 
   useEffect(() => {
+    if (
+      pageLoading ||
+      role !== "prestador" ||
+      onboardingInitializedRef.current
+    ) {
+      return;
+    }
+
+    setOnboardingStep(firstIncompleteOnboardingStep);
+    onboardingInitializedRef.current = true;
+  }, [firstIncompleteOnboardingStep, pageLoading, role]);
+
+  useEffect(() => {
     if (zone && !zoneOptions.includes(zone)) {
       setZone("");
     }
@@ -1418,6 +1464,61 @@ export default function PerfilPrestador() {
       setError(text);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveOnboardingStep = async (step: number) => {
+    if (!user) return;
+
+    setSaving(true);
+    setError("");
+    setOnboardingError("");
+
+    try {
+      const payload =
+        step === 0
+          ? {
+              name: name.trim(),
+              whatsapp: whatsapp.trim(),
+              profileUpdatedAt: serverTimestamp(),
+            }
+          : {
+              name: name.trim(),
+              whatsapp: whatsapp.trim(),
+              price: Number(price),
+              department,
+              city,
+              zone: zoneOptions.length > 0 ? zone.trim() : "",
+              profileUpdatedAt: serverTimestamp(),
+            };
+
+      await setDoc(doc(db, "users", user.uid), payload, { merge: true });
+    } catch (saveError) {
+      const text =
+        saveError instanceof Error
+          ? saveError.message
+          : "No pudimos guardar este paso";
+      setOnboardingError(text);
+      throw saveError;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const continueOnboarding = async () => {
+    if (!onboardingStepValid) return;
+
+    try {
+      await saveOnboardingStep(onboardingStep);
+
+      if (onboardingStep < 2) {
+        setOnboardingStep((step) => Math.min(step + 1, 2));
+        return;
+      }
+
+      showSuccess("Perfil base completado");
+    } catch {
+      // saveOnboardingStep already published the visible error.
     }
   };
 
@@ -2214,6 +2315,383 @@ export default function PerfilPrestador() {
             </p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (role === "prestador" && !hasRequiredProfileInfo) {
+    const onboardingItems = [
+      {
+        title: "Identidad",
+        text: "Nombre publico y WhatsApp",
+        done: hasRequiredIdentity,
+      },
+      {
+        title: "Servicio",
+        text: "Precio, departamento y ciudad",
+        done: hasRequiredService,
+      },
+      {
+        title: "Foto",
+        text: "Imagen principal del perfil",
+        done: hasProfilePhoto,
+      },
+    ];
+    const currentOnboardingItem =
+      onboardingItems[onboardingStep] || onboardingItems[0];
+    const continueLabel =
+      uploadingProfile
+        ? "Subiendo foto..."
+        : saving
+          ? "Guardando..."
+          : onboardingStep === 2
+            ? hasProfilePhoto
+              ? "Entrar al panel"
+              : "Foto pendiente"
+            : "Continuar";
+
+    return (
+      <div className="min-h-screen bg-[#050505] pt-14 text-white sm:pt-16">
+        <Header />
+
+        <main className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-5 sm:px-6 lg:grid-cols-[320px_1fr] lg:px-8 lg:py-8">
+          {(message || error || onboardingError) && (
+            <div
+              className={`lg:col-span-2 rounded-md border px-4 py-3 text-sm ${
+                error || onboardingError
+                  ? "border-rose-500/30 bg-rose-500/10 text-rose-100"
+                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+              }`}
+            >
+              {error || onboardingError || message}
+            </div>
+          )}
+
+          <aside className="rounded-lg border border-white/[0.08] bg-[#101012] p-5 shadow-xl shadow-black/25">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+              Creacion de perfil
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold text-white">
+              Configura tu perfil profesional
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-neutral-400">
+              Completa la informacion minima para entrar a tu panel y solicitar
+              verificacion.
+            </p>
+
+            <div className="mt-5 rounded-md border border-white/[0.08] bg-white/[0.03] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-neutral-400">
+                  Progreso
+                </span>
+                <span className="rounded-full border border-blue-300/20 bg-blue-400/10 px-2.5 py-1 text-xs font-semibold text-blue-100">
+                  {onboardingProgress}/3
+                </span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.08]">
+                <div
+                  className="h-full rounded-full bg-blue-400 transition-all"
+                  style={{ width: `${(onboardingProgress / 3) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-2">
+              {onboardingItems.map((item, index) => (
+                <button
+                  key={item.title}
+                  type="button"
+                  onClick={() => {
+                    if (index <= onboardingStep) {
+                      setOnboardingStep(index);
+                    }
+                  }}
+                  className={`flex w-full items-center gap-3 rounded-md border p-3 text-left transition ${
+                    index === onboardingStep
+                      ? "border-blue-300/35 bg-blue-400/[0.08]"
+                      : item.done
+                        ? "border-emerald-300/20 bg-emerald-400/[0.06]"
+                        : "border-white/[0.08] bg-black/20"
+                  }`}
+                >
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                      item.done
+                        ? "border-emerald-300/35 bg-emerald-400/15 text-emerald-100"
+                        : index === onboardingStep
+                          ? "border-blue-300/35 bg-blue-400/15 text-blue-100"
+                          : "border-white/10 bg-white/[0.04] text-neutral-500"
+                    }`}
+                  >
+                    {item.done ? "OK" : index + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-white">
+                      {item.title}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-neutral-500">
+                      {item.text}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <section className="rounded-lg border border-white/[0.08] bg-[#101012] p-5 shadow-xl shadow-black/25">
+            <div className="flex flex-col gap-3 border-b border-white/[0.08] pb-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+                  Paso {onboardingStep + 1} de 3
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">
+                  {currentOnboardingItem.title}
+                </h2>
+                <p className="mt-1 text-sm text-neutral-500">
+                  {currentOnboardingItem.text}
+                </p>
+              </div>
+              <div className="rounded-md border border-white/[0.08] bg-black/25 px-3 py-2 text-xs font-semibold text-neutral-300">
+                {onboardingStepValid ? "Listo para continuar" : "Pendiente"}
+              </div>
+            </div>
+
+            {onboardingStep === 0 && (
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="onboarding-name"
+                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                  >
+                    Nombre publico
+                  </label>
+                  <input
+                    id="onboarding-name"
+                    value={name}
+                    onChange={(event) => {
+                      setName(event.target.value);
+                      setOnboardingError("");
+                    }}
+                    className={fieldBaseClass}
+                    placeholder="Nombre artistico"
+                    autoFocus
+                  />
+                  <p className="mt-1.5 text-xs text-neutral-500">
+                    Minimo 2 caracteres.
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="onboarding-whatsapp"
+                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                  >
+                    WhatsApp
+                  </label>
+                  <div className="flex items-center rounded-lg border border-white/10 bg-[#09090a] px-3 transition focus-within:border-emerald-400/70 focus-within:ring-2 focus-within:ring-emerald-500/15">
+                    <span className="text-sm font-semibold text-emerald-300">
+                      WA
+                    </span>
+                    <input
+                      id="onboarding-whatsapp"
+                      type="tel"
+                      value={whatsapp}
+                      onChange={(event) => {
+                        setWhatsapp(event.target.value);
+                        setOnboardingError("");
+                      }}
+                      className="w-full bg-transparent px-2 py-2 text-[13px] outline-none placeholder:text-neutral-600"
+                      placeholder="3001234567"
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-neutral-500">
+                    Usa un numero real para que puedan contactarte.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {onboardingStep === 1 && (
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="onboarding-price"
+                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                  >
+                    Precio base
+                  </label>
+                  <div className="flex items-center rounded-lg border border-white/10 bg-[#09090a] px-3 transition focus-within:border-blue-400/70 focus-within:ring-2 focus-within:ring-blue-500/15">
+                    <span className="text-neutral-500">$</span>
+                    <input
+                      id="onboarding-price"
+                      type="number"
+                      min={0}
+                      step={10000}
+                      value={price}
+                      onChange={(event) => {
+                        setPrice(event.target.value);
+                        setOnboardingError("");
+                      }}
+                      className="w-full bg-transparent px-2 py-2 text-[13px] outline-none"
+                      placeholder="50000"
+                      autoFocus
+                    />
+                    <span className="text-sm text-neutral-500">COP</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="onboarding-department"
+                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                  >
+                    Departamento
+                  </label>
+                  <select
+                    id="onboarding-department"
+                    value={department}
+                    onChange={(event) => {
+                      setDepartment(event.target.value);
+                      setCity("");
+                      setZone("");
+                      setOnboardingError("");
+                    }}
+                    className={fieldBaseClass}
+                  >
+                    <option value="">Selecciona</option>
+                    {colombia.departments.map((item) => (
+                      <option key={item.name} value={item.name}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="onboarding-city"
+                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                  >
+                    Ciudad
+                  </label>
+                  <select
+                    id="onboarding-city"
+                    value={city}
+                    onChange={(event) => {
+                      setCity(event.target.value);
+                      setZone("");
+                      setOnboardingError("");
+                    }}
+                    disabled={!department}
+                    className={`${fieldBaseClass} disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    <option value="">Selecciona</option>
+                    {cities.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {zoneOptions.length > 0 && (
+                  <div>
+                    <label
+                      htmlFor="onboarding-zone"
+                      className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                    >
+                      Zona
+                    </label>
+                    <select
+                      id="onboarding-zone"
+                      value={zone}
+                      onChange={(event) => {
+                        setZone(event.target.value);
+                        setOnboardingError("");
+                      }}
+                      className={fieldBaseClass}
+                    >
+                      <option value="">Opcional</option>
+                      {zoneOptions.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {onboardingStep === 2 && (
+              <div className="mt-5 grid gap-5 lg:grid-cols-[220px_1fr] lg:items-center">
+                <div className="flex justify-center lg:justify-start">
+                  <div className="relative h-44 w-44 overflow-hidden rounded-full border border-white/15 bg-zinc-900 shadow-2xl shadow-black/35 ring-4 ring-white/[0.04]">
+                    <Image
+                      src={photoUrl || "/default-avatar.png"}
+                      alt="Foto de perfil"
+                      fill
+                      className="object-cover"
+                      sizes="176px"
+                      priority
+                    />
+                    {uploadingProfile && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-sm font-semibold text-white">
+                        Subiendo...
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Sube una foto principal clara
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-neutral-400">
+                    Esta imagen sera la primera impresion de tu perfil. Usa una
+                    foto vertical, nitida y reciente.
+                  </p>
+                  <label className="mt-4 inline-flex h-11 cursor-pointer items-center justify-center rounded-md bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60">
+                    {photoUrl ? "Cambiar foto" : "Subir foto de perfil"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      disabled={uploadingProfile}
+                      onChange={handleProfilePhoto}
+                    />
+                  </label>
+                  <p className="mt-3 text-xs text-neutral-500">
+                    Al completarla entraras al panel para solicitar verificacion
+                    y subir galeria.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-col-reverse gap-3 border-t border-white/[0.08] pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                onClick={() =>
+                  setOnboardingStep((step) => Math.max(step - 1, 0))
+                }
+                disabled={onboardingStep === 0 || saving || uploadingProfile}
+                className="inline-flex h-11 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] px-5 text-sm font-semibold text-neutral-200 transition hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Atras
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void continueOnboarding()}
+                disabled={!onboardingStepValid || saving || uploadingProfile}
+                className="inline-flex h-11 items-center justify-center rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {continueLabel}
+              </button>
+            </div>
+          </section>
+        </main>
       </div>
     );
   }

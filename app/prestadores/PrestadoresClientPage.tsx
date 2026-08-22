@@ -124,6 +124,7 @@ export default function PrestadoresPage({
     useState<PendingPurchase | null>(null);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState("");
+  const [highlightPrivateBadges, setHighlightPrivateBadges] = useState(false);
   const hasPageIntroContent = Boolean(initialCity || pageTitle);
   const resolvedPageTitle = pageTitle || `Escorts en ${initialCity}`;
   const resolvedPageDescription =
@@ -480,6 +481,11 @@ export default function PrestadoresPage({
 
     const params = new URLSearchParams(window.location.search);
     const providerId = params.get("providerId")?.trim() || "";
+    const shouldHighlightPrivate =
+      params.get("highlightPrivate") === "1" ||
+      params.get("unlockPrivate") === "1";
+
+    setHighlightPrivateBadges(shouldHighlightPrivate);
 
     if (!providerId || autoOpenProfileRequestRef.current === providerId) {
       return;
@@ -778,19 +784,29 @@ export default function PrestadoresPage({
           )}
 
           {!loading && !pageError && filtered.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3.5 lg:grid-cols-4 xl:grid-cols-5">
-              {filtered.map((provider, index) => (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  isOpening={openingProfileId === provider.id}
-                  imagePriority={index < 2}
-                  profileHref={provider.profilePath}
-                  onOpen={(id) => void openModal(id)}
-                  onOpenDailyVideo={setDailyVideoProvider}
-                />
-              ))}
-            </div>
+            <>
+              {highlightPrivateBadges && (
+                <div className="mb-3 rounded-md border border-emerald-300/20 bg-emerald-400/[0.08] px-4 py-3 text-sm text-emerald-100">
+                  Busca las etiquetas iluminadas de contenido privado y abre un
+                  perfil para desbloquear tu primer contenido.
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3.5 lg:grid-cols-4 xl:grid-cols-5">
+                {filtered.map((provider, index) => (
+                  <ProviderCard
+                    key={provider.id}
+                    provider={provider}
+                    isOpening={openingProfileId === provider.id}
+                    imagePriority={index < 2}
+                    highlightPrivateCount={highlightPrivateBadges}
+                    profileHref={provider.profilePath}
+                    onOpen={(id) => void openModal(id)}
+                    onOpenDailyVideo={setDailyVideoProvider}
+                  />
+                ))}
+              </div>
+            </>
           )}
 
           {hasPageIntroContent && !loading && !pageError && (

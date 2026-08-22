@@ -61,6 +61,21 @@ const defaultProgress: UserProgress = {
 
 const money = (value: number) => `$${value.toLocaleString("es-CO")}`;
 
+const privateUnlockHighlights = [
+  {
+    label: "Activa Nivel 2",
+    text: "Tu perfil empieza a construir historial real.",
+  },
+  {
+    label: "Acceso privado",
+    text: "Puedes volver al contenido desbloqueado desde tu cuenta.",
+  },
+  {
+    label: "Siguiente meta",
+    text: "Se abre el camino para convertirte en cliente de confianza.",
+  },
+];
+
 const parseUploadResponse = async (res: Response): Promise<UploadResponse> => {
   const responseText = await res.text();
 
@@ -97,7 +112,7 @@ const buildLevelSteps = (progress: UserProgress): LevelStep[] => [
     completed: progress.hasUnlockedContent,
     locked: false,
     progressText: `${Math.min(progress.unlockedContentCount, 1)}/1 contenido`,
-    actionLabel: "Ver contenido privado",
+    actionLabel: "Desbloquear contenido",
     actionType: "browse",
   },
   {
@@ -213,6 +228,7 @@ export default function PerfilUsuario() {
     progress.level >= 2 || nextStep?.level === 2;
   const showServiceDepositStat = progress.level >= 3 || nextStep?.level === 3;
   const progressPercent = Math.round((progress.level / progress.maxLevel) * 100);
+  const firstUnlockPending = !progress.hasUnlockedContent;
 
   const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -276,6 +292,17 @@ export default function PerfilUsuario() {
     }
   };
 
+  const openPrivateContent = () => {
+    if (progress.latestUnlockedProvider?.id) {
+      router.push(
+        `/?providerId=${encodeURIComponent(progress.latestUnlockedProvider.id)}`
+      );
+      return;
+    }
+
+    router.push("/escorts?highlightPrivate=1");
+  };
+
   const runLevelAction = (step?: LevelStep) => {
     if (!step?.actionType) return;
 
@@ -288,14 +315,7 @@ export default function PerfilUsuario() {
       return;
     }
 
-    if (progress.latestUnlockedProvider?.id) {
-      router.push(
-        `/?providerId=${encodeURIComponent(progress.latestUnlockedProvider.id)}`
-      );
-      return;
-    }
-
-    router.push("/escorts");
+    openPrivateContent();
   };
 
   if (loading || pageLoading) {
@@ -414,6 +434,70 @@ export default function PerfilUsuario() {
           </aside>
 
           <section className="space-y-5">
+            {firstUnlockPending && (
+              <section className="overflow-hidden rounded-md border border-blue-300/20 bg-[linear-gradient(135deg,rgba(37,99,235,0.18),rgba(16,185,129,0.09)_48%,rgba(255,255,255,0.035))] p-5 shadow-lg shadow-black/20">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">
+                      Primer reto
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+                      Desbloquea tu primer contenido privado
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">
+                      Elige un perfil con contenido privado, revisa el precio y
+                      desbloquea una foto o video para activar tu Nivel 2.
+                    </p>
+                  </div>
+                  <span className="inline-flex h-9 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 text-xs font-semibold text-emerald-100">
+                    Nivel 2
+                  </span>
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                  {privateUnlockHighlights.map((item, index) => (
+                    <div key={item.label} className="flex gap-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-xs font-bold text-blue-100">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-white">
+                          {item.label}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-neutral-400">
+                          {item.text}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 flex flex-col gap-4 border-t border-white/[0.08] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-neutral-400">
+                        Progreso del reto
+                      </span>
+                      <span className="text-xs font-semibold text-blue-100">
+                        0/1 contenido
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.08]">
+                      <div className="h-full w-0 rounded-full bg-emerald-400" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={openPrivateContent}
+                    className="inline-flex min-h-11 items-center justify-center rounded-md bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                  >
+                    Desbloquear primer contenido
+                  </button>
+                </div>
+              </section>
+            )}
+
             <div className="rounded-md border border-white/[0.08] bg-[#101012] p-5 shadow-lg shadow-black/20">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
                 Camino de usuario
