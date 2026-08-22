@@ -14,6 +14,12 @@ export const getDisplayName = (provider: Prestador) => {
   return provider.name?.trim() || "Escort verificada";
 };
 
+export const getWhatsAppMessage = (providerName?: string | null) => {
+  const name = providerName?.trim();
+
+  return name ? `Hola ${name}, te vi en BelaClub` : "Hola, te vi en BelaClub";
+};
+
 export const getLocation = (provider: Prestador) => {
   return [provider.zone, provider.city, provider.department]
     .filter(Boolean)

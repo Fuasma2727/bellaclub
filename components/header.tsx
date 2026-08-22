@@ -3,18 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  collection,
-  doc,
-  getFirestore,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { app } from "@/lib/firebase";
-import { logoutUser } from "@/lib/auth";
 import {
   DEFAULT_PROVIDER_SUBSCRIPTION_PLAN,
   PROVIDER_RECHARGE_AMOUNTS,
@@ -97,8 +86,7 @@ const isProviderSubscriptionPastDue = (data: Record<string, unknown>) => {
 };
 
 export default function Header() {
-  const { user } = useAuth();
-  const db = getFirestore(app);
+  const { user, loading: authLoading } = useAuth();
   const ownerEmail =
     process.env.NEXT_PUBLIC_OWNER_EMAIL?.toLowerCase() ||
     "jace127127@gmail.com";
@@ -193,50 +181,105 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setRole(null);
+      setBalance(0);
+      setProviderSubscriptionPastDue(false);
+      setProviderCanPostDailyVideo(false);
+      return;
+    }
 
-    const unsubscribe = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      if (!snap.exists()) return;
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-      const data = snap.data();
-      const subscriptionPastDue = isProviderSubscriptionPastDue(data);
+    void Promise.all([
+      import("firebase/firestore"),
+      import("@/lib/firebaseApp"),
+    ])
+      .then(([{ doc, getFirestore, onSnapshot }, { app }]) => {
+        if (cancelled) return;
 
-      setRole(data.role || null);
-      setBalance(Number(data.balance || 0));
-      setProviderSubscriptionPastDue(subscriptionPastDue);
-      setProviderCanPostDailyVideo(
-        data.role === "prestador" &&
-          data.verificationStatus === "approved" &&
-          data.profileVisible === true &&
-          data.profilePaused !== true &&
-          data.blocked !== true &&
-          !subscriptionPastDue
-      );
-    });
+        unsubscribe = onSnapshot(
+          doc(getFirestore(app), "users", user.uid),
+          (snap) => {
+            if (!snap.exists()) return;
 
-    return () => unsubscribe();
-  }, [user, db]);
+            const data = snap.data();
+            const subscriptionPastDue = isProviderSubscriptionPastDue(data);
+
+            setRole(data.role || null);
+            setBalance(Number(data.balance || 0));
+            setProviderSubscriptionPastDue(subscriptionPastDue);
+            setProviderCanPostDailyVideo(
+              data.role === "prestador" &&
+                data.verificationStatus === "approved" &&
+                data.profileVisible === true &&
+                data.profilePaused !== true &&
+                data.blocked !== true &&
+                !subscriptionPastDue
+            );
+          }
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Error loading user header data:", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [user]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
 
-    const notificationsQuery = query(
-      collection(db, "notifications"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-    const unsubscribe = onSnapshot(notificationsQuery, (snap) => {
-      setNotifications(
-        snap.docs.map((item) => ({
-          id: item.id,
-          ...item.data(),
-        })) as NotificationItem[]
-      );
-    });
+    void Promise.all([
+      import("firebase/firestore"),
+      import("@/lib/firebaseApp"),
+    ])
+      .then(
+        ([
+          { collection, getFirestore, onSnapshot, orderBy, query, where },
+          { app },
+        ]) => {
+          if (cancelled) return;
 
-    return () => unsubscribe();
-  }, [user, db]);
+          const notificationsQuery = query(
+            collection(getFirestore(app), "notifications"),
+            where("userId", "==", user.uid),
+            orderBy("createdAt", "desc")
+          );
+
+          unsubscribe = onSnapshot(notificationsQuery, (snap) => {
+            setNotifications(
+              snap.docs.map((item) => ({
+                id: item.id,
+                ...item.data(),
+              })) as NotificationItem[]
+            );
+          });
+        }
+      )
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Error loading header notifications:", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [user]);
 
   const resetBalanceModal = useCallback(() => {
     setSelectedRechargeAmount(null);
@@ -304,6 +347,8 @@ export default function Header() {
   };
 
   const handleLogout = async () => {
+    const { logoutUser } = await import("@/lib/auth");
+
     await logoutUser();
     window.location.href = "/escorts";
   };
@@ -430,7 +475,7 @@ export default function Header() {
     }
   };
 
-  if (!mounted) {
+  if (!mounted || authLoading) {
     return (
       <header
         className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.08] bg-black/95 shadow-sm backdrop-blur"

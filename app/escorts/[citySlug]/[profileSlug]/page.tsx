@@ -10,7 +10,11 @@ import {
   getProviderPhonePath,
   getPublicProviderProfileBySlug,
 } from "@/lib/publicProviders";
-import { formatMoney, getWhatsAppUrl } from "@/app/prestadores/_components/utils";
+import {
+  formatMoney,
+  getWhatsAppMessage,
+  getWhatsAppUrl,
+} from "@/app/prestadores/_components/utils";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
@@ -117,7 +121,7 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
     .join(", ");
   const whatsappUrl = getWhatsAppUrl(
     provider.whatsapp,
-    `Hola, vi tu perfil en BelaClub: ${name}`
+    getWhatsAppMessage(provider.name)
   );
   const phoneSeo = getPhoneSeoValues(provider.whatsapp);
   const phonePath = getProviderPhonePath(provider);

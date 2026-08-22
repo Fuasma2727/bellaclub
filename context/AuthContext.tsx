@@ -1,8 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { getAuth, onAuthStateChanged, User } from "firebase/auth";
-import { app } from "@/lib/firebase";
+import type { User } from "firebase/auth";
 
 // 1️⃣ Crear el contexto
 const AuthContext = createContext<{ user: User | null; loading: boolean }>({
@@ -14,16 +13,32 @@ const AuthContext = createContext<{ user: User | null; loading: boolean }>({
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const auth = getAuth(app);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-    return () => unsubscribe();
-  }, [auth]);
+    void Promise.all([import("firebase/auth"), import("@/lib/firebaseApp")])
+      .then(([{ getAuth, onAuthStateChanged }, { app }]) => {
+        if (cancelled) return;
+
+        unsubscribe = onAuthStateChanged(getAuth(app), (currentUser) => {
+          setUser(currentUser);
+          setLoading(false);
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Error loading Firebase Auth:", error);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading }}>

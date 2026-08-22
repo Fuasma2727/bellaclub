@@ -7,6 +7,7 @@ import { MediaItem, Prestador } from "./types";
 import {
   formatMoney,
   getDisplayName,
+  getWhatsAppMessage,
   getWhatsAppUrl,
 } from "./utils";
 
@@ -138,7 +139,10 @@ export default function ProviderProfileModal({
     "gallery"
   );
   const providerName = getDisplayName(provider);
-  const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
+  const whatsappUrl = getWhatsAppUrl(
+    provider.whatsapp,
+    getWhatsAppMessage(provider.name)
+  );
   const phoneSeo = getPhoneSeoValues(provider.whatsapp);
   const displayPhone = phoneSeo.canonicalDigits
     ? phoneSeo.formattedLocal ||

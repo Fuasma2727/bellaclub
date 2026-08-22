@@ -9,7 +9,11 @@ import {
   getProviderPhonePath,
   getPublicProviderProfileByPhone,
 } from "@/lib/publicProviders";
-import { formatMoney, getWhatsAppUrl } from "@/app/prestadores/_components/utils";
+import {
+  formatMoney,
+  getWhatsAppMessage,
+  getWhatsAppUrl,
+} from "@/app/prestadores/_components/utils";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
@@ -115,7 +119,7 @@ export default async function PhoneLookupPage({ params }: PhonePageProps) {
   const pageUrl = `${siteUrl}${phonePath}`;
   const whatsappUrl = getWhatsAppUrl(
     provider.whatsapp,
-    `Hola, vi tu perfil en BelaClub: ${name}`
+    getWhatsAppMessage(provider.name)
   );
   const displayPhone =
     phoneSeo.formattedLocal ||

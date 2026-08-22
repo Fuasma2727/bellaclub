@@ -7,6 +7,7 @@ import {
   formatMoney,
   getDisplayName,
   getLocation,
+  getWhatsAppMessage,
   getWhatsAppUrl,
 } from "./utils";
 
@@ -134,7 +135,10 @@ export default function ProviderCard({
   const [showBadgeInfo, setShowBadgeInfo] = useState(false);
   const name = getDisplayName(provider);
   const location = getLocation(provider);
-  const whatsappUrl = getWhatsAppUrl(provider.whatsapp);
+  const whatsappUrl = getWhatsAppUrl(
+    provider.whatsapp,
+    getWhatsAppMessage(provider.name)
+  );
   const phoneSeo = getPhoneSeoValues(provider.whatsapp);
   const displayPhone =
     phoneSeo.formattedLocal || phoneSeo.canonicalDigits || phoneSeo.raw;
