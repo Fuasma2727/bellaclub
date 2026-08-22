@@ -12,6 +12,34 @@ const trustSignals = [
   "Contenido privado seguro",
 ];
 
+type UserProgressResponse = {
+  latestUnlockedProvider?: {
+    id?: string;
+  } | null;
+};
+
+const getPostLoginRoute = async (token: string) => {
+  try {
+    const res = await fetch("/api/user-progress", {
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) return "/escorts";
+
+    const data = (await res.json()) as UserProgressResponse;
+    const providerId = data.latestUnlockedProvider?.id?.trim();
+
+    return providerId
+      ? `/?providerId=${encodeURIComponent(providerId)}`
+      : "/escorts";
+  } catch {
+    return "/escorts";
+  }
+};
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -28,8 +56,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await loginUser(email, password);
-      router.push("/escorts");
+      const credential = await loginUser(email, password);
+      const token = await credential.user.getIdToken();
+      router.push(await getPostLoginRoute(token));
     } catch {
       setMessageType("error");
       setMessage("Correo o contrasena incorrectos");

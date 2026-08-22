@@ -5,12 +5,21 @@ import {
   requireAuthenticatedUser,
   requireUserDocument,
 } from "@/lib/serverAuth";
+import { getPublicProviderProfileById } from "@/lib/publicProviders";
 
 const PREMIUM_BALANCE_REQUIREMENT = 500000;
 
 type PurchasedContentItem = {
   sellerId?: string;
   mediaId?: string;
+  purchasedAt?: string;
+};
+
+type PurchaseCandidate = {
+  sellerId: string;
+  mediaId: string;
+  purchasedAtMs: number;
+  order: number;
 };
 
 const countLimited = async (
@@ -30,6 +39,62 @@ const countLimited = async (
   };
 };
 
+const toMillis = (value: unknown) => {
+  if (!value) return 0;
+  if (typeof value === "string") {
+    const millis = new Date(value).getTime();
+    return Number.isFinite(millis) ? millis : 0;
+  }
+  if (value instanceof Date) return value.getTime();
+
+  const maybeTimestamp = value as { toDate?: () => Date };
+  return maybeTimestamp.toDate?.().getTime() || 0;
+};
+
+const getContentPurchaseStats = async (buyerId: string) => {
+  const snapshot = await adminDb
+    .collection("contentPurchases")
+    .where("buyerId", "==", buyerId)
+    .limit(50)
+    .get();
+
+  return {
+    count: snapshot.size,
+    hasAny: !snapshot.empty,
+    purchases: snapshot.docs.flatMap((doc, index) => {
+      const data = doc.data();
+      const sellerId = String(data.sellerId || "");
+      const mediaId = String(data.mediaId || "");
+
+      if (!sellerId || !mediaId) return [];
+
+      return [
+        {
+          sellerId,
+          mediaId,
+          purchasedAtMs: toMillis(data.createdAt),
+          order: index,
+        },
+      ];
+    }),
+  };
+};
+
+const getLatestUnlockedProvider = async (purchase?: PurchaseCandidate) => {
+  if (!purchase) return null;
+
+  const provider = await getPublicProviderProfileById(purchase.sellerId);
+
+  if (!provider) return null;
+
+  return {
+    id: provider.id,
+    name: provider.name || "",
+    profilePath: provider.profilePath || "",
+    mediaId: purchase.mediaId,
+  };
+};
+
 export async function GET(request: Request) {
   try {
     const decoded = await requireAuthenticatedUser(request);
@@ -42,9 +107,29 @@ export async function GET(request: Request) {
       (item) => item?.sellerId && item?.mediaId
     );
     const [purchaseStats, depositStats] = await Promise.all([
-      countLimited("contentPurchases", "buyerId", decoded.uid),
+      getContentPurchaseStats(decoded.uid),
       countLimited("serviceDeposits", "buyerId", decoded.uid),
     ]);
+    const purchaseCandidates = [
+      ...validPurchasedContent.map((item, index) => ({
+        sellerId: item.sellerId || "",
+        mediaId: item.mediaId || "",
+        purchasedAtMs: toMillis(item.purchasedAt),
+        order: index,
+      })),
+      ...purchaseStats.purchases.map((item, index) => ({
+        ...item,
+        order: validPurchasedContent.length + index,
+      })),
+    ].filter(
+      (item): item is PurchaseCandidate =>
+        Boolean(item.sellerId && item.mediaId)
+    );
+    const latestPurchase = purchaseCandidates.sort(
+      (a, b) => b.purchasedAtMs - a.purchasedAtMs || b.order - a.order
+    )[0];
+    const latestUnlockedProvider =
+      await getLatestUnlockedProvider(latestPurchase);
 
     const unlockedContentCount = Math.max(
       validPurchasedContent.length,
@@ -72,6 +157,7 @@ export async function GET(request: Request) {
       hasServiceDeposit,
       premiumBalanceRequirement: PREMIUM_BALANCE_REQUIREMENT,
       isCatadorPremium: level >= 4,
+      latestUnlockedProvider,
     });
   } catch (error) {
     const authError = authRouteError(error);

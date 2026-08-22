@@ -25,6 +25,12 @@ type UserProgress = {
   hasServiceDeposit: boolean;
   premiumBalanceRequirement: number;
   isCatadorPremium: boolean;
+  latestUnlockedProvider?: {
+    id: string;
+    name?: string;
+    profilePath?: string;
+    mediaId?: string;
+  } | null;
 };
 
 type LevelStep = {
@@ -50,6 +56,7 @@ const defaultProgress: UserProgress = {
   hasServiceDeposit: false,
   premiumBalanceRequirement: 500000,
   isCatadorPremium: false,
+  latestUnlockedProvider: null,
 };
 
 const money = (value: number) => `$${value.toLocaleString("es-CO")}`;
@@ -277,6 +284,13 @@ export default function PerfilUsuario() {
         new CustomEvent("belaclub:open-balance-modal", {
           detail: { mode: "recharge" },
         })
+      );
+      return;
+    }
+
+    if (progress.latestUnlockedProvider?.id) {
+      router.push(
+        `/?providerId=${encodeURIComponent(progress.latestUnlockedProvider.id)}`
       );
       return;
     }

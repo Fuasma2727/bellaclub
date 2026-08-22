@@ -84,9 +84,10 @@ export default function PrestadoresPage({
   initialProviders,
   seoContent,
 }: PrestadoresPageProps = {}) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const profileModalHistoryRef = useRef(false);
+  const autoOpenProfileRequestRef = useRef<string | null>(null);
 
   const [prestadores, setPrestadores] = useState<Prestador[]>(
     initialProviders || []
@@ -440,7 +441,7 @@ export default function PrestadoresPage({
     };
   }, [initialCity, initialProviders]);
 
-  const openModal = async (id: string) => {
+  const openModal = useCallback(async (id: string) => {
     setOpeningProfileId(id);
 
     try {
@@ -472,7 +473,24 @@ export default function PrestadoresPage({
     } finally {
       setOpeningProfileId(null);
     }
-  };
+  }, [pushProfileModalHistory, user]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || loading || authLoading) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const providerId = params.get("providerId")?.trim() || "";
+
+    if (!providerId || autoOpenProfileRequestRef.current === providerId) {
+      return;
+    }
+
+    autoOpenProfileRequestRef.current = providerId;
+
+    void openModal(providerId).catch((error) => {
+      console.error("Error auto opening provider:", error);
+    });
+  }, [authLoading, loading, openModal]);
 
   const openExpandedMedia = (index: number) => {
     if (!canViewMedia(mediaList[index])) return;
