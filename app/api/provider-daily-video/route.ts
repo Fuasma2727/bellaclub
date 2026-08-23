@@ -107,6 +107,7 @@ export async function POST(request: Request) {
         dailyVideo: {
           url: videoUrl,
           duration,
+          playbackStatus: "ready",
           createdAt: adminFieldValue.serverTimestamp(),
           expiresAt,
         },
@@ -164,6 +165,7 @@ export async function POST(request: Request) {
       dailyVideo: {
         url: videoUrl,
         duration,
+        playbackStatus: "ready",
         expiresAt: expiresAt.toISOString(),
       },
       rewardAmount: DAILY_VIDEO_REWARD_AMOUNT,

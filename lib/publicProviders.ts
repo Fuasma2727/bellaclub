@@ -23,6 +23,7 @@ type RawMediaItem = {
   private?: boolean;
   price?: number | string | null;
   description?: string;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 type RawProviderData = FirebaseFirestore.DocumentData;
@@ -49,13 +50,13 @@ type PublicProviderCache = {
   diskLoaded?: boolean;
 };
 
-const PUBLIC_PROVIDER_CACHE_VERSION = 4;
+const PUBLIC_PROVIDER_CACHE_VERSION = 5;
 const PUBLIC_PROVIDER_CACHE_TTL_MS = 5 * 60 * 1000;
 const PUBLIC_PROVIDER_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 const PUBLIC_PROVIDER_DISK_CACHE_PATH = path.join(
   process.cwd(),
   ".runtime-cache",
-  "public-providers-v4.json"
+  "public-providers-v5.json"
 );
 
 const globalForPublicProviderCache = globalThis as typeof globalThis & {
@@ -141,12 +142,28 @@ const toMillis = (value: unknown) => {
   return iso ? new Date(iso).getTime() : 0;
 };
 
+const isPublicPlayableVideo = (video: {
+  url?: string;
+  playbackStatus?: string | null;
+}) => {
+  return video.playbackStatus !== "failed" && isSupportedVideoUrl(video.url);
+};
+
+const isPublicMediaAvailable = (item: RawMediaItem) => {
+  if ((item.type || "photo") !== "video") {
+    return isSupportedMediaUrl(item.type || "photo", item.url);
+  }
+
+  return isPublicPlayableVideo(item);
+};
+
 const getActiveDailyVideo = (dailyVideo: unknown, now = Date.now()) => {
   if (!dailyVideo || typeof dailyVideo !== "object") return null;
 
   const video = dailyVideo as {
     url?: string;
     duration?: number | string | null;
+    playbackStatus?: "ready" | "failed" | null;
     expiresAt?: { toDate?: () => Date } | string | Date | null;
   };
   const expiresAt =
@@ -158,7 +175,7 @@ const getActiveDailyVideo = (dailyVideo: unknown, now = Date.now()) => {
 
   if (
     !video.url ||
-    !isSupportedVideoUrl(video.url) ||
+    !isPublicPlayableVideo(video) ||
     !expiresAt ||
     expiresAt.getTime() <= now
   ) {
@@ -169,6 +186,7 @@ const getActiveDailyVideo = (dailyVideo: unknown, now = Date.now()) => {
     url: video.url,
     duration: Number(video.duration || 0) || null,
     expiresAt: expiresAt.toISOString(),
+    playbackStatus: video.playbackStatus || null,
   };
 };
 
@@ -217,7 +235,7 @@ export const getProviderPhonePath = (provider: { whatsapp?: string }) => {
 const sanitizeMediaForCard = (media?: RawMediaItem[]) => {
   return Array.isArray(media)
     ? media.flatMap((item, index) => {
-        if (!isSupportedMediaUrl(item.type || "photo", item.url)) {
+        if (!isPublicMediaAvailable(item)) {
           return [];
         }
 
@@ -228,6 +246,8 @@ const sanitizeMediaForCard = (media?: RawMediaItem[]) => {
             private: Boolean(item.private),
             price: item.private ? item.price || 0 : null,
             description: item.private ? item.description || "" : "",
+            playbackStatus:
+              item.type === "video" ? item.playbackStatus || null : null,
           },
         ];
       })
@@ -237,7 +257,7 @@ const sanitizeMediaForCard = (media?: RawMediaItem[]) => {
 const sanitizeMediaForProfile = (media?: RawMediaItem[]) => {
   return Array.isArray(media)
     ? media.flatMap((item, index) => {
-        if (!isSupportedMediaUrl(item.type || "photo", item.url)) {
+        if (!isPublicMediaAvailable(item)) {
           return [];
         }
 
@@ -251,6 +271,8 @@ const sanitizeMediaForProfile = (media?: RawMediaItem[]) => {
             private: isPrivate,
             price: isPrivate ? item.price || 0 : null,
             description: isPrivate ? item.description || "" : "",
+            playbackStatus:
+              item.type === "video" ? item.playbackStatus || null : null,
           },
         ];
       })

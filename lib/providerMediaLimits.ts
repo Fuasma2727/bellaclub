@@ -24,6 +24,7 @@ export type ProviderMediaItem = {
   price?: number | string | null;
   description?: string;
   duration?: number | string | null;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 export const getProviderVideoSecondsUsed = (media: ProviderMediaItem[]) => {

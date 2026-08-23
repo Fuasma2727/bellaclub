@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Header from "@/components/header";
+import PlayableVideo from "@/components/PlayableVideo";
 import { useAuth } from "@/context/AuthContext";
 import { app } from "@/lib/firebase";
 import { colombia } from "@/lib/colombia";
@@ -38,6 +39,7 @@ import {
   getUploadMediaType,
   inferUploadContentType as inferContentTypeFromUpload,
   isSupportedUploadContentType,
+  isSupportedVideoFilename,
 } from "@/lib/mediaCompatibility";
 import {
   PROVIDER_REFERRAL_REWARD,
@@ -58,11 +60,13 @@ type MediaItem = {
   price?: number | null;
   description?: string;
   duration?: number | null;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 type DailyVideo = {
   url?: string;
   duration?: number | null;
+  playbackStatus?: "ready" | "failed" | null;
   expiresAt?: {
     toDate?: () => Date;
   } | string | null;
@@ -155,6 +159,7 @@ type DailyVideoResponse = {
   dailyVideo?: {
     url: string;
     duration?: number | null;
+    playbackStatus?: "ready" | "failed" | null;
     expiresAt?: string | null;
   };
   rewardAmount?: number;
@@ -224,6 +229,12 @@ const validateUploadFile = (file: File) => {
   if (!mediaType || !isSupportedUploadContentType(contentType)) {
     throw new Error(
       `Formato no permitido para "${file.name}". Usa ${SUPPORTED_UPLOAD_FORMAT_LABEL}.`
+    );
+  }
+
+  if (mediaType === "video" && !isSupportedVideoFilename(file.name)) {
+    throw new Error(
+      `Formato no permitido para "${file.name}". Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
     );
   }
 
@@ -4356,17 +4367,18 @@ export default function PerfilPrestador() {
               <button
                 type="button"
                 onClick={() => setShowDailyVideoModal(false)}
-                className="absolute right-3 top-3 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/60 text-neutral-200 shadow-lg shadow-black/40 backdrop-blur transition hover:bg-white/10 hover:text-white"
+                className="absolute right-3 top-3 z-30 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/60 text-neutral-200 shadow-lg shadow-black/40 backdrop-blur transition hover:bg-white/10 hover:text-white"
                 aria-label="Cerrar video"
               >
                 X
               </button>
-              <video
+              <PlayableVideo
                 src={dailyVideoUrl}
                 controls
                 autoPlay
                 playsInline
-                className="max-h-[82vh] w-full bg-black object-contain"
+                className="min-h-[220px] w-full bg-black"
+                videoClassName="max-h-[82vh] w-full bg-black object-contain"
               />
             </div>
           </div>
@@ -4385,7 +4397,7 @@ export default function PerfilPrestador() {
                 type="button"
                 aria-label="Cerrar"
                 onClick={() => setExpandedMedia(null)}
-                className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/70 text-xl text-white"
+                className="absolute right-2 top-2 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/70 text-xl text-white"
               >
                 ×
               </button>
@@ -4399,12 +4411,13 @@ export default function PerfilPrestador() {
                   className="h-auto max-h-[90dvh] max-w-[calc(100vw-2rem)] w-auto rounded-lg object-contain"
                 />
               ) : (
-                <video
+                <PlayableVideo
                   src={mediaList[currentIndex].url}
                   controls
                   autoPlay
                   playsInline
-                  className="h-auto max-h-[90dvh] max-w-[calc(100vw-2rem)] w-auto rounded-lg bg-black object-contain"
+                  className="flex max-h-[90dvh] min-h-[220px] w-[calc(100vw-2rem)] max-w-[960px] items-center justify-center overflow-hidden rounded-lg bg-black"
+                  videoClassName="h-auto max-h-[90dvh] w-full bg-black object-contain"
                 />
               )}
             </div>

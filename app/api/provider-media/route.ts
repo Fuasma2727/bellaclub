@@ -140,6 +140,7 @@ export async function POST(request: Request) {
             private: Boolean(item.private),
             price: item.private ? privatePrice : null,
             duration: item.type === "video" ? incomingDuration : null,
+            playbackStatus: item.type === "video" ? "ready" : null,
             description: item.private
               ? String(item.description || "").trim()
               : "",
@@ -196,6 +197,7 @@ export async function POST(request: Request) {
           private: Boolean(body.item.private),
           price: body.item.private ? privatePrice : null,
           duration: body.item.type === "video" ? incomingDuration : null,
+          playbackStatus: body.item.type === "video" ? "ready" : null,
           description: body.item.private
             ? String(body.item.description || "").trim()
             : "",

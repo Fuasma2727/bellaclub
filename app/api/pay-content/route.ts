@@ -18,6 +18,7 @@ type MediaItem = {
   url?: string;
   private?: boolean;
   price?: number | string | null;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 export async function POST(req: Request) {
@@ -92,7 +93,11 @@ export async function POST(req: Request) {
       );
     }
 
-    if (targetMedia.type === "video" && !isSupportedVideoUrl(targetMedia.url)) {
+    if (
+      targetMedia.type === "video" &&
+      (targetMedia.playbackStatus === "failed" ||
+        !isSupportedVideoUrl(targetMedia.url))
+    ) {
       return NextResponse.json(
         {
           error:

@@ -20,6 +20,7 @@ type MediaItem = {
   price?: number | string | null;
   description?: string;
   duration?: number | string | null;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 type PurchasedItem = {
@@ -33,6 +34,7 @@ const getActiveDailyVideo = (dailyVideo: unknown) => {
   const video = dailyVideo as {
     url?: string;
     duration?: number | string | null;
+    playbackStatus?: "ready" | "failed" | null;
     expiresAt?: { toDate?: () => Date } | string | Date | null;
   };
   const expiresAt =
@@ -44,6 +46,7 @@ const getActiveDailyVideo = (dailyVideo: unknown) => {
 
   if (
     !video.url ||
+    video.playbackStatus === "failed" ||
     !isSupportedVideoUrl(video.url) ||
     !expiresAt ||
     expiresAt.getTime() <= Date.now()
@@ -54,6 +57,7 @@ const getActiveDailyVideo = (dailyVideo: unknown) => {
   return {
     url: video.url,
     duration: Number(video.duration || 0) || null,
+    playbackStatus: video.playbackStatus || null,
     expiresAt: expiresAt.toISOString(),
   };
 };
@@ -143,7 +147,14 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const safeMedia = media.flatMap((item, index) => {
-      if (!isSupportedMediaUrl(item.type || "photo", item.url)) {
+      if (
+        item.type === "video" &&
+        (item.playbackStatus === "failed" || !isSupportedVideoUrl(item.url))
+      ) {
+        return [];
+      }
+
+      if (item.type !== "video" && !isSupportedMediaUrl(item.type || "photo", item.url)) {
         return [];
       }
 
@@ -170,6 +181,8 @@ export async function GET(request: Request, { params }: Params) {
           previewUrl: item.private ? item.previewUrl || item.url || "" : "",
           duration:
             item.type === "video" ? Number(item.duration || 0) || null : null,
+          playbackStatus:
+            item.type === "video" ? item.playbackStatus || null : null,
         },
       ];
     });

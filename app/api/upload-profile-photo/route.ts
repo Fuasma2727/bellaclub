@@ -8,6 +8,7 @@ import {
   SUPPORTED_UPLOAD_FORMAT_LABEL,
   inferUploadContentType,
   isSupportedUploadContentType,
+  validateVideoFileCompatibility,
 } from "@/lib/mediaCompatibility";
 
 export const runtime = "nodejs";
@@ -36,6 +37,27 @@ const getSafeFilename = (filename: string) => {
 
 const getMaxSizeMb = (contentType: string) => {
   return contentType.startsWith("video") ? 150 : 12;
+};
+
+const validateVideoBeforeUpload = (
+  body: ArrayBuffer,
+  contentType: string,
+  filename: string
+) => {
+  if (!contentType.startsWith("video/")) return null;
+
+  const compatibility = validateVideoFileCompatibility(
+    body,
+    contentType,
+    filename
+  );
+
+  if (compatibility.supported) return null;
+
+  return NextResponse.json(
+    { error: compatibility.message || "Video no compatible" },
+    { status: 400 }
+  );
 };
 
 const uploadToBunny = async ({
@@ -174,6 +196,10 @@ export async function POST(request: Request) {
         );
       }
 
+      const videoError = validateVideoBeforeUpload(body, contentType, filename);
+
+      if (videoError) return videoError;
+
       return uploadToBunny({
         body,
         contentType,
@@ -212,8 +238,13 @@ export async function POST(request: Request) {
       );
     }
 
+    const body = await file.arrayBuffer();
+    const videoError = validateVideoBeforeUpload(body, contentType, file.name);
+
+    if (videoError) return videoError;
+
     return uploadToBunny({
-      body: await file.arrayBuffer(),
+      body,
       contentType,
       filename: file.name,
       uid: decoded.uid,

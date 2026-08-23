@@ -15,12 +15,14 @@ export type MediaItem = {
   price?: number | string | null;
   description?: string;
   duration?: number | null;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 export type DailyVideo = {
   url: string;
   duration?: number | null;
   expiresAt?: string | null;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 export type Prestador = {

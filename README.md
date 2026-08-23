@@ -9,7 +9,16 @@ verificaciones, saldo, contenido privado y reportes de seguridad.
 npm.cmd run dev
 ```
 
-Abre `http://localhost:3000/prestadores`.
+Abre `http://localhost:3010/prestadores`.
+
+El servidor local de BelaClub usa el puerto `3010` para no cruzarse con otros
+proyectos, como la herramienta de WhatsApp que suele quedarse viva en
+`localhost:3000`. Si necesitas cambiarlo:
+
+```powershell
+$env:BELACLUB_DEV_PORT=3011
+npm.cmd run dev
+```
 
 ## Validacion
 

@@ -6,8 +6,10 @@ export const runtime = "nodejs";
 
 type MediaItem = {
   id?: string;
+  type?: "photo" | "video";
   url?: string;
   private?: boolean;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 type PurchasedItem = {
@@ -105,7 +107,7 @@ const getPrivateMediaTargetUrl = async (request: Request) => {
     (item, index) => (item.id || `legacy-${index}`) === mediaId
   );
 
-  if (!target?.private || !target.url) {
+  if (!target?.private || !target.url || target.playbackStatus === "failed") {
     return NextResponse.json(
       { error: "Contenido no disponible" },
       { status: 404 }

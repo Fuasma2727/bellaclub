@@ -22,6 +22,7 @@ type ProviderProfileModalProps = {
   onReport: () => void;
   onOpenMedia: (index: number) => void;
   onMediaClick: (item: MediaItem, index: number) => void;
+  onMediaPlaybackError?: (item: MediaItem) => void;
 };
 
 function WhatsAppIcon() {
@@ -134,6 +135,7 @@ export default function ProviderProfileModal({
   onReport,
   onOpenMedia,
   onMediaClick,
+  onMediaPlaybackError,
 }: ProviderProfileModalProps) {
   const [activeTab, setActiveTab] = useState<"gallery" | "description">(
     "gallery"
@@ -370,6 +372,7 @@ export default function ProviderProfileModal({
                               draggable={false}
                               controlsList="nodownload noplaybackrate"
                               disablePictureInPicture
+                              onError={() => onMediaPlaybackError?.(item)}
                               onContextMenu={(event) => event.preventDefault()}
                               className={`absolute inset-0 h-full w-full object-cover ${
                                 isPrivate

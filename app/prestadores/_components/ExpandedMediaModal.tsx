@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import PlayableVideo from "@/components/PlayableVideo";
 import { MediaItem } from "./types";
 
 type ExpandedMediaModalProps = {
@@ -11,6 +12,7 @@ type ExpandedMediaModalProps = {
   onNext?: () => void;
   onPrevious?: () => void;
   onClose: () => void;
+  onPlaybackError?: (item: MediaItem) => void;
 };
 
 export default function ExpandedMediaModal({
@@ -20,6 +22,7 @@ export default function ExpandedMediaModal({
   onNext,
   onPrevious,
   onClose,
+  onPlaybackError,
 }: ExpandedMediaModalProps) {
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const overlayTimeout = useRef<number | null>(null);
@@ -176,7 +179,7 @@ export default function ExpandedMediaModal({
           type="button"
           aria-label="Cerrar"
           onClick={onClose}
-          className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/70 text-xl text-white"
+          className="absolute right-2 top-2 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/70 text-xl text-white"
         >
           ×
         </button>
@@ -199,14 +202,18 @@ export default function ExpandedMediaModal({
             className={expandedMediaClass}
           />
         ) : (
-          <video
+          <PlayableVideo
             src={item.url}
             controls
             autoPlay
+            playsInline
             controlsList="nodownload noplaybackrate"
             disablePictureInPicture
+            showErrorOverlay={false}
             onContextMenu={(event) => event.preventDefault()}
-            className={`${expandedMediaClass} bg-black`}
+            onError={() => onPlaybackError?.(item)}
+            className="flex max-h-[90dvh] min-h-[220px] w-[calc(100vw-2rem)] max-w-[960px] items-center justify-center overflow-hidden rounded-lg bg-black"
+            videoClassName="h-auto max-h-[90dvh] w-full bg-black object-contain"
           />
         )}
 

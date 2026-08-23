@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Header from "@/components/header";
+import PlayableVideo from "@/components/PlayableVideo";
 import { useAuth } from "@/context/AuthContext";
 import FiltersBar from "./_components/FiltersBar";
 import ProviderCard from "./_components/ProviderCard";
@@ -475,6 +476,79 @@ export default function PrestadoresPage({
       setOpeningProfileId(null);
     }
   }, [pushProfileModalHistory, user]);
+
+  const reportPlaybackFailure = useCallback(
+    (body: { providerId: string; kind: "dailyVideo" | "media"; mediaId?: string }) => {
+      void fetch("/api/media-playback-failure", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }).catch(() => {});
+    },
+    []
+  );
+
+  const hidePublicDailyVideo = useCallback(
+    (providerId: string) => {
+      setDailyVideoProvider(null);
+      setPrestadores((current) =>
+        current.map((provider) =>
+          provider.id === providerId ? { ...provider, dailyVideo: null } : provider
+        )
+      );
+      setModalData((current) =>
+        current?.id === providerId ? { ...current, dailyVideo: null } : current
+      );
+      reportPlaybackFailure({ providerId, kind: "dailyVideo" });
+    },
+    [reportPlaybackFailure]
+  );
+
+  const hidePublicMedia = useCallback(
+    (item: MediaItem) => {
+      const providerId = modalData?.id;
+
+      if (!providerId) return;
+
+      const matchesItem = (candidate: MediaItem) =>
+        item.id
+          ? candidate.id === item.id
+          : Boolean(item.url && candidate.url === item.url);
+
+      setExpandedMedia(null);
+      setCurrentIndex(0);
+      setMediaList((current) =>
+        current.filter((candidate, index) => index === 0 || !matchesItem(candidate))
+      );
+      setModalData((current) =>
+        current?.id === providerId
+          ? {
+              ...current,
+              media: (current.media || []).filter((candidate) => !matchesItem(candidate)),
+            }
+          : current
+      );
+      setPrestadores((current) =>
+        current.map((provider) =>
+          provider.id === providerId
+            ? {
+                ...provider,
+                media: (provider.media || []).filter(
+                  (candidate) => !matchesItem(candidate)
+                ),
+              }
+            : provider
+        )
+      );
+
+      if (item.id) {
+        reportPlaybackFailure({ providerId, kind: "media", mediaId: item.id });
+      }
+    },
+    [modalData?.id, reportPlaybackFailure]
+  );
 
   useEffect(() => {
     if (typeof window === "undefined" || loading || authLoading) return;
@@ -995,6 +1069,7 @@ export default function PrestadoresPage({
           onReport={() => void openReportModal()}
           onOpenMedia={openExpandedMedia}
           onMediaClick={handleMediaClick}
+          onMediaPlaybackError={hidePublicMedia}
         />
       )}
 
@@ -1011,20 +1086,23 @@ export default function PrestadoresPage({
             <button
               type="button"
               onClick={() => setDailyVideoProvider(null)}
-              className="absolute right-3 top-3 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/60 text-neutral-200 shadow-lg shadow-black/40 backdrop-blur transition hover:bg-white/10 hover:text-white"
+              className="absolute right-3 top-3 z-30 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/60 text-neutral-200 shadow-lg shadow-black/40 backdrop-blur transition hover:bg-white/10 hover:text-white"
               aria-label="Cerrar video"
             >
               X
             </button>
-            <video
+            <PlayableVideo
               src={dailyVideoProvider.dailyVideo.url}
               controls
               autoPlay
               playsInline
               controlsList="nodownload noplaybackrate"
               disablePictureInPicture
+              showErrorOverlay={false}
               onContextMenu={(event) => event.preventDefault()}
-              className="max-h-[82vh] w-full bg-black object-contain"
+              onError={() => hidePublicDailyVideo(dailyVideoProvider.id)}
+              className="min-h-[220px] w-full bg-black"
+              videoClassName="max-h-[82vh] w-full bg-black object-contain"
             />
           </div>
         </div>
@@ -1098,6 +1176,7 @@ export default function PrestadoresPage({
           canGoPrevious={mediaList.length > 1}
           onNext={() => moveExpandedMedia(1)}
           onPrevious={() => moveExpandedMedia(-1)}
+          onPlaybackError={hidePublicMedia}
           onClose={() => setExpandedMedia(null)}
         />
       )}
