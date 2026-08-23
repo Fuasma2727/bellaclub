@@ -197,7 +197,7 @@ type Params = {
 
 const isStrongTemporaryPassword = (value: string) => {
   return (
-    value.length >= 10 &&
+    value.length >= 6 &&
     value.length <= 128 &&
     /[A-Za-z]/.test(value) &&
     /\d/.test(value)
@@ -247,7 +247,7 @@ export async function PATCH(request: Request, { params }: Params) {
       return NextResponse.json(
         {
           error:
-            "La contraseña debe tener entre 10 y 128 caracteres, con letras y numeros.",
+            "La contraseña debe tener entre 6 y 128 caracteres, con letras y numeros.",
         },
         { status: 400 }
       );

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { loginUser, sendPasswordReset } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -12,31 +14,14 @@ const trustSignals = [
   "Contenido privado seguro",
 ];
 
-type UserProgressResponse = {
-  latestUnlockedProvider?: {
-    id?: string;
-  } | null;
-};
-
-const getPostLoginRoute = async (token: string) => {
+const getPostLoginRoute = async (uid: string) => {
   try {
-    const res = await fetch("/api/user-progress", {
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const snap = await getDoc(doc(db, "users", uid));
+    const role = snap.data()?.role;
 
-    if (!res.ok) return "/escorts";
-
-    const data = (await res.json()) as UserProgressResponse;
-    const providerId = data.latestUnlockedProvider?.id?.trim();
-
-    return providerId
-      ? `/?providerId=${encodeURIComponent(providerId)}`
-      : "/escorts";
+    return role === "prestador" ? "/prestador/perfil" : "/usuario/perfil";
   } catch {
-    return "/escorts";
+    return "/usuario/perfil";
   }
 };
 
@@ -57,8 +42,7 @@ export default function LoginPage() {
 
     try {
       const credential = await loginUser(email, password);
-      const token = await credential.user.getIdToken();
-      router.push(await getPostLoginRoute(token));
+      router.push(await getPostLoginRoute(credential.user.uid));
     } catch {
       setMessageType("error");
       setMessage("Correo o contrasena incorrectos");

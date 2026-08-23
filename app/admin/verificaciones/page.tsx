@@ -1071,7 +1071,7 @@ export default function AdminVerificationsPage() {
       window.prompt(
         `Escribe una contraseña temporal para ${
           target.name || target.email || "este usuario"
-        }. Debe tener minimo 10 caracteres, letras y numeros.`
+        }. Debe tener minimo 6 caracteres, letras y numeros.`
       ) || "";
 
     if (!password) return;
