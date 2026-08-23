@@ -492,6 +492,14 @@ export default function PrestadoresPage({
     }
 
     autoOpenProfileRequestRef.current = providerId;
+    params.delete("providerId");
+
+    const cleanSearch = params.toString();
+    const cleanUrl = `${window.location.pathname}${
+      cleanSearch ? `?${cleanSearch}` : ""
+    }${window.location.hash}`;
+
+    window.history.replaceState(window.history.state, "", cleanUrl);
 
     void openModal(providerId).catch((error) => {
       console.error("Error auto opening provider:", error);
