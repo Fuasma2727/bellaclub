@@ -12,6 +12,7 @@ import {
   ProviderMediaItem,
 } from "@/lib/providerMediaLimits";
 import { isSupportedVideoUrl } from "@/lib/mediaCompatibility";
+import { invalidatePublicProviderCache } from "@/lib/publicProviders";
 
 export const runtime = "nodejs";
 
@@ -212,6 +213,8 @@ export async function POST(request: Request) {
 
       return { media: updated, videoSecondsLimit };
     });
+
+    invalidatePublicProviderCache();
 
     return NextResponse.json({ success: true, ...result });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { isSupportedVideoUrl } from "@/lib/mediaCompatibility";
 import { verifyPrivateMediaToken } from "@/lib/privateMediaAccess";
 
 export const runtime = "nodejs";
@@ -15,6 +16,14 @@ type MediaItem = {
 type PurchasedItem = {
   sellerId?: string;
   mediaId?: string;
+};
+
+const hasConfirmedPlaybackFailure = (item: MediaItem) => {
+  return (
+    item.type === "video" &&
+    item.playbackStatus === "failed" &&
+    isSupportedVideoUrl(item.url)
+  );
 };
 
 const privateMediaResponseHeaders = [
@@ -107,7 +116,7 @@ const getPrivateMediaTargetUrl = async (request: Request) => {
     (item, index) => (item.id || `legacy-${index}`) === mediaId
   );
 
-  if (!target?.private || !target.url || target.playbackStatus === "failed") {
+  if (!target?.private || !target.url || hasConfirmedPlaybackFailure(target)) {
     return NextResponse.json(
       { error: "Contenido no disponible" },
       { status: 404 }

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 
-import PrestadoresPage from "./prestadores/page";
-
-export const dynamic = "force-dynamic";
+import PrestadoresClientPage from "./prestadores/PrestadoresClientPage";
 
 export const metadata: Metadata = {
   title: {
@@ -33,5 +31,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <PrestadoresPage />;
+  return <PrestadoresClientPage />;
 }

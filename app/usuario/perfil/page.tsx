@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/header";
 
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { app } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import Image from "next/image";
 
 type UploadResponse = {
@@ -149,7 +149,6 @@ const buildLevelSteps = (progress: UserProgress): LevelStep[] => [
 export default function PerfilUsuario() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const db = getFirestore(app);
 
   const [name, setName] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -214,7 +213,7 @@ export default function PerfilUsuario() {
     };
 
     if (!loading) void load();
-  }, [user, loading, db]);
+  }, [user, loading]);
 
   const levelSteps = useMemo(() => buildLevelSteps(progress), [progress]);
   const currentStep =

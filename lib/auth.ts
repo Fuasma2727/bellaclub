@@ -1,6 +1,4 @@
-import { app } from "./firebaseApp";
 import {
-  getAuth,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -9,15 +7,12 @@ import {
 } from "firebase/auth";
 
 import {
-  getFirestore,
   doc,
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { normalizeReferralCode } from "@/lib/referralCodes";
-
-const auth = getAuth(app);
-const db = getFirestore(app);
+import { auth, db } from "./firebase";
 
 export type UserRole = "cliente" | "prestador";
 

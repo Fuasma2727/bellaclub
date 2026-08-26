@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     const snapshot = await adminDb
       .collection("reports")
       .where("status", "==", status)
+      .limit(80)
       .get();
 
     const reports = await Promise.all(

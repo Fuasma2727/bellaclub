@@ -50,8 +50,9 @@ export async function generateMetadata({
   const name = provider.name?.trim() || "Escort verificada";
   const place = [provider.city, provider.department].filter(Boolean).join(", ");
   const phonePath = getProviderPhonePath(provider);
-  const title = `WhatsApp ${phoneSeo.canonicalDigits || phoneSeo.raw} de ${name}`;
-  const description = `Encuentra el perfil de ${name} en BelaClub por el numero de WhatsApp ${phoneSeo.canonicalDigits || phoneSeo.raw}${place ? ` en ${place}` : ""}.`;
+  const phone = phoneSeo.canonicalDigits || phoneSeo.raw;
+  const title = `${phone} - ${name}${place ? ` en ${place}` : ""}`;
+  const description = `Perfil de ${name} asociado al WhatsApp ${phone}${place ? ` en ${place}` : ""}. Revisa fotos publicas, ubicacion y contacto directo en BelaClub.`;
 
   return {
     title,
@@ -64,10 +65,10 @@ export async function generateMetadata({
       phoneSeo.formattedLocal,
       phoneSeo.formattedInternational,
       `${name} WhatsApp`,
-      `${name} ${phoneSeo.canonicalDigits || ""}`.trim(),
-      `telefono ${phoneSeo.canonicalDigits || ""}`.trim(),
-      `numero ${phoneSeo.canonicalDigits || ""}`.trim(),
-      `perfil ${phoneSeo.canonicalDigits || ""}`.trim(),
+      `${name} ${phone}`.trim(),
+      `telefono ${phone}`.trim(),
+      `numero ${phone}`.trim(),
+      `perfil ${phone}`.trim(),
       provider.city ? `${phoneSeo.canonicalDigits} ${provider.city}` : "",
     ].filter(Boolean),
     alternates: {
@@ -142,7 +143,7 @@ export default async function PhoneLookupPage({ params }: PhonePageProps) {
           {
             "@context": "https://schema.org",
             "@type": "WebPage",
-            name: `WhatsApp ${phoneSeo.canonicalDigits || phoneSeo.raw} de ${name}`,
+            name: `${phoneSeo.canonicalDigits || phoneSeo.raw} - ${name}`,
             url: pageUrl,
             isPartOf: {
               "@type": "WebSite",
@@ -181,7 +182,7 @@ export default async function PhoneLookupPage({ params }: PhonePageProps) {
               {
                 "@type": "ListItem",
                 position: 2,
-                name: `Telefono ${phoneSeo.canonicalDigits || phoneSeo.raw}`,
+                name: `${phoneSeo.canonicalDigits || phoneSeo.raw}`,
                 item: pageUrl,
               },
             ],
@@ -197,7 +198,7 @@ export default async function PhoneLookupPage({ params }: PhonePageProps) {
           </Link>
           <span>/</span>
           <span className="text-neutral-300">
-            WhatsApp {phoneSeo.canonicalDigits || phoneSeo.raw}
+            {phoneSeo.canonicalDigits || phoneSeo.raw}
           </span>
         </nav>
 
@@ -222,7 +223,7 @@ export default async function PhoneLookupPage({ params }: PhonePageProps) {
                 Perfil por telefono
               </p>
               <h1 className="mt-2 text-3xl font-semibold text-white sm:text-4xl">
-                WhatsApp {phoneSeo.canonicalDigits || displayPhone}
+                {phoneSeo.canonicalDigits || displayPhone}
               </h1>
               <p className="mt-2 text-sm text-neutral-300">
                 {name}

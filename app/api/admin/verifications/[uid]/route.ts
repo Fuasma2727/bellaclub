@@ -12,6 +12,7 @@ import {
   guardMutationRequest,
   securityErrorResponse,
 } from "@/lib/requestSecurity";
+import { invalidatePublicProviderCache } from "@/lib/publicProviders";
 
 type VerificationAction =
   | "approve"
@@ -323,6 +324,8 @@ export async function PATCH(request: Request, { params }: Params) {
         { status: 400 }
       );
     }
+
+    invalidatePublicProviderCache();
 
     if (action === "deleteProvider") {
       if (confirmText !== "ELIMINAR") {

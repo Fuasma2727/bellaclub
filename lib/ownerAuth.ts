@@ -51,6 +51,9 @@ export const ownerAuthError = (error: unknown) => {
     return { message: "No autorizado", status: 401 };
   }
 
+  const typedError = error as Error & { code?: unknown; details?: unknown };
+  const details = String(typedError.details || typedError.message || "");
+
   if (error.message === "OWNER_NOT_CONFIGURED") {
     return {
       message: "Configura OWNER_EMAIL u OWNER_UID en .env.local",
@@ -62,5 +65,20 @@ export const ownerAuthError = (error: unknown) => {
     return { message: "Debes iniciar sesión", status: 401 };
   }
 
-  return { message: "No tienes acceso a este panel", status: 403 };
+  if (error.message === "FORBIDDEN") {
+    return { message: "No tienes acceso a este panel", status: 403 };
+  }
+
+  if (typedError.code === 8 || details.includes("Quota exceeded")) {
+    return {
+      message:
+        "Firestore esta sin cuota temporalmente. Intenta de nuevo cuando se libere la cuota.",
+      status: 503,
+    };
+  }
+
+  return {
+    message: "No pudimos cargar el panel de administrador",
+    status: 500,
+  };
 };

@@ -21,6 +21,14 @@ type MediaItem = {
   playbackStatus?: "ready" | "failed" | null;
 };
 
+const hasConfirmedPlaybackFailure = (item: MediaItem) => {
+  return (
+    item.type === "video" &&
+    item.playbackStatus === "failed" &&
+    isSupportedVideoUrl(item.url)
+  );
+};
+
 export async function POST(req: Request) {
   try {
     guardMutationRequest(req, {
@@ -93,11 +101,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (
-      targetMedia.type === "video" &&
-      (targetMedia.playbackStatus === "failed" ||
-        !isSupportedVideoUrl(targetMedia.url))
-    ) {
+    if (hasConfirmedPlaybackFailure(targetMedia)) {
       return NextResponse.json(
         {
           error:

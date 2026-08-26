@@ -74,6 +74,23 @@ const footerSeoLinks: CitySeoLink[] = [
   { href: "/prepagos/la-ceja", label: "Prepagos en La Ceja" },
 ];
 
+const readApiJson = async <T extends { error?: string }>(
+  res: Response,
+  fallbackMessage: string
+) => {
+  const text = await res.text();
+
+  if (!text) {
+    return (res.ok ? {} : { error: fallbackMessage }) as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return { error: fallbackMessage } as T;
+  }
+};
+
 export default function PrestadoresPage({
   initialCity = "",
   initialDepartment = "",
@@ -95,6 +112,7 @@ export default function PrestadoresPage({
   );
   const [loading, setLoading] = useState(!initialProviders);
   const [pageError, setPageError] = useState("");
+  const [profileError, setProfileError] = useState("");
 
   const [modalData, setModalData] = useState<Prestador | null>(null);
   const [dailyVideoProvider, setDailyVideoProvider] =
@@ -208,13 +226,17 @@ export default function PrestadoresPage({
   }, [departmentFilter, cityFilter, zoneFilter, prestadores]);
 
   const hasPurchased = useCallback((item: MediaItem) => {
-    return !item.private || Boolean(item.url);
+    return !item.private || Boolean(item.url) || Boolean(item.purchased);
   }, []);
 
   const canViewMedia = useCallback(
     (item?: MediaItem) => {
       if (!item) return false;
-      return hasPurchased(item);
+      return (
+        hasPurchased(item) &&
+        Boolean(item.url) &&
+        !item.unavailable
+      );
     },
     [hasPurchased]
   );
@@ -409,10 +431,10 @@ export default function PrestadoresPage({
 
       try {
         const res = await fetch("/api/providers", { cache: "no-store" });
-        const payload = (await res.json()) as {
+        const payload = await readApiJson<{
           providers?: Prestador[];
           error?: string;
-        };
+        }>(res, "No pudimos cargar los perfiles");
 
         if (!res.ok) {
           throw new Error(payload.error || "No pudimos cargar los perfiles");
@@ -420,6 +442,7 @@ export default function PrestadoresPage({
 
         if (!cancelled) {
           setPrestadores(payload.providers || []);
+          setProfileError("");
         }
       } catch (error) {
         if (initialProviders || cancelled) return;
@@ -445,6 +468,7 @@ export default function PrestadoresPage({
 
   const openModal = useCallback(async (id: string) => {
     setOpeningProfileId(id);
+    setProfileError("");
 
     try {
       const headers: HeadersInit = {};
@@ -454,12 +478,17 @@ export default function PrestadoresPage({
       }
 
       const res = await fetch(`/api/providers/${id}`, { headers });
-      const payload = (await res.json()) as {
+      const payload = await readApiJson<{
         provider?: Prestador;
         error?: string;
-      };
+      }>(res, "No pudimos abrir el perfil");
 
       if (!res.ok || !payload.provider) {
+        if (res.status === 404) {
+          setPrestadores((current) =>
+            current.filter((provider) => provider.id !== id)
+          );
+        }
         throw new Error(payload.error || "No pudimos abrir el perfil");
       }
 
@@ -472,6 +501,10 @@ export default function PrestadoresPage({
       pushProfileModalHistory(data.id);
       setModalData(data);
       setMediaList(allMedia);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "No pudimos abrir el perfil";
+      setProfileError(message);
     } finally {
       setOpeningProfileId(null);
     }
@@ -516,6 +549,19 @@ export default function PrestadoresPage({
         item.id
           ? candidate.id === item.id
           : Boolean(item.url && candidate.url === item.url);
+
+      if (item.private) {
+        setExpandedMedia(null);
+        setProfileError(
+          "No pudimos reproducir este video en este momento. Tu desbloqueo sigue activo."
+        );
+
+        if (item.id) {
+          reportPlaybackFailure({ providerId, kind: "media", mediaId: item.id });
+        }
+
+        return;
+      }
 
       setExpandedMedia(null);
       setCurrentIndex(0);
@@ -600,6 +646,14 @@ export default function PrestadoresPage({
   };
 
   const handleMediaClick = (item: MediaItem, index: number) => {
+    if (item.unavailable) {
+      setProfileError(
+        item.unavailableReason ||
+          "Este video no esta disponible por formato incompatible."
+      );
+      return;
+    }
+
     const isPrivate = item.private && !hasPurchased(item);
 
     if (!isPrivate) {
@@ -648,12 +702,18 @@ export default function PrestadoresPage({
 
       setMediaList((current) =>
         current.map((item, index) =>
-          index === targetIndex ? { ...item, url: unlockedUrl } : item
+          index === targetIndex
+            ? { ...item, url: unlockedUrl, purchased: true }
+            : item
         )
       );
       setPendingPurchase(null);
       setCurrentIndex(targetIndex);
-      setExpandedMedia({ ...pendingPurchase.item, url: unlockedUrl });
+      setExpandedMedia({
+        ...pendingPurchase.item,
+        url: unlockedUrl,
+        purchased: true,
+      });
     } catch (error) {
       const message =
         error instanceof Error
@@ -725,11 +785,11 @@ export default function PrestadoresPage({
     setReportEligibilityLoading(true);
 
     try {
-      const [{ doc, getDoc, getFirestore }, { app }] = await Promise.all([
+      const [{ doc, getDoc }, { db }] = await Promise.all([
         import("firebase/firestore"),
-        import("@/lib/firebaseApp"),
+        import("@/lib/firebase"),
       ]);
-      const userSnap = await getDoc(doc(getFirestore(app), "users", user.uid));
+      const userSnap = await getDoc(doc(db, "users", user.uid));
 
       if (!userSnap.exists()) {
         setReportMessage(
@@ -853,6 +913,12 @@ export default function PrestadoresPage({
           {!loading && pageError && (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-100">
               {pageError}
+            </div>
+          )}
+
+          {!loading && !pageError && profileError && (
+            <div className="mb-3 rounded-md border border-amber-300/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+              {profileError}
             </div>
           )}
 

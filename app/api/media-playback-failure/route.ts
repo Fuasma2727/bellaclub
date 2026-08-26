@@ -8,6 +8,7 @@ import {
   isSupportedVideoUrl,
   validateVideoFileCompatibility,
 } from "@/lib/mediaCompatibility";
+import { invalidatePublicProviderCache } from "@/lib/publicProviders";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,13 @@ type MediaItem = {
 
 const VIDEO_PROBE_BYTES = 4 * 1024 * 1024 - 1;
 
+const hasConfirmedPlaybackFailure = (video: {
+  url?: string;
+  playbackStatus?: string | null;
+}) => {
+  return video.playbackStatus === "failed" && isSupportedVideoUrl(video.url);
+};
+
 const getFilenameFromUrl = (url: string) => {
   try {
     return new URL(url).pathname.split("/").pop() || "video.mp4";
@@ -36,8 +44,6 @@ const getFilenameFromUrl = (url: string) => {
 };
 
 const isConfirmedUnsupportedVideo = async (url: string) => {
-  if (!isSupportedVideoUrl(url)) return true;
-
   const response = await fetch(url, {
     headers: {
       Range: `bytes=0-${VIDEO_PROBE_BYTES}`,
@@ -101,7 +107,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ hidden: false }, { status: 404 });
       }
 
-      if (dailyVideo.playbackStatus === "failed") {
+      if (hasConfirmedPlaybackFailure(dailyVideo)) {
         return NextResponse.json({ hidden: true });
       }
 
@@ -113,6 +119,8 @@ export async function POST(request: Request) {
         "dailyVideo.playbackStatus": "failed",
         dailyVideoPlaybackFailedAt: adminFieldValue.serverTimestamp(),
       });
+
+      invalidatePublicProviderCache();
 
       return NextResponse.json({ hidden: true });
     }
@@ -127,7 +135,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ hidden: false }, { status: 404 });
     }
 
-    if (target.playbackStatus === "failed") {
+    if (hasConfirmedPlaybackFailure(target)) {
       return NextResponse.json({ hidden: true });
     }
 
@@ -144,6 +152,8 @@ export async function POST(request: Request) {
       mediaUpdatedAt: adminFieldValue.serverTimestamp(),
       mediaPlaybackFailedAt: adminFieldValue.serverTimestamp(),
     });
+
+    invalidatePublicProviderCache();
 
     return NextResponse.json({ hidden: true });
   } catch (error) {

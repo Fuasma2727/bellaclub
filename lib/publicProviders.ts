@@ -1,5 +1,5 @@
 import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { citySlug } from "@/lib/providerCitySeo";
@@ -20,9 +20,11 @@ type RawMediaItem = {
   id?: string;
   type?: "photo" | "video";
   url?: string;
+  previewUrl?: string;
   private?: boolean;
   price?: number | string | null;
   description?: string;
+  duration?: number | string | null;
   playbackStatus?: "ready" | "failed" | null;
 };
 
@@ -48,15 +50,16 @@ type PublicProviderCache = {
   inFlight?: Promise<PublicProviderCard[]>;
   loaded?: boolean;
   diskLoaded?: boolean;
+  mustRefresh?: boolean;
 };
 
-const PUBLIC_PROVIDER_CACHE_VERSION = 5;
-const PUBLIC_PROVIDER_CACHE_TTL_MS = 5 * 60 * 1000;
-const PUBLIC_PROVIDER_STALE_TTL_MS = 24 * 60 * 60 * 1000;
+const PUBLIC_PROVIDER_CACHE_VERSION = 8;
+const PUBLIC_PROVIDER_CACHE_TTL_MS = 60 * 60 * 1000;
+const PUBLIC_PROVIDER_STALE_TTL_MS = 72 * 60 * 60 * 1000;
 const PUBLIC_PROVIDER_DISK_CACHE_PATH = path.join(
   process.cwd(),
   ".runtime-cache",
-  "public-providers-v5.json"
+  "public-providers-v8.json"
 );
 
 const globalForPublicProviderCache = globalThis as typeof globalThis & {
@@ -71,6 +74,7 @@ const publicProviderCache =
     staleUntil: 0,
     loaded: false,
     diskLoaded: false,
+    mustRefresh: false,
   };
 
 if (publicProviderCache.version !== PUBLIC_PROVIDER_CACHE_VERSION) {
@@ -81,17 +85,50 @@ if (publicProviderCache.version !== PUBLIC_PROVIDER_CACHE_VERSION) {
   publicProviderCache.inFlight = undefined;
   publicProviderCache.loaded = false;
   publicProviderCache.diskLoaded = false;
+  publicProviderCache.mustRefresh = false;
 }
 
 globalForPublicProviderCache.__belaclubPublicProviderCache =
   publicProviderCache;
 
+export const invalidatePublicProviderCache = () => {
+  const now = Date.now();
+
+  publicProviderCache.expiresAt = 0;
+  publicProviderCache.staleUntil = Math.max(
+    publicProviderCache.staleUntil,
+    now + PUBLIC_PROVIDER_STALE_TTL_MS
+  );
+  publicProviderCache.inFlight = undefined;
+  publicProviderCache.loaded = publicProviderCache.providers.length > 0;
+  publicProviderCache.mustRefresh = true;
+};
+
 const readPublicProviderDiskCache = async () => {
   try {
-    const raw = await readFile(PUBLIC_PROVIDER_DISK_CACHE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as { providers?: PublicProviderCard[] };
+    const [raw, fileStats] = await Promise.all([
+      readFile(PUBLIC_PROVIDER_DISK_CACHE_PATH, "utf8"),
+      stat(PUBLIC_PROVIDER_DISK_CACHE_PATH).catch(() => null),
+    ]);
+    const parsed = JSON.parse(raw) as {
+      providers?: PublicProviderCard[];
+      updatedAt?: string;
+    };
 
-    return Array.isArray(parsed.providers) ? parsed.providers : null;
+    if (!Array.isArray(parsed.providers)) return null;
+
+    const updatedAt = parsed.updatedAt
+      ? new Date(parsed.updatedAt).getTime()
+      : 0;
+    const updatedAtMs =
+      Number.isFinite(updatedAt) && updatedAt > 0
+        ? updatedAt
+        : fileStats?.mtimeMs || 0;
+
+    return {
+      providers: parsed.providers,
+      updatedAtMs,
+    };
   } catch {
     return null;
   }
@@ -142,11 +179,18 @@ const toMillis = (value: unknown) => {
   return iso ? new Date(iso).getTime() : 0;
 };
 
+const hasConfirmedPlaybackFailure = (video: {
+  url?: string;
+  playbackStatus?: string | null;
+}) => {
+  return video.playbackStatus === "failed" && isSupportedVideoUrl(video.url);
+};
+
 const isPublicPlayableVideo = (video: {
   url?: string;
   playbackStatus?: string | null;
 }) => {
-  return video.playbackStatus !== "failed" && isSupportedVideoUrl(video.url);
+  return !hasConfirmedPlaybackFailure(video) && Boolean(video.url);
 };
 
 const isPublicMediaAvailable = (item: RawMediaItem) => {
@@ -155,6 +199,14 @@ const isPublicMediaAvailable = (item: RawMediaItem) => {
   }
 
   return isPublicPlayableVideo(item);
+};
+
+const shouldExposeMediaSummary = (item: RawMediaItem) => {
+  if (item.private) {
+    return Boolean(item.url);
+  }
+
+  return isPublicMediaAvailable(item);
 };
 
 const getActiveDailyVideo = (dailyVideo: unknown, now = Date.now()) => {
@@ -175,7 +227,8 @@ const getActiveDailyVideo = (dailyVideo: unknown, now = Date.now()) => {
 
   if (
     !video.url ||
-    !isPublicPlayableVideo(video) ||
+    video.playbackStatus === "failed" ||
+    !isSupportedVideoUrl(video.url) ||
     !expiresAt ||
     expiresAt.getTime() <= now
   ) {
@@ -235,19 +288,32 @@ export const getProviderPhonePath = (provider: { whatsapp?: string }) => {
 const sanitizeMediaForCard = (media?: RawMediaItem[]) => {
   return Array.isArray(media)
     ? media.flatMap((item, index) => {
-        if (!isPublicMediaAvailable(item)) {
+        if (!shouldExposeMediaSummary(item)) {
           return [];
         }
+
+        const type = item.type || "photo";
+        const isPrivate = Boolean(item.private);
+        const isFailedVideo =
+          type === "video" && hasConfirmedPlaybackFailure(item);
 
         return [
           {
             id: item.id || `legacy-${index}`,
-            type: item.type || "photo",
-            private: Boolean(item.private),
-            price: item.private ? item.price || 0 : null,
-            description: item.private ? item.description || "" : "",
-            playbackStatus:
-              item.type === "video" ? item.playbackStatus || null : null,
+            type,
+            url: isPrivate ? "" : item.url || "",
+            private: isPrivate,
+            price: isPrivate ? item.price || 0 : null,
+            description: isPrivate ? item.description || "" : "",
+            previewUrl: isPrivate ? item.previewUrl || "" : "",
+            duration:
+              type === "video" ? Number(item.duration || 0) || null : null,
+            playbackStatus: type === "video" ? item.playbackStatus || null : null,
+            unavailable: isPrivate && isFailedVideo,
+            unavailableReason:
+              isPrivate && isFailedVideo
+                ? "Video no disponible por formato incompatible"
+                : "",
           },
         ];
       })
@@ -257,22 +323,32 @@ const sanitizeMediaForCard = (media?: RawMediaItem[]) => {
 const sanitizeMediaForProfile = (media?: RawMediaItem[]) => {
   return Array.isArray(media)
     ? media.flatMap((item, index) => {
-        if (!isPublicMediaAvailable(item)) {
+        if (!shouldExposeMediaSummary(item)) {
           return [];
         }
 
+        const type = item.type || "photo";
         const isPrivate = Boolean(item.private);
+        const isFailedVideo =
+          type === "video" && hasConfirmedPlaybackFailure(item);
 
         return [
           {
             id: item.id || `legacy-${index}`,
-            type: item.type || "photo",
+            type,
             url: isPrivate ? "" : item.url || "",
             private: isPrivate,
             price: isPrivate ? item.price || 0 : null,
             description: isPrivate ? item.description || "" : "",
-            playbackStatus:
-              item.type === "video" ? item.playbackStatus || null : null,
+            previewUrl: isPrivate ? item.previewUrl || "" : "",
+            duration:
+              type === "video" ? Number(item.duration || 0) || null : null,
+            playbackStatus: type === "video" ? item.playbackStatus || null : null,
+            unavailable: isPrivate && isFailedVideo,
+            unavailableReason:
+              isPrivate && isFailedVideo
+                ? "Video no disponible por formato incompatible"
+                : "",
           },
         ];
       })
@@ -432,35 +508,7 @@ async function fetchPublicProviderCards() {
   });
 }
 
-async function readPublicProviderCards() {
-  const now = Date.now();
-
-  if (
-    publicProviderCache.providers.length === 0 &&
-    !publicProviderCache.diskLoaded
-  ) {
-    const diskProviders = await readPublicProviderDiskCache();
-
-    publicProviderCache.diskLoaded = true;
-
-    if (diskProviders?.length) {
-      publicProviderCache.providers = diskProviders;
-      publicProviderCache.expiresAt = now + PUBLIC_PROVIDER_CACHE_TTL_MS;
-      publicProviderCache.staleUntil = now + PUBLIC_PROVIDER_STALE_TTL_MS;
-      publicProviderCache.loaded = true;
-    }
-  }
-
-  if (publicProviderCache.loaded) {
-    if (publicProviderCache.expiresAt > now) {
-      return publicProviderCache.providers;
-    }
-
-    if (publicProviderCache.inFlight) {
-      return publicProviderCache.providers;
-    }
-  }
-
+const refreshPublicProviderCache = () => {
   if (publicProviderCache.inFlight) {
     return publicProviderCache.inFlight;
   }
@@ -475,6 +523,7 @@ async function readPublicProviderCards() {
       publicProviderCache.staleUntil =
         refreshedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
       publicProviderCache.loaded = true;
+      publicProviderCache.mustRefresh = false;
 
       void writePublicProviderDiskCache(providers);
 
@@ -489,6 +538,7 @@ async function readPublicProviderCards() {
           "Error refreshing public provider cache; serving stale providers:",
           error
         );
+        publicProviderCache.mustRefresh = false;
         return publicProviderCache.providers;
       }
 
@@ -501,6 +551,7 @@ async function readPublicProviderCards() {
         publicProviderCache.staleUntil =
           failedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
         publicProviderCache.loaded = true;
+        publicProviderCache.mustRefresh = false;
         console.error(
           "Public providers unavailable because Firestore quota is exhausted:",
           error
@@ -515,28 +566,103 @@ async function readPublicProviderCards() {
     });
 
   return publicProviderCache.inFlight;
+};
+
+async function readPublicProviderCards() {
+  const now = Date.now();
+
+  if (
+    publicProviderCache.providers.length === 0 &&
+    !publicProviderCache.diskLoaded
+  ) {
+    const diskCache = await readPublicProviderDiskCache();
+
+    publicProviderCache.diskLoaded = true;
+
+    if (diskCache?.providers.length) {
+      const cacheAge = Math.max(0, now - diskCache.updatedAtMs);
+
+      if (cacheAge <= PUBLIC_PROVIDER_STALE_TTL_MS) {
+        publicProviderCache.providers = diskCache.providers;
+        publicProviderCache.expiresAt =
+          cacheAge <= PUBLIC_PROVIDER_CACHE_TTL_MS
+            ? diskCache.updatedAtMs + PUBLIC_PROVIDER_CACHE_TTL_MS
+            : 0;
+        publicProviderCache.staleUntil =
+          diskCache.updatedAtMs + PUBLIC_PROVIDER_STALE_TTL_MS;
+        publicProviderCache.loaded = true;
+      }
+    }
+  }
+
+  if (publicProviderCache.loaded && !publicProviderCache.mustRefresh) {
+    if (publicProviderCache.expiresAt > now) {
+      return publicProviderCache.providers;
+    }
+
+    if (publicProviderCache.staleUntil > now) {
+      void refreshPublicProviderCache().catch(() => {});
+      return publicProviderCache.providers;
+    }
+  }
+
+  if (publicProviderCache.inFlight) {
+    return publicProviderCache.inFlight;
+  }
+
+  return refreshPublicProviderCache();
 }
+
+const toPublicProviderProfile = (
+  provider: PublicProviderCard,
+  media: MediaItem[]
+): PublicProviderProfile => ({
+  ...provider,
+  media,
+  publicMedia: media.filter((item) => !item.private && Boolean(item.url)),
+  privateMediaCount: media.filter((item) => item.private).length,
+});
+
+const getCachedPublicProviderProfile = async (id: string) => {
+  const cachedProvider = (await getPublicProviderCards()).find(
+    (provider) => provider.id === id
+  );
+
+  if (!cachedProvider) return null;
+
+  const media = Array.isArray(cachedProvider.media)
+    ? cachedProvider.media
+    : [];
+
+  return toPublicProviderProfile(cachedProvider, media);
+};
 
 export async function getPublicProviderProfileById(id: string) {
   if (!id) return null;
 
-  const snap = await adminDb.collection("users").doc(id).get();
-  const data = snap.data();
+  try {
+    const snap = await adminDb.collection("users").doc(id).get();
+    const data = snap.data();
 
-  if (!snap.exists || !data) return null;
+    if (!snap.exists || !data) return null;
 
-  const card = toPublicProviderCard(snap.id, data);
-  if (!card) return null;
+    const card = toPublicProviderCard(snap.id, data);
+    if (!card) return null;
 
-  const media = sanitizeMediaForProfile(data.media);
-  const privateMediaCount = media.filter((item) => item.private).length;
+    return toPublicProviderProfile(card, sanitizeMediaForProfile(data.media));
+  } catch (error) {
+    const cachedProfile = await getCachedPublicProviderProfile(id);
 
-  return {
-    ...card,
-    media,
-    publicMedia: media.filter((item) => !item.private && Boolean(item.url)),
-    privateMediaCount,
-  };
+    if (cachedProfile) {
+      console.error(
+        "Error loading fresh public provider profile; serving cached profile:",
+        error
+      );
+      return cachedProfile;
+    }
+
+    throw error;
+  }
 }
 
 export async function getPublicProviderProfileBySlug(

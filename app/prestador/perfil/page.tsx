@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  getFirestore,
   doc,
   getDoc,
   setDoc,
@@ -13,7 +12,7 @@ import Image from "next/image";
 import Header from "@/components/header";
 import PlayableVideo from "@/components/PlayableVideo";
 import { useAuth } from "@/context/AuthContext";
-import { app } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { colombia } from "@/lib/colombia";
 import {
   EXTRA_VIDEO_TIME_PRICE,
@@ -888,7 +887,6 @@ const getDateValue = (value: ProviderProfile["promotedUntil"]) => {
 export default function PerfilPrestador() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const db = getFirestore(app);
 
   const [pageLoading, setPageLoading] = useState(true);
   const [role, setRole] = useState("");
@@ -1395,7 +1393,7 @@ export default function PerfilPrestador() {
     };
 
     void loadData();
-  }, [user, db]);
+  }, [user]);
 
   useEffect(() => {
     document.body.style.overflow =

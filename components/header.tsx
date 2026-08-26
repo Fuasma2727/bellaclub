@@ -194,13 +194,13 @@ export default function Header() {
 
     void Promise.all([
       import("firebase/firestore"),
-      import("@/lib/firebaseApp"),
+      import("@/lib/firebase"),
     ])
-      .then(([{ doc, getFirestore, onSnapshot }, { app }]) => {
+      .then(([{ doc, onSnapshot }, { db }]) => {
         if (cancelled) return;
 
         unsubscribe = onSnapshot(
-          doc(getFirestore(app), "users", user.uid),
+          doc(db, "users", user.uid),
           (snap) => {
             if (!snap.exists()) return;
 
@@ -244,19 +244,20 @@ export default function Header() {
 
     void Promise.all([
       import("firebase/firestore"),
-      import("@/lib/firebaseApp"),
+      import("@/lib/firebase"),
     ])
       .then(
         ([
-          { collection, getFirestore, onSnapshot, orderBy, query, where },
-          { app },
+          { collection, limit, onSnapshot, orderBy, query, where },
+          { db },
         ]) => {
           if (cancelled) return;
 
           const notificationsQuery = query(
-            collection(getFirestore(app), "notifications"),
+            collection(db, "notifications"),
             where("userId", "==", user.uid),
-            orderBy("createdAt", "desc")
+            orderBy("createdAt", "desc"),
+            limit(25)
           );
 
           unsubscribe = onSnapshot(notificationsQuery, (snap) => {

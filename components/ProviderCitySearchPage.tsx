@@ -8,7 +8,10 @@ import {
   type ProviderCitySeo,
 } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
-import { getPublicProviderCards } from "@/lib/publicProviders";
+import {
+  getProviderPhonePath,
+  getPublicProviderCards,
+} from "@/lib/publicProviders";
 import {
   getRelatedProviderSearchText,
   getProviderSearchKeywords,
@@ -384,6 +387,7 @@ export default async function ProviderCitySearchPage({
               .slice(0, 30)
               .map((provider, index) => {
                 const phoneSeo = getPhoneSeoValues(provider.whatsapp);
+                const phonePath = getProviderPhonePath(provider);
 
                 return {
                   "@type": "ListItem",
@@ -401,6 +405,7 @@ export default async function ProviderCitySearchPage({
                       undefined,
                     identifier: phoneSeo.canonicalDigits || undefined,
                     url: `${siteUrl}${provider.profilePath}`,
+                    sameAs: phonePath ? [`${siteUrl}${phonePath}`] : undefined,
                   },
                 };
               }),

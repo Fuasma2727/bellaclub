@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logoutUser } from "@/lib/auth";
 
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const db = getFirestore(app);
 
   const [role, setRole] = useState<string | null>(null);
   const [loadingRole, setLoadingRole] = useState(true);
@@ -38,7 +37,7 @@ export default function DashboardPage() {
     };
 
     fetchRole();
-  }, [user, db]);
+  }, [user]);
 
   // Mientras verifica sesión
   if (loading || loadingRole) {

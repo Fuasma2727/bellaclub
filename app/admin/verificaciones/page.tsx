@@ -8,6 +8,7 @@ import ExpandedMediaModal from "@/app/prestadores/_components/ExpandedMediaModal
 import ProviderCard from "@/app/prestadores/_components/ProviderCard";
 import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
 import { getWhatsAppUrl } from "@/app/prestadores/_components/utils";
+import { isSupportedMediaUrl } from "@/lib/mediaCompatibility";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
@@ -19,6 +20,7 @@ type AdminMediaItem = {
   url?: string;
   private: boolean;
   description?: string;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 type AdminDailyVideo = {
@@ -27,6 +29,7 @@ type AdminDailyVideo = {
   createdAt?: string | null;
   expiresAt?: string | null;
   active?: boolean;
+  playbackStatus?: "ready" | "failed" | null;
 };
 
 type ProviderVerification = {
@@ -302,6 +305,35 @@ const isPastDueProvider = (provider: ProviderVerification) => {
   return !provider.subscriptionStatus;
 };
 
+const isAdminMediaPubliclyAvailable = (media: AdminMediaItem) => {
+  if (media.playbackStatus === "failed") return false;
+
+  return Boolean(media.url);
+};
+
+const getPrivateMediaSummary = (provider: ProviderVerification) => {
+  const privateMedia = (provider.media || []).filter((media) => media.private);
+  const publicableCount = privateMedia.filter(isAdminMediaPubliclyAvailable)
+    .length;
+
+  return {
+    publicableCount,
+    unavailableCount: privateMedia.length - publicableCount,
+  };
+};
+
+const isAdminDailyVideoCompatible = (video?: AdminDailyVideo | null) => {
+  return Boolean(
+    video?.url &&
+      video.playbackStatus !== "failed" &&
+      isSupportedMediaUrl("video", video.url)
+  );
+};
+
+const isAdminDailyVideoPubliclyAvailable = (
+  video?: AdminDailyVideo | null
+) => Boolean(video?.active && isAdminDailyVideoCompatible(video));
+
 const isInitialVerificationPending = (provider: ProviderVerification) =>
   !provider.verificationStatus || provider.verificationStatus === "pending";
 
@@ -393,21 +425,29 @@ const ProviderDailyVideoButton = ({
   if (!video?.url) return null;
 
   const isActive = Boolean(video.active);
+  const isCompatible = isAdminDailyVideoCompatible(video);
   const durationLabel = formatDuration(video.duration);
+  const statusLabel = !isCompatible
+    ? "Resubir MP4"
+    : isActive
+      ? "Activo"
+      : "Vencido";
 
   return (
     <button
       type="button"
-      aria-label={`Ver video temporal ${isActive ? "activo" : "vencido"}`}
+      aria-label={`Ver video temporal ${statusLabel.toLowerCase()}`}
       title={video.url}
       onClick={(event) => {
         event.stopPropagation();
         onOpen();
       }}
       className={`absolute left-2 top-14 z-20 flex min-h-11 max-w-[calc(100%-5.5rem)] items-center gap-2 rounded-md border px-2.5 py-1.5 text-left shadow-xl backdrop-blur-md transition hover:-translate-y-0.5 ${
-        isActive
-          ? "border-sky-200/45 bg-sky-950/78 text-sky-50 shadow-sky-950/35 hover:border-sky-100/70"
-          : "border-amber-200/35 bg-amber-950/75 text-amber-50 shadow-amber-950/30 hover:border-amber-100/60"
+        !isCompatible
+          ? "border-red-200/40 bg-red-950/78 text-red-50 shadow-red-950/35 hover:border-red-100/70"
+          : isActive
+            ? "border-sky-200/45 bg-sky-950/78 text-sky-50 shadow-sky-950/35 hover:border-sky-100/70"
+            : "border-amber-200/35 bg-amber-950/75 text-amber-50 shadow-amber-950/30 hover:border-amber-100/60"
       }`}
     >
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white">
@@ -425,7 +465,7 @@ const ProviderDailyVideoButton = ({
           Video 4h
         </span>
         <span className="mt-0.5 block truncate text-[10px] font-semibold leading-3 opacity-75">
-          {isActive ? "Activo" : "Vencido"}
+          {statusLabel}
           {durationLabel ? ` - ${durationLabel}` : ""}
         </span>
       </span>
@@ -658,6 +698,7 @@ export default function AdminVerificationsPage() {
         url: item.url,
         private: item.private,
         description: item.description,
+        playbackStatus: item.playbackStatus,
       });
     });
 
@@ -703,6 +744,7 @@ export default function AdminVerificationsPage() {
       private: false,
       description: "Video temporal de 4 horas",
       duration: provider.dailyVideo.duration || null,
+      playbackStatus: provider.dailyVideo.playbackStatus,
     };
 
     setMediaList([dailyVideoItem]);
@@ -1445,6 +1487,8 @@ export default function AdminVerificationsPage() {
                 Boolean(media.url) &&
                 !media.private &&
                 media.url !== provider.photoUrl;
+              const mediaPubliclyAvailable =
+                isAdminMediaPubliclyAvailable(media);
 
               return (
                 <div
@@ -1490,8 +1534,23 @@ export default function AdminVerificationsPage() {
                       </button>
                     )}
                     {media.private && (
-                      <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
-                        Privada
+                      <span
+                        className={`absolute right-2 top-2 rounded-full px-2 py-1 text-[10px] font-semibold text-white ${
+                          mediaPubliclyAvailable
+                            ? "bg-black/70"
+                            : "border border-red-200/45 bg-red-950/85"
+                        }`}
+                      >
+                        {mediaPubliclyAvailable
+                          ? "Privada"
+                          : "Privada no publicable"}
+                      </span>
+                    )}
+                    {!mediaPubliclyAvailable && (
+                      <span className="absolute left-2 top-2 rounded-full border border-amber-200/45 bg-amber-950/85 px-2 py-1 text-[10px] font-semibold text-amber-50">
+                        {media.type === "video"
+                          ? "Resubir MP4"
+                          : "No publicable"}
                       </span>
                     )}
                   </div>
@@ -1502,6 +1561,12 @@ export default function AdminVerificationsPage() {
                           ? "Contenido privado"
                           : "Contenido publico")}
                     </p>
+                    {!mediaPubliclyAvailable && (
+                      <p className="rounded-md border border-amber-300/20 bg-amber-400/10 px-2 py-1.5 text-[11px] leading-4 text-amber-100">
+                        No sale en la pagina principal ni se puede vender hasta
+                        que se resuba como MP4 compatible.
+                      </p>
+                    )}
                     {canUseAsProfilePhoto && (
                       <button
                         type="button"
@@ -1540,20 +1605,26 @@ export default function AdminVerificationsPage() {
     );
   };
 
-  const toPublicProviderCard = (provider: ProviderVerification): Prestador => ({
-    id: provider.id,
-    name: provider.name || provider.email || "Prestador sin nombre",
-    price: provider.price,
-    photoUrl: provider.photoUrl,
-    department: provider.department,
-    city: provider.city,
-    zone: provider.zone,
-    whatsapp: provider.whatsapp,
-    description: provider.description,
-    media: provider.media,
-    verificationBadge: provider.verificationBadge || null,
-    badgeVerificationLevel: provider.badgeVerificationLevel || null,
-  });
+  const toPublicProviderCard = (provider: ProviderVerification): Prestador => {
+    const publicMedia = (provider.media || []).filter(
+      isAdminMediaPubliclyAvailable
+    );
+
+    return {
+      id: provider.id,
+      name: provider.name || provider.email || "Prestador sin nombre",
+      price: provider.price,
+      photoUrl: provider.photoUrl,
+      department: provider.department,
+      city: provider.city,
+      zone: provider.zone,
+      whatsapp: provider.whatsapp,
+      description: provider.description,
+      media: publicMedia,
+      verificationBadge: provider.verificationBadge || null,
+      badgeVerificationLevel: provider.badgeVerificationLevel || null,
+    };
+  };
 
   const renderProviderAdminContent = (
     provider: ProviderVerification,
@@ -1590,6 +1661,11 @@ export default function AdminVerificationsPage() {
     const canAdjustBadge = !isBadgeRequest && !isInitialRequest;
     const canUpgradeBadge = canAdjustBadge && currentBadgeLevel < 4;
     const canDowngradeBadge = canAdjustBadge && currentBadgeLevel > 0;
+    const privateMediaSummary = getPrivateMediaSummary(provider);
+    const dailyVideoNotPublicable = Boolean(
+      provider.dailyVideo?.url &&
+        !isAdminDailyVideoPubliclyAvailable(provider.dailyVideo)
+    );
 
     return (
       <div className="mt-3 space-y-3 border-t border-white/[0.08] pt-3">
@@ -1632,6 +1708,26 @@ export default function AdminVerificationsPage() {
           {provider.adminQualityRank && (
             <span className="rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-2.5 py-1 text-[11px] font-medium text-fuchsia-100">
               Calidad {provider.adminQualityRank}/5
+            </span>
+          )}
+          {privateMediaSummary.publicableCount > 0 && (
+            <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-100">
+              {privateMediaSummary.publicableCount} privado
+              {privateMediaSummary.publicableCount === 1
+                ? " publicable"
+                : "s publicables"}
+            </span>
+          )}
+          {privateMediaSummary.unavailableCount > 0 && (
+            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[11px] font-medium text-amber-100">
+              {privateMediaSummary.unavailableCount} privado
+              {privateMediaSummary.unavailableCount === 1 ? "" : "s"} no
+              publicable
+            </span>
+          )}
+          {dailyVideoNotPublicable && (
+            <span className="rounded-full border border-red-400/30 bg-red-400/10 px-2.5 py-1 text-[11px] font-medium text-red-100">
+              Video 4h no publicable
             </span>
           )}
           <button
@@ -2651,6 +2747,11 @@ export default function AdminVerificationsPage() {
                   : provider.requestKind === "badge"
                     ? "Solicitud de verificacion"
                     : "";
+              const privateMediaSummary = getPrivateMediaSummary(provider);
+              const dailyVideoNotPublicable = Boolean(
+                provider.dailyVideo?.url &&
+                  !isAdminDailyVideoPubliclyAvailable(provider.dailyVideo)
+              );
 
               return (
                 <article key={provider.requestId || provider.id}>
@@ -2679,6 +2780,26 @@ export default function AdminVerificationsPage() {
                       }
                     />
                   </div>
+                  {(privateMediaSummary.unavailableCount > 0 ||
+                    dailyVideoNotPublicable) && (
+                    <div className="mt-2 rounded-md border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-xs font-semibold leading-5 text-amber-100">
+                      {privateMediaSummary.unavailableCount > 0 && (
+                        <span>
+                          {privateMediaSummary.unavailableCount} privado
+                          {privateMediaSummary.unavailableCount === 1
+                            ? ""
+                            : "s"}{" "}
+                          no publicable
+                        </span>
+                      )}
+                      {privateMediaSummary.unavailableCount > 0 &&
+                        dailyVideoNotPublicable &&
+                        " · "}
+                      {dailyVideoNotPublicable && (
+                        <span>Video 4h no publicable</span>
+                      )}
+                    </div>
+                  )}
                 </article>
               );
             })}

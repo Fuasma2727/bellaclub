@@ -21,11 +21,21 @@ type MediaItem = {
   description?: string;
   duration?: number | string | null;
   playbackStatus?: "ready" | "failed" | null;
+  purchased?: boolean;
+  unavailable?: boolean;
+  unavailableReason?: string;
 };
 
 type PurchasedItem = {
   sellerId?: string;
   mediaId?: string;
+};
+
+const hasConfirmedPlaybackFailure = (item: {
+  url?: string;
+  playbackStatus?: string | null;
+}) => {
+  return item.playbackStatus === "failed" && isSupportedVideoUrl(item.url);
 };
 
 const getActiveDailyVideo = (dailyVideo: unknown) => {
@@ -147,42 +157,54 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const safeMedia = media.flatMap((item, index) => {
-      if (
-        item.type === "video" &&
-        (item.playbackStatus === "failed" || !isSupportedVideoUrl(item.url))
-      ) {
-        return [];
-      }
-
-      if (item.type !== "video" && !isSupportedMediaUrl(item.type || "photo", item.url)) {
-        return [];
-      }
-
       const mediaId = item.id || `legacy-${index}`;
-      const unlocked = !item.private || purchasedIds.has(mediaId);
+      const type = item.type || "photo";
+      const isPrivate = Boolean(item.private);
+      const isFailedVideo =
+        type === "video" && hasConfirmedPlaybackFailure(item);
+
+      if (isPrivate) {
+        if (!item.url) return [];
+      } else {
+        if (type === "video" && (isFailedVideo || !item.url)) {
+          return [];
+        }
+
+        if (type !== "video" && !isSupportedMediaUrl(type, item.url)) {
+          return [];
+        }
+      }
+
+      const purchased = isPrivate && purchasedIds.has(mediaId);
+      const canServePrivateMedia =
+        isPrivate && purchased && requesterId && !isFailedVideo;
 
       return [
         {
           id: mediaId,
-          type: item.type || "photo",
-          url:
-            unlocked && item.private && requesterId
+          type,
+          url: isPrivate
+            ? canServePrivateMedia
               ? createPrivateMediaUrl(request, {
                   buyerId: requesterId,
                   sellerId: id,
                   mediaId,
                 })
-              : unlocked
-                ? item.url || ""
-                : "",
-          private: Boolean(item.private),
-          price: item.private ? item.price || 0 : null,
-          description: item.private ? item.description || "" : "",
-          previewUrl: item.private ? item.previewUrl || item.url || "" : "",
+              : ""
+            : item.url || "",
+          private: isPrivate,
+          price: isPrivate ? item.price || 0 : null,
+          description: isPrivate ? item.description || "" : "",
+          previewUrl: isPrivate ? item.previewUrl || "" : "",
           duration:
-            item.type === "video" ? Number(item.duration || 0) || null : null,
-          playbackStatus:
-            item.type === "video" ? item.playbackStatus || null : null,
+            type === "video" ? Number(item.duration || 0) || null : null,
+          playbackStatus: type === "video" ? item.playbackStatus || null : null,
+          purchased,
+          unavailable: isPrivate && isFailedVideo,
+          unavailableReason:
+            isPrivate && isFailedVideo
+              ? "Video no disponible por formato incompatible"
+              : "",
         },
       ];
     });

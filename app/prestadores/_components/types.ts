@@ -16,6 +16,9 @@ export type MediaItem = {
   description?: string;
   duration?: number | null;
   playbackStatus?: "ready" | "failed" | null;
+  purchased?: boolean;
+  unavailable?: boolean;
+  unavailableReason?: string;
 };
 
 export type DailyVideo = {

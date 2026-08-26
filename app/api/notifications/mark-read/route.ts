@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       .collection("notifications")
       .where("userId", "==", decoded.uid)
       .where("read", "==", false)
+      .limit(100)
       .get();
 
     const batch = adminDb.batch();

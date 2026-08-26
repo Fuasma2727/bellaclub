@@ -15,6 +15,7 @@ import {
 } from "@/lib/providerDailyVideo";
 import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 import { isSupportedVideoUrl } from "@/lib/mediaCompatibility";
+import { invalidatePublicProviderCache } from "@/lib/publicProviders";
 
 export const runtime = "nodejs";
 
@@ -159,6 +160,8 @@ export async function POST(request: Request) {
 
       return { rewardEligible, rewardGranted };
     });
+
+    invalidatePublicProviderCache();
 
     return NextResponse.json({
       success: true,

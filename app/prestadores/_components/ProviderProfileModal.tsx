@@ -308,30 +308,44 @@ export default function ProviderProfileModal({
                     {mediaList.slice(1).map((item, index) => {
                       const realIndex = index + 1;
                       const alreadyUnlocked = hasPurchased(item);
+                      const isUnavailable = Boolean(item.unavailable);
                       const isPrivate = Boolean(
-                        item.private && !alreadyUnlocked
+                        item.private && !alreadyUnlocked && !isUnavailable
                       );
                       const previewUrl = isPrivate
-                        ? item.previewUrl || item.url || ""
-                        : item.url || "";
+                        ? item.previewUrl || ""
+                        : item.url || item.previewUrl || "";
                       const durationLabel =
                         item.type === "video"
                           ? formatDuration(item.duration)
                           : "";
                       const privateDescription = item.description?.trim() || "";
                       const priceLabel = formatMoney(item.price);
+                      const unavailableText =
+                        item.unavailableReason ||
+                        "Video no disponible por formato incompatible";
 
                       return (
                         <button
                           key={`${item.id || item.url || "media"}-${index}`}
                           type="button"
                           aria-label={
-                            isPrivate
+                            isUnavailable
+                              ? "Contenido no disponible"
+                              : isPrivate
                               ? "Desbloquear contenido privado"
                               : "Ampliar contenido"
                           }
-                          className="group relative aspect-square overflow-hidden rounded-md border border-white/[0.08] bg-zinc-900"
-                          onClick={() => onMediaClick(item, realIndex)}
+                          aria-disabled={isUnavailable}
+                          className={`group relative aspect-square overflow-hidden rounded-md border border-white/[0.08] bg-zinc-900 ${
+                            isUnavailable
+                              ? "cursor-not-allowed"
+                              : "cursor-pointer"
+                          }`}
+                          onClick={() => {
+                            if (isUnavailable) return;
+                            onMediaClick(item, realIndex);
+                          }}
                           onContextMenu={(event) => event.preventDefault()}
                         >
                           {previewUrl &&
@@ -384,7 +398,9 @@ export default function ProviderProfileModal({
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.08),_rgba(0,0,0,0.15))]" />
                           )}
 
-                          {item.type === "video" && !isPrivate && (
+                          {item.type === "video" &&
+                            !isPrivate &&
+                            !isUnavailable && (
                             <>
                               <div className="absolute inset-0 bg-gradient-to-t from-black/36 via-transparent to-black/10 opacity-90 transition group-hover:from-black/45" />
                               <span
@@ -399,6 +415,26 @@ export default function ProviderProfileModal({
                                   {durationLabel}
                                 </span>
                               )}
+                            </>
+                          )}
+
+                          {isUnavailable && (
+                            <>
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/55 to-black/15" />
+                              <span className="absolute left-2 top-2 z-10 rounded-full border border-amber-200/20 bg-amber-300/12 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100 shadow-lg shadow-black/30 backdrop-blur">
+                                No disponible
+                              </span>
+                              <span className="absolute left-1/2 top-[38%] z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-amber-200/25 bg-black/55 text-amber-100 shadow-xl shadow-black/40 backdrop-blur sm:h-14 sm:w-14">
+                                <PlayIcon className="ml-0.5 h-6 w-6" />
+                              </span>
+                              <div className="absolute inset-x-2 bottom-2 z-10 rounded-md border border-amber-200/15 bg-black/68 p-2 text-left shadow-xl shadow-black/35 backdrop-blur">
+                                <p className="line-clamp-2 min-h-[2rem] text-[11px] font-medium leading-4 text-white sm:text-xs sm:leading-5">
+                                  {privateDescription || "Contenido privado"}
+                                </p>
+                                <p className="mt-1.5 text-[11px] font-semibold leading-4 text-amber-100">
+                                  {unavailableText}
+                                </p>
+                              </div>
                             </>
                           )}
 

@@ -144,6 +144,9 @@ export default function ProviderCard({
   const phoneSeo = getPhoneSeoValues(provider.whatsapp);
   const displayPhone =
     phoneSeo.formattedLocal || phoneSeo.canonicalDigits || phoneSeo.raw;
+  const phoneHref = phoneSeo.canonicalDigits
+    ? `/telefono/${phoneSeo.canonicalDigits}`
+    : "";
   const rating = Number(provider.rating || 0);
   const verificationBadge = provider.verificationBadge || null;
   const badgeText =
@@ -283,11 +286,19 @@ export default function ProviderCard({
           <p className="truncate text-[11px] leading-[15px] text-neutral-500 sm:text-xs">
             {location || "Ubicacion por confirmar"}
           </p>
-          {displayPhone && (
+          {displayPhone && phoneHref ? (
+            <Link
+              href={phoneHref}
+              onClick={(event) => event.stopPropagation()}
+              className="block truncate text-[11px] leading-[15px] text-neutral-400 transition hover:text-blue-200 sm:text-xs"
+            >
+              WhatsApp {displayPhone}
+            </Link>
+          ) : displayPhone ? (
             <p className="truncate text-[11px] leading-[15px] text-neutral-400 sm:text-xs">
               WhatsApp {displayPhone}
             </p>
-          )}
+          ) : null}
         </div>
 
         <div className="mt-1 flex items-center justify-between gap-2">
