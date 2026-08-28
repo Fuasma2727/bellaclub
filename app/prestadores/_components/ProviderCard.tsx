@@ -137,6 +137,7 @@ export default function ProviderCard({
   const [showBadgeInfo, setShowBadgeInfo] = useState(false);
   const name = getDisplayName(provider);
   const location = getLocation(provider);
+  const imageAlt = location ? `${name} en ${location}` : name;
   const whatsappUrl = getWhatsAppUrl(
     provider.whatsapp,
     getWhatsAppMessage(provider.name)
@@ -207,7 +208,7 @@ export default function ProviderCard({
       <div className="relative aspect-[3/4] overflow-hidden bg-zinc-900">
         <Image
           src={provider.photoUrl || "/default-avatar.png"}
-          alt={name}
+          alt={imageAlt}
           fill
           draggable={false}
           onContextMenu={(event) => event.preventDefault()}

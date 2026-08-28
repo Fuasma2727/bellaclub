@@ -882,6 +882,39 @@ export default function PrestadoresPage({
       <Header />
 
       <main>
+        {hasPageIntroContent && (
+          <section className="mx-auto w-full max-w-7xl px-3 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5 lg:px-8">
+            <div className="max-w-4xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+                {pageEyebrow}
+              </p>
+              <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+                {resolvedPageTitle}
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
+                {resolvedPageDescription}
+              </p>
+            </div>
+
+            {seoCityLinks.length > 0 && (
+              <nav
+                aria-label="Ciudades populares"
+                className="mt-4 flex flex-wrap gap-2"
+              >
+                {seoCityLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+          </section>
+        )}
+
         <FiltersBar
           departmentFilter={departmentFilter}
           cityFilter={cityFilter}
@@ -955,39 +988,6 @@ export default function PrestadoresPage({
                 ))}
               </div>
             </>
-          )}
-
-          {hasPageIntroContent && !loading && !pageError && (
-            <section className="mt-7 border-t border-white/[0.08] pt-6">
-              <div className="max-w-4xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
-                  {pageEyebrow}
-                </p>
-                <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
-                  {resolvedPageTitle}
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
-                  {resolvedPageDescription}
-                </p>
-              </div>
-
-              {seoCityLinks.length > 0 && (
-                <nav
-                  aria-label="Ciudades populares"
-                  className="mt-4 flex flex-wrap gap-2"
-                >
-                  {seoCityLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </nav>
-              )}
-            </section>
           )}
 
           {seoContent && !loading && !pageError && (
