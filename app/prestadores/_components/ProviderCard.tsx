@@ -274,6 +274,7 @@ export default function ProviderCard({
           {profileHref ? (
             <Link
               href={profileHref}
+              prefetch={false}
               onClick={(event) => event.stopPropagation()}
               className="block truncate text-[13px] font-semibold leading-[15px] text-neutral-50 transition hover:text-blue-100 sm:text-sm"
             >
@@ -290,6 +291,7 @@ export default function ProviderCard({
           {displayPhone && phoneHref ? (
             <Link
               href={phoneHref}
+              prefetch={false}
               onClick={(event) => event.stopPropagation()}
               className="block truncate text-[11px] leading-[15px] text-neutral-400 transition hover:text-blue-200 sm:text-xs"
             >

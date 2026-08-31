@@ -11,15 +11,11 @@ type GuardOptions = {
 const getAllowedOrigins = (request: Request) => {
   const requestOrigin = new URL(request.url).origin;
   const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const vercelUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "";
 
   return new Set(
     [
       requestOrigin,
       configuredUrl,
-      vercelUrl,
       process.env.NODE_ENV !== "production" ? "http://localhost:3000" : "",
     ]
       .filter(Boolean)

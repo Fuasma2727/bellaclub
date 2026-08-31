@@ -54,7 +54,7 @@ WOMPI_PUBLIC_KEY=
 WOMPI_INTEGRITY_SECRET=
 WOMPI_EVENTS_SECRET=
 
-# Opcional para ejecutar manualmente el cobro de mensualidades
+# Requerido en produccion para proteger el cobro de mensualidades
 CRON_SECRET=
 ```
 
@@ -102,5 +102,5 @@ https://tu-dominio.com/api/wompi/webhook
 - Los reportes se guardan en Firestore y se revisan desde el panel admin.
 - Next envia headers base de seguridad para bloquear iframes, sniffing y
   rastreo de rutas privadas/API.
-- Las mensualidades de prestadores se procesan con un cron diario de Vercel en
-  `/api/provider-subscriptions/process`.
+- Las mensualidades de prestadores se procesan con un cron del servidor que llama
+  `/api/provider-subscriptions/process` usando `Authorization: Bearer CRON_SECRET`.
