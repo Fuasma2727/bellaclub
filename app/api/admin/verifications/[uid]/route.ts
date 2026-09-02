@@ -13,6 +13,8 @@ import {
   securityErrorResponse,
 } from "@/lib/requestSecurity";
 import { invalidatePublicProviderCache } from "@/lib/publicProviders";
+import { colombia } from "@/lib/colombia";
+import { getProviderZoneOptions } from "@/lib/providerZones";
 
 type VerificationAction =
   | "approve"
@@ -27,6 +29,7 @@ type VerificationAction =
   | "deleteMedia"
   | "setProfilePhoto"
   | "setQualityRank"
+  | "updateContact"
   | "deleteProvider"
   | "disableSubscription"
   | "enableSubscription";
@@ -249,6 +252,48 @@ const badgeLabelByLevel = (level: number) => {
   return "verificacion";
 };
 
+const cleanTextField = (value: unknown, maxLength: number) => {
+  if (typeof value !== "string") return "";
+
+  return value.trim().slice(0, maxLength);
+};
+
+const getDepartment = (value: string) =>
+  colombia.departments.find((department) => department.name === value) || null;
+
+const validateProviderContactUpdate = (payload: {
+  whatsapp: string;
+  department: string;
+  city: string;
+  zone: string;
+}) => {
+  const whatsappDigits = payload.whatsapp.replace(/\D/g, "");
+
+  if (payload.whatsapp && whatsappDigits.length < 10) {
+    return "El WhatsApp debe tener minimo 10 digitos";
+  }
+
+  const department = payload.department
+    ? getDepartment(payload.department)
+    : null;
+
+  if (payload.department && !department) {
+    return "Departamento invalido";
+  }
+
+  if (payload.city && department && !department.cities.includes(payload.city)) {
+    return "Ciudad invalida para el departamento seleccionado";
+  }
+
+  const zoneOptions = getProviderZoneOptions(payload.city);
+
+  if (payload.zone && zoneOptions.length > 0 && !zoneOptions.includes(payload.zone)) {
+    return "Zona invalida para la ciudad seleccionada";
+  }
+
+  return null;
+};
+
 type Params = {
   params: Promise<{
     uid: string;
@@ -266,12 +311,25 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const owner = await requireOwner(request);
     const { uid } = await params;
-    const { action, mediaId, confirmText, qualityRank } =
+    const {
+      action,
+      mediaId,
+      confirmText,
+      qualityRank,
+      whatsapp,
+      department,
+      city,
+      zone,
+    } =
       (await request.json()) as {
       action?: VerificationAction;
       mediaId?: string;
       confirmText?: string;
       qualityRank?: number | null;
+      whatsapp?: string;
+      department?: string;
+      city?: string;
+      zone?: string;
     };
 
     if (!uid) {
@@ -294,6 +352,7 @@ export async function PATCH(request: Request, { params }: Params) {
       "deleteMedia",
       "setProfilePhoto",
       "setQualityRank",
+      "updateContact",
       "deleteProvider",
       "disableSubscription",
       "enableSubscription",
@@ -700,6 +759,40 @@ export async function PATCH(request: Request, { params }: Params) {
       return NextResponse.json({
         success: true,
         adminQualityRank: rank,
+      });
+    }
+
+    if (action === "updateContact") {
+      const payload = {
+        whatsapp: cleanTextField(whatsapp, 40),
+        department: cleanTextField(department, 80),
+        city: cleanTextField(city, 80),
+        zone: cleanTextField(zone, 80),
+      };
+      const validationError = validateProviderContactUpdate(payload);
+
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
+
+      const safeZone = payload.zone;
+
+      await userRef.update({
+        whatsapp: payload.whatsapp,
+        department: payload.department,
+        city: payload.city,
+        zone: safeZone,
+        profileUpdatedAt: adminFieldValue.serverTimestamp(),
+        adminContactUpdatedAt: adminFieldValue.serverTimestamp(),
+        adminContactUpdatedBy: owner.uid,
+      });
+
+      return NextResponse.json({
+        success: true,
+        whatsapp: payload.whatsapp,
+        department: payload.department,
+        city: payload.city,
+        zone: safeZone,
       });
     }
 

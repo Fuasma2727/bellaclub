@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -9,6 +9,8 @@ import ProviderCard from "@/app/prestadores/_components/ProviderCard";
 import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
 import { getWhatsAppUrl } from "@/app/prestadores/_components/utils";
 import { isSupportedMediaUrl } from "@/lib/mediaCompatibility";
+import { colombia } from "@/lib/colombia";
+import { getProviderZoneOptions } from "@/lib/providerZones";
 
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
@@ -199,11 +201,19 @@ type VerificationAction =
   | "deleteMedia"
   | "setProfilePhoto"
   | "setQualityRank"
+  | "updateContact"
   | "deleteProvider"
   | "disableSubscription"
   | "enableSubscription";
 
 type VerificationRequestKind = "profile" | "badge";
+
+type ProviderContactUpdate = {
+  whatsapp: string;
+  department: string;
+  city: string;
+  zone: string;
+};
 
 const statusClass: Record<VerificationStatus, string> = {
   pending: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200",
@@ -470,6 +480,144 @@ const ProviderDailyVideoButton = ({
         </span>
       </span>
     </button>
+  );
+};
+
+const getProviderContactKey = (provider: ProviderVerification) =>
+  [
+    provider.id,
+    provider.whatsapp || "",
+    provider.department || "",
+    provider.city || "",
+    provider.zone || "",
+  ].join(":");
+
+const ProviderContactEditor = ({
+  provider,
+  disabled,
+  saving,
+  onSave,
+}: {
+  provider: ProviderVerification;
+  disabled: boolean;
+  saving: boolean;
+  onSave: (provider: ProviderVerification, payload: ProviderContactUpdate) => void;
+}) => {
+  const [whatsapp, setWhatsapp] = useState(provider.whatsapp || "");
+  const [department, setDepartment] = useState(provider.department || "");
+  const [city, setCity] = useState(provider.city || "");
+  const [zone, setZone] = useState(provider.zone || "");
+  const cityOptions = useMemo(
+    () =>
+      colombia.departments.find((item) => item.name === department)?.cities ||
+      [],
+    [department]
+  );
+  const zoneOptions = useMemo(() => getProviderZoneOptions(city), [city]);
+  const canSave =
+    whatsapp !== (provider.whatsapp || "") ||
+    department !== (provider.department || "") ||
+    city !== (provider.city || "") ||
+    zone !== (provider.zone || "");
+  const selectedZone =
+    zoneOptions.length > 0 && !zoneOptions.includes(zone) ? "" : zone;
+
+  return (
+    <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100/80">
+        Contacto y ubicacion
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-neutral-300">
+          WhatsApp
+          <input
+            type="tel"
+            value={whatsapp}
+            disabled={disabled}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => setWhatsapp(event.target.value)}
+            className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm font-semibold text-white outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+            placeholder="3001234567"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-neutral-300">
+          Departamento
+          <select
+            value={department}
+            disabled={disabled}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => {
+              setDepartment(event.target.value);
+              setCity("");
+              setZone("");
+            }}
+            className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm font-semibold text-white outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <option value="">Selecciona</option>
+            {colombia.departments.map((item) => (
+              <option key={item.name} value={item.name}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-xs font-semibold text-neutral-300">
+          Ciudad
+          <select
+            value={city}
+            disabled={disabled || !department}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => {
+              setCity(event.target.value);
+              setZone("");
+            }}
+            className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm font-semibold text-white outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <option value="">Selecciona</option>
+            {cityOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+        {zoneOptions.length > 0 && (
+          <label className="block text-xs font-semibold text-neutral-300">
+            Zona
+            <select
+              value={selectedZone}
+              disabled={disabled}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => setZone(event.target.value)}
+              className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm font-semibold text-white outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">Selecciona</option>
+              {zoneOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      <button
+        type="button"
+        disabled={disabled || saving || !canSave}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSave(provider, {
+            whatsapp: whatsapp.trim(),
+            department,
+            city,
+            zone: selectedZone,
+          });
+        }}
+        className="mt-3 w-full rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {saving ? "Guardando..." : "Guardar contacto"}
+      </button>
+    </div>
   );
 };
 
@@ -1211,6 +1359,58 @@ export default function AdminVerificationsPage() {
     }
   };
 
+  const handleProviderContactUpdate = async (
+    provider: ProviderVerification,
+    payload: ProviderContactUpdate
+  ) => {
+    if (!user) return;
+
+    const currentActionId = `${provider.id}:contact`;
+
+    setActionId(currentActionId);
+    setMessage("");
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/verifications/${provider.id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "updateContact",
+          ...payload,
+        }),
+      });
+      const data = await readAdminJson<
+        ProviderContactUpdate & { error?: string }
+      >(res, "No pudimos actualizar el contacto");
+
+      setProviders((current) =>
+        current.map((item) =>
+          item.id === provider.id
+            ? {
+                ...item,
+                whatsapp: data.whatsapp,
+                department: data.department,
+                city: data.city,
+                zone: data.zone,
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "No pudimos actualizar el contacto";
+      setMessage(errorMessage);
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const handleReportAction = async (
     report: ReportItem,
     action: "markReviewed" | "blockProvider"
@@ -1791,6 +1991,14 @@ export default function AdminVerificationsPage() {
             </p>
           )}
         </div>
+
+        <ProviderContactEditor
+          key={getProviderContactKey(provider)}
+          provider={provider}
+          disabled={Boolean(actionId)}
+          saving={actionId === `${provider.id}:contact`}
+          onSave={handleProviderContactUpdate}
+        />
 
         {provider.dailyVideo?.url && (
           <div className="rounded-lg border border-sky-300/20 bg-sky-400/[0.07] p-3">
@@ -2798,6 +3006,17 @@ export default function AdminVerificationsPage() {
                       {dailyVideoNotPublicable && (
                         <span>Video 4h no publicable</span>
                       )}
+                    </div>
+                  )}
+                  {activeView === "requests" && search.trim() && (
+                    <div className="mt-2">
+                      <ProviderContactEditor
+                        key={`card-${getProviderContactKey(provider)}`}
+                        provider={provider}
+                        disabled={Boolean(actionId)}
+                        saving={actionId === `${provider.id}:contact`}
+                        onSave={handleProviderContactUpdate}
+                      />
                     </div>
                   )}
                 </article>
