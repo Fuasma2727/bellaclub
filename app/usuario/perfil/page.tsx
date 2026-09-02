@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/header";
 
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
 
@@ -151,6 +151,7 @@ export default function PerfilUsuario() {
   const router = useRouter();
 
   const [name, setName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -185,6 +186,7 @@ export default function PerfilUsuario() {
         if (profileSnap.exists()) {
           const data = profileSnap.data();
           setName(data.name || "");
+          setWhatsapp(data.whatsapp || "");
           setPhotoUrl(data.photoUrl || null);
         }
 
@@ -281,7 +283,15 @@ export default function PerfilUsuario() {
     setMessage("");
 
     try {
-      await setDoc(doc(db, "users", user.uid), { name }, { merge: true });
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          name: name.trim(),
+          whatsapp: whatsapp.trim(),
+          profileUpdatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
       setMessage("Perfil actualizado");
       setEditMode(false);
     } catch {
@@ -376,16 +386,32 @@ export default function PerfilUsuario() {
 
             <div className="mt-5 text-center">
               {editMode ? (
-                <input
-                  className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-center text-lg font-semibold text-white outline-none transition placeholder:text-neutral-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Tu nombre"
-                />
+                <div className="space-y-3">
+                  <input
+                    className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-center text-lg font-semibold text-white outline-none transition placeholder:text-neutral-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Tu nombre"
+                  />
+                  <input
+                    type="tel"
+                    className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-center text-sm font-semibold text-white outline-none transition placeholder:text-neutral-600 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/20"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="WhatsApp para contacto"
+                  />
+                </div>
               ) : (
-                <h1 className="text-2xl font-semibold">
-                  {name || "Usuario BelaClub"}
-                </h1>
+                <>
+                  <h1 className="text-2xl font-semibold">
+                    {name || "Usuario BelaClub"}
+                  </h1>
+                  {whatsapp && (
+                    <p className="mt-1 text-sm font-medium text-emerald-300">
+                      WhatsApp: {whatsapp}
+                    </p>
+                  )}
+                </>
               )}
               <p className="mt-1 text-sm text-neutral-500">
                 Nivel {progress.level} de {progress.maxLevel}

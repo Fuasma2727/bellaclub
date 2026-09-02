@@ -149,6 +149,36 @@ type AdminUsersResponse = {
   error?: string;
 };
 
+type CatadorItem = {
+  id: string;
+  name: string;
+  email?: string;
+  photoUrl?: string;
+  whatsapp?: string;
+  level: number;
+  maxLevel: number;
+  balance: number;
+  unlockedContentCount: number;
+  unlockedContentTotal: number;
+  serviceDepositCount: number;
+  serviceDepositTotal: number;
+  isCatadorPremium: boolean;
+  latestUnlockedAt?: string | null;
+  latestServiceDepositAt?: string | null;
+  latestUnlockedProvider?: {
+    id: string;
+    name?: string;
+    profilePath?: string;
+    mediaId?: string;
+  } | null;
+  createdAt?: string | null;
+};
+
+type CatadoresResponse = {
+  catadores?: CatadorItem[];
+  error?: string;
+};
+
 type AdminApiErrorResponse = {
   error?: string;
 };
@@ -286,6 +316,33 @@ const userRoleLabel = (role?: string) => {
   if (role === "cliente") return "Cliente";
   return "Usuario";
 };
+
+const catadorLevelLabel = (level: number) => {
+  if (level >= 4) return "Catador Premium";
+  if (level === 3) return "Cliente de confianza";
+  if (level === 2) return "Explorador privado";
+  return "Usuario BelaClub";
+};
+
+const catadorLevelClass = (level: number) => {
+  if (level >= 4) {
+    return "border-emerald-300/35 bg-emerald-400/12 text-emerald-100";
+  }
+
+  if (level === 3) {
+    return "border-blue-300/35 bg-blue-400/12 text-blue-100";
+  }
+
+  return "border-cyan-300/35 bg-cyan-400/12 text-cyan-100";
+};
+
+const getInitials = (value: string) =>
+  value
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "BC";
 
 const isPastDueProvider = (provider: ProviderVerification) => {
   if (
@@ -492,6 +549,9 @@ const getProviderContactKey = (provider: ProviderVerification) =>
     provider.zone || "",
   ].join(":");
 
+const defaultCatadorMessage =
+  "Hola, fuiste seleccionado por BelaClub para una experiencia como catador. Regalanos tu numero de WhatsApp en tu perfil para contactarte y asignarte un servicio.";
+
 const ProviderContactEditor = ({
   provider,
   disabled,
@@ -621,12 +681,90 @@ const ProviderContactEditor = ({
   );
 };
 
+const CatadorContactBox = ({
+  catador,
+  disabled,
+  sending,
+  onSend,
+}: {
+  catador: CatadorItem;
+  disabled: boolean;
+  sending: boolean;
+  onSend: (catador: CatadorItem, message: string) => Promise<boolean>;
+}) => {
+  const [message, setMessage] = useState(defaultCatadorMessage);
+  const [sent, setSent] = useState(false);
+  const whatsappUrl = getWhatsAppUrl(
+    catador.whatsapp,
+    "Hola, soy de BelaClub. Fuiste seleccionado como catador para asignarte un servicio."
+  );
+
+  return (
+    <div className="rounded-md border border-emerald-300/15 bg-emerald-400/[0.06] p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100/75">
+        Contacto
+      </p>
+      {catador.whatsapp ? (
+        <div className="mt-2 flex flex-col gap-2">
+          <p className="truncate text-sm font-semibold text-emerald-100">
+            WhatsApp: {catador.whatsapp}
+          </p>
+          {whatsappUrl && (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+            >
+              Escribir por WhatsApp
+            </a>
+          )}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs leading-5 text-neutral-400">
+          Sin WhatsApp guardado. Enviale una solicitud interna para que lo
+          complete en su perfil.
+        </p>
+      )}
+
+      <textarea
+        value={message}
+        disabled={disabled}
+        onChange={(event) => {
+          setMessage(event.target.value);
+          setSent(false);
+        }}
+        rows={4}
+        className="mt-3 w-full resize-none rounded-md border border-white/10 bg-black/35 px-3 py-2 text-sm leading-5 text-white outline-none transition placeholder:text-neutral-600 focus:border-emerald-300/60 focus:ring-2 focus:ring-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+      />
+      <button
+        type="button"
+        disabled={disabled || sending || message.trim().length < 12}
+        onClick={async () => {
+          const success = await onSend(catador, message);
+
+          if (success) setSent(true);
+        }}
+        className="mt-2 w-full rounded-md border border-emerald-300/30 bg-emerald-400/10 px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {sending ? "Enviando..." : "Enviar mensaje"}
+      </button>
+      {sent && (
+        <p className="mt-2 text-xs font-semibold text-emerald-200">
+          Mensaje enviado.
+        </p>
+      )}
+    </div>
+  );
+};
+
 export default function AdminVerificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const [providers, setProviders] = useState<ProviderVerification[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUserItem[]>([]);
+  const [catadores, setCatadores] = useState<CatadorItem[]>([]);
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(
     null
   );
@@ -635,7 +773,13 @@ export default function AdminVerificationsPage() {
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [activeView, setActiveView] = useState<
-    "requests" | "blocked" | "past_due" | "reports" | "withdrawals" | "users"
+    | "requests"
+    | "blocked"
+    | "past_due"
+    | "reports"
+    | "withdrawals"
+    | "catadores"
+    | "users"
   >("requests");
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     null
@@ -695,6 +839,31 @@ export default function AdminVerificationsPage() {
         setProviders([]);
         setWithdrawals([]);
         setAdminUsers([]);
+        setCatadores([]);
+        return;
+      }
+
+      if (activeView === "catadores") {
+        const queryString = params.toString() ? `?${params.toString()}` : "";
+        const [res, summaryRes] = await Promise.all([
+          fetch(`/api/admin/catadores${queryString}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          summaryPromise,
+        ]);
+        const data = await readAdminJson<CatadoresResponse>(
+          res,
+          "No pudimos cargar los catadores"
+        );
+        setFinanceSummary(summaryRes);
+
+        setCatadores(data.catadores || []);
+        setAdminUsers([]);
+        setProviders([]);
+        setReports([]);
+        setWithdrawals([]);
         return;
       }
 
@@ -704,6 +873,7 @@ export default function AdminVerificationsPage() {
           setFinanceSummary(summaryData);
 
           setAdminUsers([]);
+          setCatadores([]);
           setProviders([]);
           setReports([]);
           setWithdrawals([]);
@@ -726,6 +896,7 @@ export default function AdminVerificationsPage() {
         setFinanceSummary(summaryRes);
 
         setAdminUsers(data.users || []);
+        setCatadores([]);
         setProviders([]);
         setReports([]);
         setWithdrawals([]);
@@ -753,6 +924,7 @@ export default function AdminVerificationsPage() {
         setReports([]);
         setProviders([]);
         setAdminUsers([]);
+        setCatadores([]);
         return;
       }
 
@@ -778,6 +950,7 @@ export default function AdminVerificationsPage() {
       setReports([]);
       setWithdrawals([]);
       setAdminUsers([]);
+      setCatadores([]);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "No pudimos cargar el panel";
@@ -1406,6 +1579,47 @@ export default function AdminVerificationsPage() {
           ? error.message
           : "No pudimos actualizar el contacto";
       setMessage(errorMessage);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleCatadorMessageSend = async (
+    catador: CatadorItem,
+    message: string
+  ) => {
+    if (!user) return false;
+
+    const currentActionId = `catador:${catador.id}:message`;
+
+    setActionId(currentActionId);
+    setMessage("");
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/admin/catadores", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          targetUserId: catador.id,
+          message,
+        }),
+      });
+
+      await readAdminJson<{ error?: string }>(
+        res,
+        "No pudimos enviar el mensaje"
+      );
+
+      return true;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "No pudimos enviar el mensaje";
+      setMessage(errorMessage);
+      return false;
     } finally {
       setActionId(null);
     }
@@ -2320,6 +2534,7 @@ export default function AdminVerificationsPage() {
     selectedProviderId &&
     activeView !== "reports" &&
     activeView !== "withdrawals" &&
+    activeView !== "catadores" &&
     activeView !== "users"
       ? displayProviders.find(
           (provider) =>
@@ -2333,6 +2548,8 @@ export default function AdminVerificationsPage() {
       ? reports.length > 0
       : activeView === "withdrawals"
         ? withdrawals.length > 0
+      : activeView === "catadores"
+        ? catadores.length > 0
       : activeView === "users"
         ? adminUsers.length > 0
         : displayProviders.length > 0;
@@ -2462,7 +2679,7 @@ export default function AdminVerificationsPage() {
               </div>
             )}
 
-            <div className="mb-3 inline-flex rounded-lg border border-white/10 bg-black/30 p-1">
+            <div className="mb-3 flex w-fit max-w-full flex-wrap rounded-lg border border-white/10 bg-black/30 p-1">
               <button
                 type="button"
                 onClick={() => setActiveView("requests")}
@@ -2520,6 +2737,17 @@ export default function AdminVerificationsPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setActiveView("catadores")}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  activeView === "catadores"
+                    ? "bg-cyan-500 text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Catadores
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveView("users")}
                 className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
                   activeView === "users"
@@ -2543,6 +2771,8 @@ export default function AdminVerificationsPage() {
                     ? "Buscar reporte por prestador, correo, WhatsApp o motivo"
                     : activeView === "withdrawals"
                       ? "Buscar retiro por prestador, correo, titular, banco o cuenta"
+                    : activeView === "catadores"
+                      ? "Buscar catador por nombre, correo, ID o perfil desbloqueado"
                     : activeView === "users"
                       ? "Escribe nombre o correo del usuario"
                     : activeView === "past_due"
@@ -2581,6 +2811,8 @@ export default function AdminVerificationsPage() {
               ? search.trim()
                 ? "Buscando usuario..."
                 : "Preparando busqueda..."
+              : activeView === "catadores"
+                ? "Cargando catadores..."
               : activeView === "reports"
                 ? "Cargando reportes..."
               : activeView === "withdrawals"
@@ -2604,6 +2836,10 @@ export default function AdminVerificationsPage() {
                   ? search
                     ? "No hay resultados"
                     : "Busca un usuario"
+                : activeView === "catadores"
+                  ? search
+                    ? "No hay resultados"
+                    : "No hay catadores"
                 : activeView === "past_due"
                   ? "No hay vencidos"
                 : activeView === "blocked"
@@ -2621,6 +2857,10 @@ export default function AdminVerificationsPage() {
                   ? search
                     ? "Prueba con otro nombre o correo."
                     : "Escribe en la barra de busqueda para mostrar solo el usuario que necesitas."
+                : activeView === "catadores"
+                  ? search
+                    ? "Prueba con otro nombre, correo, ID o perfil desbloqueado."
+                    : "Cuando un usuario desbloquee su primer contenido privado aparecera aqui con su nivel."
                 : activeView === "past_due"
                   ? "No tienes perfiles con mensualidad vencida en este momento."
                 : activeView === "blocked"
@@ -2714,6 +2954,155 @@ export default function AdminVerificationsPage() {
             </div>
           </section>
         )}
+
+        {user &&
+          !isLoading &&
+          activeView === "catadores" &&
+          catadores.length > 0 && (
+            <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {catadores.map((catador) => {
+                const progressPercent = Math.round(
+                  (catador.level / catador.maxLevel) * 100
+                );
+                const latestProvider = catador.latestUnlockedProvider;
+
+                return (
+                  <article
+                    key={catador.id}
+                    className="overflow-hidden rounded-lg border border-white/10 bg-neutral-950"
+                  >
+                    <div className="border-b border-white/10 bg-white/[0.03] p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-black/35 text-sm font-bold text-cyan-100">
+                          {catador.photoUrl ? (
+                            <Image
+                              src={catador.photoUrl}
+                              alt={catador.name}
+                              fill
+                              className="object-cover"
+                              sizes="56px"
+                            />
+                          ) : (
+                            getInitials(catador.name)
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-white">
+                              {catador.name}
+                            </p>
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${catadorLevelClass(
+                                catador.level
+                              )}`}
+                            >
+                              Nivel {catador.level}
+                            </span>
+                          </div>
+                          {catador.email && (
+                            <p className="mt-1 truncate text-xs text-neutral-500">
+                              {catador.email}
+                            </p>
+                          )}
+                          <p className="mt-1 truncate text-[11px] text-neutral-600">
+                            ID: {catador.id}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold text-cyan-100">
+                            {catadorLevelLabel(catador.level)}
+                          </p>
+                          <p className="text-xs font-semibold text-neutral-500">
+                            {progressPercent}%
+                          </p>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.08]">
+                          <div
+                            className="h-full rounded-full bg-cyan-400"
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 p-4">
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-md border border-white/10 bg-black/25 p-3">
+                          <p className="text-[10px] uppercase tracking-wide text-neutral-500">
+                            Privados
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-white">
+                            {catador.unlockedContentCount}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-white/10 bg-black/25 p-3">
+                          <p className="text-[10px] uppercase tracking-wide text-neutral-500">
+                            Abonos
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-white">
+                            {catador.serviceDepositCount}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-white/10 bg-black/25 p-3">
+                          <p className="text-[10px] uppercase tracking-wide text-neutral-500">
+                            Saldo
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-white">
+                            {money(catador.balance)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-md border border-cyan-300/15 bg-cyan-400/[0.06] p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100/75">
+                          Ultimo desbloqueo
+                        </p>
+                        {latestProvider?.profilePath ? (
+                          <Link
+                            href={latestProvider.profilePath}
+                            className="mt-2 block truncate text-sm font-semibold text-cyan-100 transition hover:text-white"
+                          >
+                            {latestProvider.name || "Perfil desbloqueado"}
+                          </Link>
+                        ) : (
+                          <p className="mt-2 truncate text-sm font-semibold text-cyan-100">
+                            {latestProvider?.name || "Perfil no disponible"}
+                          </p>
+                        )}
+                        {catador.latestUnlockedAt && (
+                          <p className="mt-1 text-xs text-neutral-500">
+                            {formatDateTime(catador.latestUnlockedAt)}
+                          </p>
+                        )}
+                      </div>
+
+                      <CatadorContactBox
+                        catador={catador}
+                        disabled={Boolean(actionId)}
+                        sending={actionId === `catador:${catador.id}:message`}
+                        onSend={handleCatadorMessageSend}
+                      />
+
+                      <div className="grid gap-2 text-xs text-neutral-500 sm:grid-cols-2">
+                        <p>Gastado privado: {money(catador.unlockedContentTotal)}</p>
+                        <p>Abonado: {money(catador.serviceDepositTotal)}</p>
+                        {catador.latestServiceDepositAt && (
+                          <p className="sm:col-span-2">
+                            Ultimo abono:{" "}
+                            {formatDateTime(catador.latestServiceDepositAt)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+          )}
 
         {user &&
           !isLoading &&

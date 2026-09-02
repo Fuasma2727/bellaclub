@@ -30,7 +30,10 @@ const publicSearchLinks = [
 
 type NotificationItem = {
   id: string;
+  title?: string;
   message?: string;
+  actionLabel?: string;
+  actionUrl?: string;
   read?: boolean;
   createdAt?: {
     toDate?: () => Date;
@@ -672,9 +675,24 @@ export default function Header() {
                                 }`}
                               />
                               <div className="min-w-0">
+                                {notification.title && (
+                                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-amber-200">
+                                    {notification.title}
+                                  </p>
+                                )}
                                 <p className="font-medium leading-5 text-zinc-100">
                                   {notification.message}
                                 </p>
+                                {notification.actionUrl &&
+                                  notification.actionUrl.startsWith("/") && (
+                                    <Link
+                                      href={notification.actionUrl}
+                                      onClick={() => setShowNotifications(false)}
+                                      className="mt-3 inline-flex rounded-md border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/15 hover:text-white"
+                                    >
+                                      {notification.actionLabel || "Abrir"}
+                                    </Link>
+                                  )}
                                 <p className="mt-1 text-xs text-zinc-500">
                                   {notification.createdAt
                                     ?.toDate?.()
