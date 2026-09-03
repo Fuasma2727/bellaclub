@@ -41,14 +41,19 @@ globalForFinanceSummaryCache.__belaclubFinanceSummaryCache =
   financeSummaryCache;
 
 const loadFinanceSummary = async (): Promise<FinanceSummary> => {
-  const [usersSnap, withdrawalsSnap, ledgerSnap] = await Promise.all([
-    adminDb.collection("users").get(),
-    adminDb
-      .collection("withdrawals")
-      .where("status", "==", "pending_wompi")
-      .get(),
-    adminDb.collection("ledger").where("direction", "==", "commission").get(),
-  ]);
+  const [usersSnap, withdrawalsSnap, ledgerSnap, subscriptionsSnap] =
+    await Promise.all([
+      adminDb.collection("users").get(),
+      adminDb
+        .collection("withdrawals")
+        .where("status", "==", "pending_wompi")
+        .get(),
+      adminDb.collection("ledger").where("direction", "==", "commission").get(),
+      adminDb
+        .collection("providerSubscriptions")
+        .where("status", "==", "paid")
+        .get(),
+    ]);
 
   const users = usersSnap.docs.map((doc) => doc.data());
   const providers = users.filter((user) => user.role === "prestador");
@@ -62,10 +67,30 @@ const loadFinanceSummary = async (): Promise<FinanceSummary> => {
     const data = doc.data();
     return total + sumNumber(data.releasedAmount || data.amount);
   }, 0);
-  const commissionsEarned = ledgerSnap.docs.reduce((total, doc) => {
+  const subscriptionCommissionSourceIds = new Set<string>();
+  const ledgerCommissionsEarned = ledgerSnap.docs.reduce((total, doc) => {
     const data = doc.data();
+
+    if (
+      data.sourceCollection === "providerSubscriptions" &&
+      typeof data.sourceId === "string" &&
+      data.sourceId
+    ) {
+      subscriptionCommissionSourceIds.add(data.sourceId);
+    }
+
     return total + sumNumber(data.amount || data.commissionAmount);
   }, 0);
+  const legacySubscriptionRevenue = subscriptionsSnap.docs.reduce(
+    (total, doc) => {
+      if (subscriptionCommissionSourceIds.has(doc.id)) return total;
+
+      const data = doc.data();
+      return total + sumNumber(data.amount);
+    },
+    0
+  );
+  const commissionsEarned = ledgerCommissionsEarned + legacySubscriptionRevenue;
   const pastDueProviders = providers.filter((provider) =>
     isProviderSubscriptionPastDue(provider)
   ).length;

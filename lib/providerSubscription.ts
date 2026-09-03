@@ -208,6 +208,22 @@ export async function processProviderSubscription(
         },
       });
 
+      setLedgerEntry(tx, {
+        userId: null,
+        counterpartyUserId: providerId,
+        type: "provider_subscription_commission",
+        direction: "commission",
+        amount: selectedPlan.amount,
+        commissionAmount: selectedPlan.amount,
+        status: "completed",
+        sourceCollection: "providerSubscriptions",
+        sourceId: paymentRef.id,
+        metadata: {
+          planId: selectedPlan.id,
+          planDays: selectedPlan.durationDays,
+        },
+      });
+
       tx.set(successNotificationRef, {
         userId: providerId,
         type: "provider_subscription_paid",
