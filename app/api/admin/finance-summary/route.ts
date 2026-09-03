@@ -26,7 +26,7 @@ type FinanceSummaryCache = {
   inFlight?: Promise<FinanceSummary>;
 };
 
-const FINANCE_SUMMARY_CACHE_TTL_MS = 10 * 60 * 1000;
+const FINANCE_SUMMARY_CACHE_TTL_MS = 0;
 
 const globalForFinanceSummaryCache = globalThis as typeof globalThis & {
   __belaclubFinanceSummaryCache?: FinanceSummaryCache;
