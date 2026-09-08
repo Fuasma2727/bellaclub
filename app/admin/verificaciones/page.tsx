@@ -140,6 +140,8 @@ type AdminUserItem = {
   name: string;
   email?: string;
   role?: string;
+  whatsapp?: string;
+  balance?: number;
   createdAt?: string | null;
   isOwner?: boolean;
 };
@@ -292,6 +294,18 @@ const getProviderBadgeLevel = (provider: ProviderVerification) =>
 
 const money = (value?: number | null) => {
   return `$${Number(value || 0).toLocaleString("es-CO")}`;
+};
+
+const DEFAULT_ADMIN_BALANCE_RECHARGE = 30000;
+
+const parseMoneyInput = (value: string) => {
+  const text = value.trim().toLowerCase();
+  const digits = text.replace(/\D/g, "");
+  const amount = digits ? Number(digits) : 0;
+
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+
+  return Math.floor(amount * (text.includes("mil") && amount < 1000 ? 1000 : 1));
 };
 
 const formatDuration = (seconds?: number | null) => {
@@ -1475,6 +1489,163 @@ export default function AdminVerificationsPage() {
         error instanceof Error
           ? error.message
           : "No pudimos cambiar la contraseña";
+      setMessage(errorMessage);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleUpdateAdminUserProfile = async (target: AdminUserItem) => {
+    if (!user || target.isOwner) return;
+
+    const nextName = window.prompt(
+      `Nombre para ${target.email || target.name || "este usuario"}`,
+      target.name || ""
+    );
+
+    if (nextName === null) return;
+
+    const nextWhatsapp = window.prompt(
+      "Telefono o WhatsApp del usuario",
+      target.whatsapp || ""
+    );
+
+    if (nextWhatsapp === null) return;
+
+    const name = nextName.trim();
+    const whatsapp = nextWhatsapp.trim();
+
+    if (!name) {
+      setMessage("El nombre no puede quedar vacio.");
+      return;
+    }
+
+    if (name === target.name && whatsapp === (target.whatsapp || "")) return;
+
+    const actionKey = `profile:${target.id}`;
+    setActionId(actionKey);
+    setMessage("");
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/users/${target.id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "updateProfile",
+          name,
+          whatsapp,
+        }),
+      });
+      const data = await readAdminJson<{
+        error?: string;
+        name?: string;
+        whatsapp?: string;
+      }>(res, "No pudimos actualizar el usuario");
+
+      setAdminUsers((current) =>
+        current.map((item) =>
+          item.id === target.id
+            ? {
+                ...item,
+                name: data.name || name,
+                whatsapp: data.whatsapp ?? whatsapp,
+              }
+            : item
+        )
+      );
+      window.alert("Datos actualizados.");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "No pudimos actualizar el usuario";
+      setMessage(errorMessage);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleCreditAdminUserBalance = async (target: AdminUserItem) => {
+    if (!user || target.isOwner) return;
+
+    const rawAmount = window.prompt(
+      `Monto a recargar a ${target.name || target.email || "este usuario"}`,
+      String(DEFAULT_ADMIN_BALANCE_RECHARGE)
+    );
+
+    if (rawAmount === null) return;
+
+    const amount = parseMoneyInput(rawAmount);
+
+    if (!amount) {
+      setMessage("Escribe un monto valido para recargar.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Vas a recargar ${money(amount)} a ${
+        target.name || target.email || "este usuario"
+      }. Quieres continuar?`
+    );
+
+    if (!confirmed) return;
+
+    const actionKey = `credit:${target.id}`;
+    setActionId(actionKey);
+    setMessage("");
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/users/${target.id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "creditBalance",
+          amount,
+          reason: "Bono por usuario referido",
+        }),
+      });
+      const data = await readAdminJson<{
+        error?: string;
+        amount?: number;
+        balance?: number;
+      }>(res, "No pudimos recargar saldo");
+      const creditedAmount = Number(data.amount || amount);
+      const nextBalance =
+        typeof data.balance === "number"
+          ? data.balance
+          : Number(target.balance || 0) + creditedAmount;
+
+      setAdminUsers((current) =>
+        current.map((item) =>
+          item.id === target.id
+            ? {
+                ...item,
+                balance: nextBalance,
+              }
+            : item
+        )
+      );
+      setFinanceSummary((current) =>
+        current
+          ? {
+              ...current,
+              totalPlatformBalance:
+                current.totalPlatformBalance + creditedAmount,
+            }
+          : current
+      );
+      window.alert(`${money(creditedAmount)} recargados.`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "No pudimos recargar saldo";
       setMessage(errorMessage);
     } finally {
       setActionId(null);
@@ -2774,7 +2945,7 @@ export default function AdminVerificationsPage() {
                     : activeView === "catadores"
                       ? "Buscar catador por nombre, correo, ID o perfil desbloqueado"
                     : activeView === "users"
-                      ? "Escribe nombre o correo del usuario"
+                      ? "Buscar usuario por nombre, correo, telefono o ID"
                     : activeView === "past_due"
                     ? "Buscar vencido por nombre, correo o WhatsApp"
                     : activeView === "blocked"
@@ -2855,7 +3026,7 @@ export default function AdminVerificationsPage() {
                   ? "Cuando un prestador solicite retirar saldo aparecera aqui."
                 : activeView === "users"
                   ? search
-                    ? "Prueba con otro nombre o correo."
+                    ? "Prueba con otro nombre, correo, telefono o ID."
                     : "Escribe en la barra de busqueda para mostrar solo el usuario que necesitas."
                 : activeView === "catadores"
                   ? search
@@ -2881,11 +3052,13 @@ export default function AdminVerificationsPage() {
               {adminUsers.map((adminUser) => {
                 const deleteActionKey = `user:${adminUser.id}`;
                 const passwordActionKey = `password:${adminUser.id}`;
+                const profileActionKey = `profile:${adminUser.id}`;
+                const creditActionKey = `credit:${adminUser.id}`;
 
                 return (
                   <article
                     key={adminUser.id}
-                    className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-4"
+                    className="grid gap-4 px-4 py-4 md:grid-cols-[1fr_auto] md:items-center"
                   >
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -2908,6 +3081,14 @@ export default function AdminVerificationsPage() {
                           {adminUser.email}
                         </p>
                       )}
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-neutral-500">
+                        <span className="rounded-md border border-white/10 bg-black/25 px-2 py-1">
+                          Telefono: {adminUser.whatsapp || "Sin registrar"}
+                        </span>
+                        <span className="rounded-md border border-emerald-300/20 bg-emerald-400/10 px-2 py-1 font-semibold text-emerald-100">
+                          Saldo: {money(adminUser.balance)}
+                        </span>
+                      </div>
                       {adminUser.createdAt && (
                         <p className="mt-1 text-xs text-neutral-600">
                           Registro:{" "}
@@ -2918,7 +3099,39 @@ export default function AdminVerificationsPage() {
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-2 sm:flex-row">
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                      <button
+                        type="button"
+                        disabled={
+                          adminUser.isOwner || actionId === profileActionKey
+                        }
+                        onClick={() =>
+                          void handleUpdateAdminUserProfile(adminUser)
+                        }
+                        className="rounded-md border border-white/15 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {actionId === profileActionKey
+                          ? "Guardando..."
+                          : adminUser.isOwner
+                            ? "Protegido"
+                            : "Editar datos"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          adminUser.isOwner || actionId === creditActionKey
+                        }
+                        onClick={() =>
+                          void handleCreditAdminUserBalance(adminUser)
+                        }
+                        className="rounded-md border border-emerald-300/35 bg-emerald-400/10 px-3 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {actionId === creditActionKey
+                          ? "Recargando..."
+                          : adminUser.isOwner
+                            ? "Protegido"
+                            : "Recargar saldo"}
+                      </button>
                       <button
                         type="button"
                         disabled={
@@ -2927,7 +3140,7 @@ export default function AdminVerificationsPage() {
                         onClick={() =>
                           void handleSetAdminUserPassword(adminUser)
                         }
-                        className="rounded-md border border-blue-400/35 bg-blue-400/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-md border border-blue-400/35 bg-blue-400/10 px-3 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-400/15 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {actionId === passwordActionKey
                           ? "Cambiando..."
@@ -2939,7 +3152,7 @@ export default function AdminVerificationsPage() {
                         type="button"
                         disabled={adminUser.isOwner || actionId === deleteActionKey}
                         onClick={() => void handleDeleteAdminUser(adminUser)}
-                        className="rounded-md border border-red-500/35 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-md border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {actionId === deleteActionKey
                           ? "Eliminando..."

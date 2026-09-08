@@ -72,6 +72,8 @@ const ledgerLabel: Record<string, string> = {
   provider_video_time_purchase: "Tiempo extra de video",
   provider_subscription: "Plan BelaClub",
   daily_video_reward: "Bono por video del dia",
+  referral_reward: "Bono por referido",
+  admin_balance_credit: "Recarga manual",
 };
 
 const withdrawalStatus: Record<string, { label: string; className: string }> = {

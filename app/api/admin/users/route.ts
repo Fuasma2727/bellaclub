@@ -7,6 +7,8 @@ type AdminUserListItem = {
   name: string;
   email?: string;
   role?: string;
+  whatsapp?: string;
+  balance?: number;
   createdAt?: string | null;
   isOwner?: boolean;
 };
@@ -38,7 +40,7 @@ const toDateString = (value: FirebaseFirestore.Timestamp | undefined) => {
 const loadAdminUsers = async () => {
   const snapshot = await adminDb
     .collection("users")
-    .select("name", "email", "role", "createdAt")
+    .select("name", "email", "role", "whatsapp", "balance", "createdAt")
     .get();
 
   return snapshot.docs.map((doc) => {
@@ -46,12 +48,17 @@ const loadAdminUsers = async () => {
     const email = typeof data.email === "string" ? data.email : "";
     const name = typeof data.name === "string" ? data.name.trim() : "";
     const role = typeof data.role === "string" ? data.role : "";
+    const whatsapp =
+      typeof data.whatsapp === "string" ? data.whatsapp.trim() : "";
+    const balance = Number(data.balance || 0);
 
     return {
       id: doc.id,
       name: name || email || "Usuario sin nombre",
       email,
       role,
+      whatsapp,
+      balance,
       createdAt: toDateString(data.createdAt),
     };
   });
@@ -120,7 +127,13 @@ export async function GET(request: Request) {
         };
       })
       .filter((item) => {
-        const haystack = [item.name, item.email, item.role, item.id]
+        const haystack = [
+          item.name,
+          item.email,
+          item.role,
+          item.whatsapp,
+          item.id,
+        ]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();

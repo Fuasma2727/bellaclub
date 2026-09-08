@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { setLedgerEntry } from "@/lib/ledger";
 import { ownerAuthError, requireOwner } from "@/lib/ownerAuth";
+import { invalidatePublicProviderCache } from "@/lib/publicProviders";
 import {
   guardMutationRequest,
   securityErrorResponse,
@@ -184,6 +186,7 @@ const deleteUserRecords = async (uid: string) => {
     deleteWhere("providerPromotions", "providerId", uid),
     deleteWhere("referralRewards", "referrerId", uid),
     deleteWhere("referralRewards", "referredUserId", uid),
+    deleteWhere("adminBalanceCredits", "userId", uid),
   ]);
 
   await removePurchasedContentReferences(uid);
@@ -204,11 +207,55 @@ const isStrongTemporaryPassword = (value: string) => {
   );
 };
 
+const cleanTextField = (value: unknown, maxLength: number) => {
+  if (typeof value !== "string") return "";
+
+  return value.trim().slice(0, maxLength);
+};
+
+const parseMoneyAmount = (value: unknown) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? Math.floor(value) : 0;
+  }
+
+  if (typeof value !== "string") return 0;
+
+  const text = value.trim().toLowerCase();
+  const digits = text.replace(/\D/g, "");
+  const digitValue = digits ? Number(digits) : 0;
+
+  if (!Number.isFinite(digitValue) || digitValue <= 0) {
+    return 0;
+  }
+
+  return Math.floor(
+    digitValue * (text.includes("mil") && digitValue < 1000 ? 1000 : 1)
+  );
+};
+
+const invalidateAdminUsersCache = () => {
+  const globalForAdminUsersCache = globalThis as typeof globalThis & {
+    __belaclubAdminUsersCache?: {
+      users?: unknown[];
+      expiresAt: number;
+      inFlight?: Promise<unknown[]>;
+    };
+  };
+
+  const cache = globalForAdminUsersCache.__belaclubAdminUsersCache;
+
+  if (!cache) return;
+
+  cache.users = undefined;
+  cache.expiresAt = 0;
+  cache.inFlight = undefined;
+};
+
 export async function PATCH(request: Request, { params }: Params) {
   try {
     guardMutationRequest(request, {
-      rateLimitKey: "admin-users-password",
-      limit: 20,
+      rateLimitKey: "admin-users-action",
+      limit: 60,
       windowMs: 10 * 60 * 1000,
       maxBodyBytes: 8 * 1024,
     });
@@ -216,8 +263,12 @@ export async function PATCH(request: Request, { params }: Params) {
     const owner = await requireOwner(request);
     const { uid } = await params;
     const body = (await request.json().catch(() => ({}))) as {
-      action?: "setPassword";
+      action?: "setPassword" | "updateProfile" | "creditBalance";
       password?: string;
+      name?: string;
+      whatsapp?: string;
+      amount?: number | string;
+      reason?: string;
     };
 
     if (!uid) {
@@ -227,7 +278,10 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
-    if (body.action !== "setPassword") {
+    if (
+      !body.action ||
+      !["setPassword", "updateProfile", "creditBalance"].includes(body.action)
+    ) {
       return NextResponse.json(
         { error: "Accion invalida" },
         { status: 400 }
@@ -236,19 +290,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
     if (uid === owner.uid) {
       return NextResponse.json(
-        { error: "No puedes cambiar la contraseña de la cuenta administradora" },
-        { status: 400 }
-      );
-    }
-
-    const password = String(body.password || "");
-
-    if (!isStrongTemporaryPassword(password)) {
-      return NextResponse.json(
-        {
-          error:
-            "La contraseña debe tener entre 6 y 128 caracteres, con letras y numeros.",
-        },
+        { error: "No puedes modificar la cuenta administradora" },
         { status: 400 }
       );
     }
@@ -268,7 +310,127 @@ export async function PATCH(request: Request, { params }: Params) {
 
     if (owner.email && email.toLowerCase() === owner.email.toLowerCase()) {
       return NextResponse.json(
-        { error: "No puedes cambiar la contraseña de la cuenta administradora" },
+        { error: "No puedes modificar la cuenta administradora" },
+        { status: 400 }
+      );
+    }
+
+    if (body.action === "updateProfile") {
+      const name = cleanTextField(body.name, 90);
+      const whatsapp = cleanTextField(body.whatsapp, 40);
+
+      if (!name) {
+        return NextResponse.json(
+          { error: "El nombre es requerido" },
+          { status: 400 }
+        );
+      }
+
+      await userRef.update({
+        name,
+        whatsapp,
+        profileUpdatedAt: adminFieldValue.serverTimestamp(),
+        adminProfileUpdatedAt: adminFieldValue.serverTimestamp(),
+        adminProfileUpdatedBy: owner.uid,
+      });
+
+      invalidateAdminUsersCache();
+
+      if (userData.role === "prestador") {
+        invalidatePublicProviderCache();
+      }
+
+      return NextResponse.json({
+        success: true,
+        name,
+        whatsapp,
+      });
+    }
+
+    if (body.action === "creditBalance") {
+      const amount = parseMoneyAmount(body.amount);
+      const reason =
+        cleanTextField(body.reason, 140) || "Bono por usuario referido";
+
+      if (!amount || amount < 1000) {
+        return NextResponse.json(
+          { error: "El monto minimo para recargar es $1.000" },
+          { status: 400 }
+        );
+      }
+
+      const creditRef = adminDb.collection("adminBalanceCredits").doc();
+      const notificationRef = adminDb.collection("notifications").doc();
+
+      await adminDb.runTransaction(async (tx) => {
+        const currentUserSnap = await tx.get(userRef);
+
+        if (!currentUserSnap.exists) {
+          throw new Error("USER_NOT_FOUND");
+        }
+
+        tx.update(userRef, {
+          balance: adminFieldValue.increment(amount),
+          adminBalanceCreditedAt: adminFieldValue.serverTimestamp(),
+          adminBalanceCreditedBy: owner.uid,
+          updatedAt: adminFieldValue.serverTimestamp(),
+        });
+
+        tx.set(creditRef, {
+          userId: uid,
+          amount,
+          reason,
+          status: "completed",
+          createdBy: owner.uid,
+          createdAt: adminFieldValue.serverTimestamp(),
+        });
+
+        setLedgerEntry(tx, {
+          userId: uid,
+          type: "admin_balance_credit",
+          direction: "credit",
+          amount,
+          status: "completed",
+          sourceCollection: "adminBalanceCredits",
+          sourceId: creditRef.id,
+          createdBy: owner.uid,
+          metadata: {
+            reason,
+            source: "admin_panel",
+          },
+        });
+
+        tx.set(notificationRef, {
+          userId: uid,
+          type: "admin_balance_credit",
+          title: "Saldo recargado",
+          message: `Recibiste $${amount.toLocaleString(
+            "es-CO"
+          )} de saldo en BelaClub. Motivo: ${reason}.`,
+          amount,
+          reason,
+          read: false,
+          createdAt: adminFieldValue.serverTimestamp(),
+        });
+      });
+
+      invalidateAdminUsersCache();
+
+      return NextResponse.json({
+        success: true,
+        amount,
+        balance: Number(userData.balance || 0) + amount,
+      });
+    }
+
+    const password = String(body.password || "");
+
+    if (!isStrongTemporaryPassword(password)) {
+      return NextResponse.json(
+        {
+          error:
+            "La contraseña debe tener entre 6 y 128 caracteres, con letras y numeros.",
+        },
         { status: 400 }
       );
     }
@@ -295,6 +457,13 @@ export async function PATCH(request: Request, { params }: Params) {
     if (code === "auth/user-not-found") {
       return NextResponse.json(
         { error: "Usuario no encontrado en Firebase Auth" },
+        { status: 404 }
+      );
+    }
+
+    if (error instanceof Error && error.message === "USER_NOT_FOUND") {
+      return NextResponse.json(
+        { error: "Usuario no encontrado" },
         { status: 404 }
       );
     }
@@ -379,6 +548,7 @@ export async function DELETE(request: Request, { params }: Params) {
 
     await deleteUserRecords(uid);
     await userRef.delete();
+    invalidateAdminUsersCache();
 
     try {
       await adminAuth.deleteUser(uid);
