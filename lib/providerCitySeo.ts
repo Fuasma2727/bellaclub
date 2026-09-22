@@ -1,3 +1,4 @@
+import { isTimeoutError, withTimeout } from "@/lib/asyncTimeout";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 
@@ -26,6 +27,9 @@ type ProviderCityCache = {
 
 const PROVIDER_CITY_CACHE_TTL_MS = 5 * 60 * 1000;
 const PROVIDER_CITY_STALE_TTL_MS = 24 * 60 * 60 * 1000;
+const PROVIDER_CITY_FIRESTORE_TIMEOUT_MS = Number(
+  process.env.PROVIDER_CITY_FIRESTORE_TIMEOUT_MS || 3500
+);
 
 export const targetSeoCities: ProviderCitySeo[] = [
   {
@@ -158,12 +162,16 @@ const isFirestoreQuotaError = (error: unknown) => {
 
 async function fetchPublicProviderCities(): Promise<ProviderCitySeo[]> {
   const now = new Date();
-  const snapshot = await adminDb
-    .collection("users")
-    .where("role", "==", "prestador")
-    .where("profileVisible", "==", true)
-    .where("verificationStatus", "==", "approved")
-    .get();
+  const snapshot = await withTimeout(
+    adminDb
+      .collection("users")
+      .where("role", "==", "prestador")
+      .where("profileVisible", "==", true)
+      .where("verificationStatus", "==", "approved")
+      .get(),
+    PROVIDER_CITY_FIRESTORE_TIMEOUT_MS,
+    "Provider city Firestore query"
+  );
 
   const bySlug = new Map<string, ProviderCitySeo>();
 
@@ -262,6 +270,19 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
         providerCityCache.staleUntil = failedAt + PROVIDER_CITY_STALE_TTL_MS;
         console.error(
           "Provider cities unavailable because Firestore quota is exhausted:",
+          error
+        );
+        return targetSeoCities;
+      }
+
+      if (isTimeoutError(error)) {
+        const failedAt = Date.now();
+
+        providerCityCache.cities = targetSeoCities;
+        providerCityCache.expiresAt = failedAt + PROVIDER_CITY_CACHE_TTL_MS;
+        providerCityCache.staleUntil = failedAt + PROVIDER_CITY_STALE_TTL_MS;
+        console.error(
+          "Provider cities timed out; serving target SEO cities:",
           error
         );
         return targetSeoCities;

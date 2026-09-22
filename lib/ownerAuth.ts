@@ -12,6 +12,59 @@ const getOwnerConfig = () => {
   return { ownerUid, ownerEmail };
 };
 
+const getErrorDetails = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return "";
+  }
+
+  const typedError = error as Error & {
+    code?: unknown;
+    details?: unknown;
+    errorInfo?: { code?: unknown; message?: unknown };
+  };
+
+  return [
+    typedError.code,
+    typedError.details,
+    typedError.message,
+    typedError.errorInfo?.code,
+    typedError.errorInfo?.message,
+  ]
+    .filter(Boolean)
+    .join(" ");
+};
+
+const isFirebaseAdminCredentialError = (error: unknown) => {
+  const details = getErrorDetails(error).toLowerCase();
+
+  return (
+    details.includes("app/invalid-credential") ||
+    details.includes("invalid credential") ||
+    details.includes("invalid-credential") ||
+    details.includes("credential implementation") ||
+    details.includes("valid google oauth2 access token")
+  );
+};
+
+const verifyOwnerToken = async (token: string) => {
+  try {
+    return await adminAuth.verifyIdToken(token, true);
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "Owner token verification failed:",
+        getErrorDetails(error) || error
+      );
+    }
+
+    if (isFirebaseAdminCredentialError(error)) {
+      throw new Error("ADMIN_AUTH_INVALID_CREDENTIAL");
+    }
+
+    throw new Error("INVALID_TOKEN");
+  }
+};
+
 export const requireOwner = async (request: Request): Promise<OwnerUser> => {
   const { ownerUid, ownerEmail } = getOwnerConfig();
 
@@ -28,7 +81,7 @@ export const requireOwner = async (request: Request): Promise<OwnerUser> => {
     throw new Error("MISSING_TOKEN");
   }
 
-  const decoded = await adminAuth.verifyIdToken(token, true);
+  const decoded = await verifyOwnerToken(token);
   const decodedEmail = decoded.email?.toLowerCase();
 
   const matchesUid = ownerUid ? decoded.uid === ownerUid : false;
@@ -51,8 +104,8 @@ export const ownerAuthError = (error: unknown) => {
     return { message: "No autorizado", status: 401 };
   }
 
-  const typedError = error as Error & { code?: unknown; details?: unknown };
-  const details = String(typedError.details || typedError.message || "");
+  const typedError = error as Error & { code?: unknown };
+  const details = getErrorDetails(error);
 
   if (error.message === "OWNER_NOT_CONFIGURED") {
     return {
@@ -63,6 +116,30 @@ export const ownerAuthError = (error: unknown) => {
 
   if (error.message === "MISSING_TOKEN") {
     return { message: "Debes iniciar sesión", status: 401 };
+  }
+
+  if (error.message === "INVALID_TOKEN") {
+    return {
+      message:
+        "Tu sesión venció o no es válida. Cierra sesión e inicia de nuevo.",
+      status: 401,
+    };
+  }
+
+  if (error.message === "ADMIN_AUTH_INVALID_CREDENTIAL") {
+    return {
+      message:
+        "La credencial de Firebase Admin en .env.local no es válida. Regenera la clave de servicio.",
+      status: 500,
+    };
+  }
+
+  if (isFirebaseAdminCredentialError(error)) {
+    return {
+      message:
+        "La credencial de Firebase Admin en .env.local no es válida. Regenera la clave de servicio.",
+      status: 500,
+    };
   }
 
   if (error.message === "FORBIDDEN") {

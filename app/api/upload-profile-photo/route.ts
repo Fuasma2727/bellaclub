@@ -8,6 +8,7 @@ import {
   SUPPORTED_UPLOAD_FORMAT_LABEL,
   inferUploadContentType,
   isSupportedUploadContentType,
+  isSupportedVideoFilename,
   validateVideoFileCompatibility,
 } from "@/lib/mediaCompatibility";
 
@@ -39,6 +40,33 @@ const getMaxSizeMb = (contentType: string) => {
   return contentType.startsWith("video") ? 150 : 12;
 };
 
+const getMaxSizeBytes = (contentType: string) =>
+  getMaxSizeMb(contentType) * 1024 * 1024;
+
+const isPayloadTooLargeError = (error: unknown) =>
+  error instanceof Error && error.message === "PAYLOAD_TOO_LARGE";
+
+const sizeLimitStream = (
+  stream: ReadableStream<Uint8Array>,
+  maxBytes: number
+) => {
+  let totalBytes = 0;
+
+  return stream.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        totalBytes += chunk.byteLength;
+
+        if (totalBytes > maxBytes) {
+          throw new Error("PAYLOAD_TOO_LARGE");
+        }
+
+        controller.enqueue(chunk);
+      },
+    })
+  );
+};
+
 const validateVideoBeforeUpload = (
   body: ArrayBuffer,
   contentType: string,
@@ -60,13 +88,29 @@ const validateVideoBeforeUpload = (
   );
 };
 
+const validateVideoUploadMetadata = (contentType: string, filename: string) => {
+  if (!contentType.startsWith("video/")) return null;
+
+  if (isSupportedVideoFilename(filename)) return null;
+
+  return NextResponse.json(
+    {
+      error:
+        "Video no compatible. Sube un archivo MP4 compatible (H.264/AAC), no MOV ni HEVC.",
+    },
+    { status: 400 }
+  );
+};
+
 const uploadToBunny = async ({
   body,
+  contentLength,
   contentType,
   filename,
   uid,
 }: {
-  body: ArrayBuffer;
+  body: BodyInit;
+  contentLength?: number;
   contentType: string;
   filename: string;
   uid: string;
@@ -80,21 +124,36 @@ const uploadToBunny = async ({
     AccessKey: BUNNY_API_KEY || "",
     "Content-Type": contentType || "application/octet-stream",
   };
-  const uploadBody = Buffer.from(body);
+  const uploadInit: RequestInit & { duplex?: "half" } = {
+    method: "PUT",
+    headers,
+    body,
+  };
+
+  if (contentLength && contentLength > 0) {
+    headers["Content-Length"] = String(contentLength);
+  }
+
+  if (body instanceof ReadableStream) {
+    uploadInit.duplex = "half";
+  }
 
   let upload: Response;
 
   try {
-    upload = await fetch(uploadUrl, {
-      method: "PUT",
-      headers,
-      body: uploadBody,
-    });
+    upload = await fetch(uploadUrl, uploadInit);
   } catch (error) {
+    if (isPayloadTooLargeError(error)) {
+      return NextResponse.json(
+        { error: `El archivo supera el limite de ${getMaxSizeMb(contentType)} MB` },
+        { status: 413 }
+      );
+    }
+
     console.error("Bunny upload request error:", {
       filename,
       contentType,
-      bytes: uploadBody.byteLength,
+      bytes: contentLength || null,
       error,
     });
 
@@ -156,6 +215,7 @@ export async function POST(request: Request) {
       const contentLength = Number(request.headers.get("content-length") || 0);
       const fileSize = declaredSize || contentLength;
       const maxSize = getMaxSizeMb(contentType);
+      const maxSizeBytes = getMaxSizeBytes(contentType);
 
       if (!isSupportedUploadContentType(contentType)) {
         return NextResponse.json(
@@ -166,7 +226,7 @@ export async function POST(request: Request) {
         );
       }
 
-      if (fileSize && fileSize > maxSize * 1024 * 1024) {
+      if (fileSize && fileSize > maxSizeBytes) {
         return NextResponse.json(
           { error: `El archivo supera el limite de ${maxSize} MB` },
           { status: 400 }
@@ -180,28 +240,13 @@ export async function POST(request: Request) {
         );
       }
 
-      const body = await request.arrayBuffer();
-
-      if (!body.byteLength) {
-        return NextResponse.json(
-          { error: "No se recibio ningun archivo" },
-          { status: 400 }
-        );
-      }
-
-      if (body.byteLength > maxSize * 1024 * 1024) {
-        return NextResponse.json(
-          { error: `El archivo supera el limite de ${maxSize} MB` },
-          { status: 400 }
-        );
-      }
-
-      const videoError = validateVideoBeforeUpload(body, contentType, filename);
+      const videoError = validateVideoUploadMetadata(contentType, filename);
 
       if (videoError) return videoError;
 
       return uploadToBunny({
-        body,
+        body: sizeLimitStream(request.body, maxSizeBytes),
+        contentLength: fileSize || undefined,
         contentType,
         filename,
         uid: decoded.uid,
@@ -230,8 +275,9 @@ export async function POST(request: Request) {
     }
 
     const maxSize = getMaxSizeMb(contentType);
+    const maxSizeBytes = getMaxSizeBytes(contentType);
 
-    if (file.size > maxSize * 1024 * 1024) {
+    if (file.size > maxSizeBytes) {
       return NextResponse.json(
         { error: `El archivo supera el limite de ${maxSize} MB` },
         { status: 400 }
@@ -244,7 +290,8 @@ export async function POST(request: Request) {
     if (videoError) return videoError;
 
     return uploadToBunny({
-      body,
+      body: Buffer.from(body),
+      contentLength: body.byteLength,
       contentType,
       filename: file.name,
       uid: decoded.uid,
@@ -252,6 +299,13 @@ export async function POST(request: Request) {
   } catch (error) {
     const securityError = securityErrorResponse(error);
     if (securityError) return securityError;
+
+    if (isPayloadTooLargeError(error)) {
+      return NextResponse.json(
+        { error: "La solicitud supera el tamano permitido" },
+        { status: 413 }
+      );
+    }
 
     const authError = authRouteError(error);
 
@@ -265,7 +319,10 @@ export async function POST(request: Request) {
     console.error("Upload error:", error);
 
     return NextResponse.json(
-      { error: "Error inesperado al subir el archivo" },
+      {
+        error:
+          "No pudimos procesar el archivo en el servidor. Intenta con un video MP4 mas liviano o conviertelo a H.264/AAC.",
+      },
       { status: 500 }
     );
   }

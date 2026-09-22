@@ -376,7 +376,7 @@ const uploadFileMultipart = async (file: File, token: string) => {
 };
 
 const uploadFile = async (file: File, token: string) => {
-  const { contentType } = validateUploadFile(file);
+  const { contentType, mediaType } = validateUploadFile(file);
 
   let binaryError: unknown = null;
   let res: Response | null = null;
@@ -400,6 +400,12 @@ const uploadFile = async (file: File, token: string) => {
     if (res && (res.status === 413 || res.status === 401 || res.status === 403)) {
       throw new Error(
         firstTry.error || firstTry.details || "No pudimos subir el archivo"
+      );
+    }
+
+    if (mediaType === "video") {
+      throw new Error(
+        firstTry.error || firstTry.details || "No pudimos subir el video"
       );
     }
 
@@ -524,6 +530,7 @@ const uploadFileWithProgressFallback = async (
   token: string,
   onProgress: (progress: number) => void
 ) => {
+  const { mediaType } = validateUploadFile(file);
   let progressError: unknown = null;
 
   try {
@@ -541,6 +548,12 @@ const uploadFileWithProgressFallback = async (
 
   if (status === 401 || status === 403 || status === 413) {
     throw progressError;
+  }
+
+  if (mediaType === "video") {
+    throw progressError instanceof Error
+      ? progressError
+      : new Error("No pudimos subir el video");
   }
 
   let res: Response;

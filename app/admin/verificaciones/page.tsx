@@ -205,10 +205,18 @@ const readAdminJson = async <T extends AdminApiErrorResponse>(
     try {
       payload = JSON.parse(rawText) as T;
     } catch {
+      const responsePath = getResponsePath(response);
+      const normalizedText = rawText.trimStart().toLowerCase();
+      const localApiRestartHint =
+        response.status === 404 &&
+        responsePath.startsWith("/api/admin/") &&
+        (normalizedText.startsWith("<!doctype") ||
+          normalizedText.startsWith("<html"))
+          ? ". Reinicia el servidor local con npm.cmd run dev para refrescar las rutas admin."
+          : "";
+
       throw new Error(
-        `${fallbackMessage}: ${getResponsePath(
-          response
-        )} respondio ${response.status} con un formato inesperado`
+        `${fallbackMessage}: ${responsePath} respondió ${response.status} con un formato inesperado${localApiRestartHint}`
       );
     }
   }
@@ -811,7 +819,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const params = new URLSearchParams();
       const summaryPromise = fetch("/api/admin/finance-summary", {
         headers: {
@@ -1195,7 +1203,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch(`/api/admin/verifications/${provider.id}`, {
         method: "PATCH",
         headers: {
@@ -1413,7 +1421,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch(`/api/admin/users/${target.id}`, {
         method: "DELETE",
         headers: {
@@ -1466,7 +1474,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch(`/api/admin/users/${target.id}`, {
         method: "PATCH",
         headers: {
@@ -1527,7 +1535,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch(`/api/admin/users/${target.id}`, {
         method: "PATCH",
         headers: {
@@ -1599,7 +1607,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch(`/api/admin/users/${target.id}`, {
         method: "PATCH",
         headers: {
@@ -1665,7 +1673,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch(`/api/admin/verifications/${provider.id}`, {
         method: "PATCH",
         headers: {
@@ -1715,7 +1723,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch(`/api/admin/verifications/${provider.id}`, {
         method: "PATCH",
         headers: {
@@ -1767,7 +1775,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch("/api/admin/catadores", {
         method: "POST",
         headers: {
@@ -1814,7 +1822,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
 
       if (action === "blockProvider") {
         const res = await fetch(
@@ -1884,7 +1892,7 @@ export default function AdminVerificationsPage() {
     setMessage("");
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const res = await fetch("/api/admin/withdrawals", {
         method: "PATCH",
         headers: {

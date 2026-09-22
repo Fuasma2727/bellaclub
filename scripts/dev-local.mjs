@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_PORT = 3010;
 const HOST = "127.0.0.1";
+const HTTP_CHECK_TIMEOUT_MS = 3000;
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const portCheckHosts = ["::", "0.0.0.0", "127.0.0.1", "::1"];
 
@@ -55,7 +56,7 @@ const isPortFree = async (port) => {
 const readHttpSummary = (port, path) =>
   new Promise((resolve) => {
     const request = http.get(
-      { host: HOST, port, path, timeout: 1000 },
+      { host: HOST, port, path, timeout: HTTP_CHECK_TIMEOUT_MS },
       (response) => {
         let body = "";
 
@@ -68,9 +69,24 @@ const readHttpSummary = (port, path) =>
         response.on("end", () => {
           const title = body.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1];
           const lowerBody = body.toLowerCase();
+          const location = String(response.headers.location || "");
+          const isAdminHealthPath =
+            path === "/admin/verificaciones" ||
+            path === "/api/admin/verifications";
+          const adminRouteMissing =
+            isAdminHealthPath &&
+            response.statusCode === 404 &&
+            lowerBody.includes("belaclub");
+          const redirectsToBelaClubRoute =
+            response.statusCode >= 300 &&
+            response.statusCode < 400 &&
+            path.startsWith("/prestadores") &&
+            (location === "/escorts" || location.startsWith("/escorts/"));
           const likelyApp = lowerBody.includes("base de contactos")
             ? "herramienta de WhatsApp"
             : lowerBody.includes("belaclub")
+              ? "BelaClub"
+              : redirectsToBelaClubRoute
               ? "BelaClub"
               : "";
 
@@ -78,6 +94,8 @@ const readHttpSummary = (port, path) =>
             path,
             status: response.statusCode,
             title: title?.trim() || "",
+            location,
+            adminRouteMissing,
             likelyApp,
           });
         });
@@ -94,10 +112,17 @@ const readHttpSummary = (port, path) =>
 const getHttpSummary = async (port) => {
   const summaries = [];
 
-  for (const path of ["/", "/prestadores", "/escorts"]) {
+  for (const path of [
+    "/api/admin/verifications",
+    "/admin/verificaciones",
+    "/",
+    "/escorts",
+    "/prestadores",
+  ]) {
     const summary = await readHttpSummary(port, path);
 
     if (!summary) continue;
+    if (summary.adminRouteMissing) return summary;
     if (summary.likelyApp || summary.title) return summary;
 
     summaries.push(summary);
@@ -289,6 +314,24 @@ const startNext = async () => {
   if (!(await isPortFree(port))) {
     const summary = await getHttpSummary(port);
     const owner = describeSummary(summary);
+
+    if (summary?.likelyApp === "BelaClub" && summary.adminRouteMissing) {
+      console.warn(
+        [
+          "",
+          `BelaClub esta corriendo en localhost:${port}, pero una ruta admin responde 404.`,
+          "Voy a reiniciar el servidor local para refrescar las rutas.",
+          "",
+        ].join("\n")
+      );
+
+      if ((await runNext(port, true)) === "restart") {
+        await warnIfDefaultPortIsBusy(port);
+        await runNext(port, false);
+      }
+
+      return;
+    }
 
     if (summary?.likelyApp === "BelaClub") {
       console.warn(

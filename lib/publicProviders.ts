@@ -1,6 +1,7 @@
 import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
 import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
+import { isTimeoutError, withTimeout } from "@/lib/asyncTimeout";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { citySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
@@ -56,6 +57,13 @@ type PublicProviderCache = {
 const PUBLIC_PROVIDER_CACHE_VERSION = 8;
 const PUBLIC_PROVIDER_CACHE_TTL_MS = 60 * 60 * 1000;
 const PUBLIC_PROVIDER_STALE_TTL_MS = 72 * 60 * 60 * 1000;
+const PUBLIC_PROVIDER_TIMEOUT_RETRY_TTL_MS = 60 * 1000;
+const PUBLIC_PROVIDER_FIRESTORE_TIMEOUT_MS = Number(
+  process.env.PUBLIC_PROVIDER_FIRESTORE_TIMEOUT_MS || 4500
+);
+const PUBLIC_PROVIDER_PROFILE_FIRESTORE_TIMEOUT_MS = Number(
+  process.env.PUBLIC_PROVIDER_PROFILE_FIRESTORE_TIMEOUT_MS || 3500
+);
 const PUBLIC_PROVIDER_DISK_CACHE_PATH = path.join(
   process.cwd(),
   ".runtime-cache",
@@ -463,12 +471,16 @@ export async function getPublicProviderCards(options?: {
 
 async function fetchPublicProviderCards() {
   const now = Date.now();
-  const snapshot = await adminDb
-    .collection("users")
-    .where("role", "==", "prestador")
-    .where("profileVisible", "==", true)
-    .where("verificationStatus", "==", "approved")
-    .get();
+  const snapshot = await withTimeout(
+    adminDb
+      .collection("users")
+      .where("role", "==", "prestador")
+      .where("profileVisible", "==", true)
+      .where("verificationStatus", "==", "approved")
+      .get(),
+    PUBLIC_PROVIDER_FIRESTORE_TIMEOUT_MS,
+    "Public provider Firestore query"
+  );
 
   const providers = snapshot.docs
     .map((doc) => {
@@ -559,6 +571,23 @@ const refreshPublicProviderCache = () => {
         return [];
       }
 
+      if (isTimeoutError(error)) {
+        const failedAt = Date.now();
+
+        publicProviderCache.providers = [];
+        publicProviderCache.expiresAt =
+          failedAt + PUBLIC_PROVIDER_TIMEOUT_RETRY_TTL_MS;
+        publicProviderCache.staleUntil =
+          failedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
+        publicProviderCache.loaded = true;
+        publicProviderCache.mustRefresh = false;
+        console.error(
+          "Public providers timed out; serving an empty cache for now:",
+          error
+        );
+        return [];
+      }
+
       throw error;
     })
     .finally(() => {
@@ -641,7 +670,11 @@ export async function getPublicProviderProfileById(id: string) {
   if (!id) return null;
 
   try {
-    const snap = await adminDb.collection("users").doc(id).get();
+    const snap = await withTimeout(
+      adminDb.collection("users").doc(id).get(),
+      PUBLIC_PROVIDER_PROFILE_FIRESTORE_TIMEOUT_MS,
+      "Public provider profile Firestore query"
+    );
     const data = snap.data();
 
     if (!snap.exists || !data) return null;
@@ -659,6 +692,14 @@ export async function getPublicProviderProfileById(id: string) {
         error
       );
       return cachedProfile;
+    }
+
+    if (isTimeoutError(error)) {
+      console.error(
+        "Public provider profile timed out with no cached fallback:",
+        error
+      );
+      return null;
     }
 
     throw error;
