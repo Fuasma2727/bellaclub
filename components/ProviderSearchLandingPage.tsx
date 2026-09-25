@@ -10,7 +10,7 @@ import {
   providerSearchRoutesByKey,
   type ProviderSearchRouteKey,
 } from "@/lib/providerSearchRoutes";
-import { absoluteSiteUrl, siteHomeUrl } from "@/lib/siteUrl";
+import { absoluteSiteUrl, siteHomeUrl, siteUrl } from "@/lib/siteUrl";
 
 type LandingContent = {
   paragraphs: string[];
