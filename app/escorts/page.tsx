@@ -4,8 +4,7 @@ import JsonLd from "@/components/JsonLd";
 import { targetSeoCities } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
-
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
+import { absoluteSiteUrl, siteHomeUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +73,7 @@ export const metadata: Metadata = {
 };
 
 export default async function EscortsPage() {
-  const pageUrl = `${siteUrl}/escorts`;
+  const pageUrl = absoluteSiteUrl("/escorts");
   const initialProviders = await getPublicProviderCards({ limit: 60 });
   const cityLinks = targetSeoCities.map((city) => ({
     href: `/escorts/${city.slug}`,
@@ -100,7 +99,7 @@ export default async function EscortsPage() {
           isPartOf: {
             "@type": "WebSite",
             name: "BelaClub",
-            url: siteUrl,
+            url: siteHomeUrl,
           },
         }}
       />

@@ -5,14 +5,9 @@ import {
   getPublicProviderCities,
   targetSeoCities,
 } from "@/lib/providerCitySeo";
-import {
-  getProviderPhonePath,
-  getPublicProviderCards,
-} from "@/lib/publicProviders";
+import { getPublicProviderCards } from "@/lib/publicProviders";
 import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
-
-const getBaseUrl = () =>
-  process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
+import { siteUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +31,7 @@ const getSearchCityRoutePriority = (
 };
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = getBaseUrl();
+  const baseUrl = siteUrl;
   const now = new Date();
   const cities = await getPublicProviderCities();
   const providers = await getPublicProviderCards();
@@ -107,30 +102,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           ? 0.84
           : 0.72,
   }));
-  const phoneRouteMap = new Map<string, MetadataRoute.Sitemap[number]>();
-
-  providers.forEach((provider) => {
-    const phonePath = getProviderPhonePath(provider);
-
-    if (!phonePath || phoneRouteMap.has(phonePath)) return;
-
-    phoneRouteMap.set(phonePath, {
-      url: `${baseUrl}${phonePath}`,
-      lastModified: provider.updatedAt ? new Date(provider.updatedAt) : now,
-      changeFrequency: "weekly",
-      priority:
-        citySlug(provider.city || "") === "rionegro"
-          ? 0.86
-          : targetCitySlugs.has(citySlug(provider.city || ""))
-            ? 0.8
-            : 0.68,
-    });
-  });
 
   return [
     ...staticRoutes,
     ...searchCityRoutes,
     ...profileRoutes,
-    ...phoneRouteMap.values(),
   ];
 }

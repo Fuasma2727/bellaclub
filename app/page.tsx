@@ -4,9 +4,8 @@ import JsonLd from "@/components/JsonLd";
 import { targetSeoCities } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
+import { siteHomeUrl } from "@/lib/siteUrl";
 import PrestadoresClientPage from "./prestadores/PrestadoresClientPage";
-
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
 
 export const dynamic = "force-dynamic";
 
@@ -58,11 +57,11 @@ export default async function Home() {
           name: "BelaClub: Escorts verificadas",
           description:
             "Perfiles aprobados en BelaClub por ciudad, con galerias publicas, zonas disponibles y contacto por WhatsApp.",
-          url: `${siteUrl}/`,
+          url: siteHomeUrl,
           isPartOf: {
             "@type": "WebSite",
             name: "BelaClub",
-            url: siteUrl,
+            url: siteHomeUrl,
           },
         }}
       />

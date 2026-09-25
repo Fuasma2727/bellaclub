@@ -10,8 +10,111 @@ import {
   providerSearchRoutesByKey,
   type ProviderSearchRouteKey,
 } from "@/lib/providerSearchRoutes";
+import { absoluteSiteUrl, siteHomeUrl } from "@/lib/siteUrl";
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
+type LandingContent = {
+  paragraphs: string[];
+  searchTerms: string[];
+  faqs: {
+    question: string;
+    answer: string;
+  }[];
+};
+
+const uniqueTexts = (items: string[]) =>
+  Array.from(new Set(items.filter(Boolean)));
+
+const defaultLandingContent: LandingContent = {
+  paragraphs: [
+    "BelaClub separa cada busqueda por ciudad para que los usuarios puedan revisar perfiles activos, zonas disponibles, fotos publicas y contacto directo sin mezclar resultados de todo el pais.",
+    "Las paginas de ciudad ayudan a comparar opciones cercanas, revisar perfiles aprobados y pasar de una busqueda amplia a un listado local con mayor contexto.",
+  ],
+  searchTerms: [
+    "escorts rionegro",
+    "prepagos rionegro",
+    "putas rionegro",
+    "escorts medellin",
+    "prepagos medellin",
+    "escorts la ceja",
+  ],
+  faqs: [
+    {
+      question: "Como se ordenan los perfiles en BelaClub?",
+      answer:
+        "La pagina muestra perfiles publicos, aprobados y activos, con prioridad para disponibilidad, ciudad, galeria publica y datos utiles de contacto.",
+    },
+    {
+      question: "Por que hay paginas por ciudad?",
+      answer:
+        "Las busquedas locales suelen depender de zona y desplazamiento, por eso BelaClub conecta cada categoria con paginas especificas de ciudad.",
+    },
+  ],
+};
+
+const landingContentByRoute: Partial<
+  Record<ProviderSearchRouteKey, LandingContent>
+> = {
+  putas: {
+    paragraphs: [
+      "La busqueda de putas en Colombia se organiza en BelaClub como una entrada hacia perfiles visibles por ciudad, con foco en datos practicos y resultados locales.",
+      "Rionegro, Medellin y La Ceja tienen enlaces propios para que la busqueda no dependa de una lista generica. Cada pagina local muestra perfiles aprobados cuando estan activos y disponibles.",
+      "Tambien se conectan categorias relacionadas como escorts y prepagos para mantener una navegacion coherente si el usuario cambia la intencion de busqueda.",
+    ],
+    searchTerms: [
+      "putas rionegro",
+      "putas en rionegro",
+      "putas medellin",
+      "putas la ceja",
+      "escorts rionegro",
+      "prepagos rionegro",
+    ],
+    faqs: [
+      {
+        question: "Que encuentra un usuario en la pagina de putas?",
+        answer:
+          "Encuentra una ruta para revisar perfiles aprobados por ciudad, con enlaces hacia busquedas locales y categorias relacionadas dentro de BelaClub.",
+      },
+      {
+        question: "La pagina muestra perfiles reales?",
+        answer:
+          "Si. Los listados usan perfiles publicos, aprobados y activos; cuando una cuenta se pausa o deja de estar visible, sale del listado publico.",
+      },
+      {
+        question: "Por que aparecen enlaces a escorts y prepagos?",
+        answer:
+          "Porque muchas busquedas son cercanas entre si. Los enlaces relacionados ayudan a llegar a la pagina local mas precisa sin duplicar contenido.",
+      },
+    ],
+  },
+  acompanantes: {
+    paragraphs: [
+      "La pagina de acompanantes agrupa busquedas amplias y las lleva hacia ciudades concretas, donde es mas facil comparar perfiles, zonas y contacto.",
+      "BelaClub prioriza perfiles aprobados y visibles, con enlaces hacia busquedas relacionadas como escorts, prepagos y damas de compania por ciudad.",
+    ],
+    searchTerms: [
+      "acompanantes rionegro",
+      "acompanantes medellin",
+      "acompanantes la ceja",
+      "escorts rionegro",
+      "prepagos medellin",
+    ],
+    faqs: defaultLandingContent.faqs,
+  },
+  "damas-de-compania": {
+    paragraphs: [
+      "La pagina de damas de compania conecta una busqueda amplia con perfiles por ciudad, zonas cercanas y categorias relacionadas dentro de BelaClub.",
+      "El objetivo es que el usuario llegue a una pagina local con perfiles activos en vez de navegar un listado sin contexto.",
+    ],
+    searchTerms: [
+      "damas de compania rionegro",
+      "damas de compania medellin",
+      "damas de compania la ceja",
+      "acompanantes medellin",
+      "escorts rionegro",
+    ],
+    faqs: defaultLandingContent.faqs,
+  },
+};
 
 export async function generateProviderSearchLandingMetadata(
   routeKey: ProviderSearchRouteKey

@@ -1,7 +1,5 @@
 import type { MetadataRoute } from "next";
-
-const getBaseUrl = () =>
-  process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
+import { siteUrl } from "@/lib/siteUrl";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -37,6 +35,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: `${getBaseUrl()}/sitemap.xml`,
+    sitemap: `${siteUrl}/sitemap.xml`,
   };
 }

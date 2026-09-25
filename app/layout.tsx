@@ -7,6 +7,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import AgeGate from "@/components/AgeGate";
 import JsonLd from "@/components/JsonLd";
 import { explicitContentMetadata } from "@/lib/explicitContentSeo";
+import { siteHomeUrl, siteUrl } from "@/lib/siteUrl";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,12 +18,6 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
-const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co").replace(
-  /\/+$/,
-  ""
-);
-const siteHomeUrl = `${siteUrl}/`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
