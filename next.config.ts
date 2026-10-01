@@ -47,6 +47,9 @@ const explicitPublicRouteSources = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    proxyClientMaxBodySize: "170mb",
+  },
   turbopack: {
     root: process.cwd(),
   },
