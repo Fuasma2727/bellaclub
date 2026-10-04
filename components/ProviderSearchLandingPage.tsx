@@ -10,9 +10,14 @@ import {
   providerSearchRoutesByKey,
   type ProviderSearchRouteKey,
 } from "@/lib/providerSearchRoutes";
-import { absoluteSiteUrl, siteHomeUrl, siteUrl } from "@/lib/siteUrl";
+import { siteUrl } from "@/lib/siteUrl";
 
 type LandingContent = {
+  metaTitle?: string;
+  metaDescription?: string;
+  pageDescription?: string;
+  heading?: string;
+  zones?: string[];
   paragraphs: string[];
   searchTerms: string[];
   faqs: {
@@ -55,6 +60,20 @@ const landingContentByRoute: Partial<
   Record<ProviderSearchRouteKey, LandingContent>
 > = {
   putas: {
+    metaTitle: "Putas Rionegro, Medellín y La Ceja",
+    metaDescription:
+      "Consulta perfiles aprobados para busquedas como putas rionegro, putas medellin y putas la ceja. Fotos publicas, zonas disponibles y WhatsApp en BelaClub.",
+    pageDescription:
+      "Consulta perfiles aprobados por ciudad para busquedas como putas rionegro, putas Medellin y putas La Ceja. Revisa fotos publicas, zonas disponibles y contacto directo por WhatsApp.",
+    heading: "Putas por ciudad: Rionegro, Medellin y La Ceja",
+    zones: [
+      "Rionegro",
+      "San Antonio de Pereira",
+      "Medellin",
+      "La Ceja",
+      "Bello",
+      "Zipaquira",
+    ],
     paragraphs: [
       "La busqueda de putas en Colombia se organiza en BelaClub como una entrada hacia perfiles visibles por ciudad, con foco en datos practicos y resultados locales.",
       "Rionegro, Medellin y La Ceja tienen enlaces propios para que la busqueda no dependa de una lista generica. Cada pagina local muestra perfiles aprobados cuando estan activos y disponibles.",
@@ -65,6 +84,7 @@ const landingContentByRoute: Partial<
       "putas en rionegro",
       "putas medellin",
       "putas la ceja",
+      "putas en la ceja",
       "escorts rionegro",
       "prepagos rionegro",
     ],
@@ -87,11 +107,30 @@ const landingContentByRoute: Partial<
     ],
   },
   acompanantes: {
+    metaTitle: "Acompañantes en Bello, Zipaquirá y Medellín",
+    metaDescription:
+      "Encuentra acompañantes por ciudad en BelaClub: Bello, Zipaquira, Medellin, Rionegro y La Ceja. Perfiles aprobados, fotos publicas y WhatsApp.",
+    pageDescription:
+      "Encuentra acompañantes por ciudad en BelaClub. Revisa perfiles aprobados en Bello, Zipaquira, Medellin, Rionegro y La Ceja, con fotos publicas y contacto por WhatsApp.",
+    heading: "Acompañantes por ciudad en BelaClub",
+    zones: [
+      "Bello",
+      "Zipaquira",
+      "Medellin",
+      "Rionegro",
+      "La Ceja",
+      "Cundinamarca",
+    ],
     paragraphs: [
       "La pagina de acompanantes agrupa busquedas amplias y las lleva hacia ciudades concretas, donde es mas facil comparar perfiles, zonas y contacto.",
+      "Bello y Zipaquira ya muestran señales de busqueda local, por eso BelaClub las conecta con paginas propias y enlaces hacia categorias relacionadas.",
       "BelaClub prioriza perfiles aprobados y visibles, con enlaces hacia busquedas relacionadas como escorts, prepagos y damas de compania por ciudad.",
     ],
     searchTerms: [
+      "acompanantes bello",
+      "acompañantes bello",
+      "acompanantes zipaquira",
+      "acompañantes en zipaquirá",
       "acompanantes rionegro",
       "acompanantes medellin",
       "acompanantes la ceja",
@@ -101,11 +140,27 @@ const landingContentByRoute: Partial<
     faqs: defaultLandingContent.faqs,
   },
   "damas-de-compania": {
+    metaTitle: "Damas de compañía en Zipaquirá y Medellín",
+    metaDescription:
+      "Explora damas de compañía por ciudad en BelaClub: Zipaquira, Medellin, Rionegro y La Ceja. Perfiles aprobados, fotos publicas y WhatsApp.",
+    pageDescription:
+      "Explora damas de compañía por ciudad, con enlaces locales hacia Zipaquira, Medellin, Rionegro y La Ceja. Perfiles aprobados y contacto directo por WhatsApp.",
+    heading: "Damas de compañía por ciudad en BelaClub",
+    zones: [
+      "Zipaquira",
+      "Medellin",
+      "Rionegro",
+      "La Ceja",
+      "Bello",
+      "Cundinamarca",
+    ],
     paragraphs: [
       "La pagina de damas de compania conecta una busqueda amplia con perfiles por ciudad, zonas cercanas y categorias relacionadas dentro de BelaClub.",
-      "El objetivo es que el usuario llegue a una pagina local con perfiles activos en vez de navegar un listado sin contexto.",
+      "Zipaquira, Medellin, Rionegro y La Ceja tienen paginas locales para que el usuario llegue a un listado con contexto en vez de navegar resultados generales.",
     ],
     searchTerms: [
+      "damas de compania zipaquira",
+      "damas de compañía zipaquira",
       "damas de compania rionegro",
       "damas de compania medellin",
       "damas de compania la ceja",
@@ -120,25 +175,30 @@ export async function generateProviderSearchLandingMetadata(
   routeKey: ProviderSearchRouteKey
 ): Promise<Metadata> {
   const route = providerSearchRoutesByKey[routeKey];
-  const description = `Encuentra perfiles de ${route.pluralNoun} en Rionegro, Medellín, La Ceja y otras ciudades de Colombia. Revisa fotos públicas, zonas disponibles y contacto por WhatsApp en BelaClub.`;
+  const content = landingContentByRoute[routeKey] || defaultLandingContent;
+  const title = content.metaTitle || route.baseTitle;
+  const description =
+    content.metaDescription ||
+    `Encuentra perfiles de ${route.pluralNoun} en Rionegro, Medellín, La Ceja y otras ciudades de Colombia. Revisa fotos públicas, zonas disponibles y contacto por WhatsApp en BelaClub.`;
 
   return {
-    title: route.baseTitle,
+    title,
     description,
-    keywords: [
+    keywords: uniqueTexts([
       ...getProviderSearchKeywords(route, "Colombia"),
+      ...content.searchTerms,
       `${route.pluralNoun} Rionegro`,
       `${route.pluralNoun} en Rionegro`,
       "escorts rionegro",
       "escorts en rionegro",
       "prepagos rionegro",
       "putas rionegro",
-    ],
+    ]),
     alternates: {
       canonical: `/${route.segment}`,
     },
     openGraph: {
-      title: `${route.baseTitle} | BelaClub`,
+      title: `${title} | BelaClub`,
       description,
       url: `/${route.segment}`,
       siteName: "BelaClub",
@@ -155,7 +215,7 @@ export async function generateProviderSearchLandingMetadata(
     },
     twitter: {
       card: "summary_large_image",
-      title: `${route.baseTitle} | BelaClub`,
+      title: `${title} | BelaClub`,
       description,
       images: ["/og-image.png"],
     },
@@ -168,6 +228,8 @@ export default async function ProviderSearchLandingPage({
   routeKey: ProviderSearchRouteKey;
 }) {
   const route = providerSearchRoutesByKey[routeKey];
+  const content = landingContentByRoute[routeKey] || defaultLandingContent;
+  const pageTitle = content.metaTitle || route.baseTitle;
   const relatedSearchText = getRelatedProviderSearchText(routeKey);
   const initialProviders = await getPublicProviderCards({ limit: 60 });
   const pageUrl = `${siteUrl}/${route.segment}`;
@@ -181,14 +243,15 @@ export default async function ProviderSearchLandingPage({
       label: `${item.title} en ${city.city}`,
     }))
   );
-  const searchTerms = [
+  const searchTerms = uniqueTexts([
+    ...content.searchTerms,
     `${route.title} Rionegro`,
     `${route.title} en Rionegro`,
     "escorts rionegro",
     "escorts en rionegro",
     "prepagos rionegro",
     "putas rionegro",
-  ];
+  ]);
 
   return (
     <>
@@ -196,7 +259,7 @@ export default async function ProviderSearchLandingPage({
         data={{
           "@context": "https://schema.org",
           "@type": "CollectionPage",
-          name: route.baseTitle,
+          name: pageTitle,
           description: `Perfiles aprobados de ${route.pluralNoun} por ciudad dentro de BelaClub, con búsquedas relacionadas de ${relatedSearchText}.`,
           url: pageUrl,
           isPartOf: {
@@ -207,19 +270,23 @@ export default async function ProviderSearchLandingPage({
         }}
       />
       <PrestadoresPage
-        pageTitle={route.baseTitle}
+        pageTitle={pageTitle}
         pageEyebrow="Explora por ciudad"
-        pageDescription={`Encuentra perfiles de ${route.pluralNoun} por ciudad. Revisa galerías públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp.`}
+        pageDescription={
+          content.pageDescription ||
+          `Encuentra perfiles de ${route.pluralNoun} por ciudad. Revisa galerías públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp.`
+        }
         initialProviders={initialProviders}
         seoCityLinks={cityLinks}
         seoContent={{
-          heading: `${route.title} por ciudad en BelaClub`,
-          paragraphs: [
+          heading: content.heading || `${route.title} por ciudad en BelaClub`,
+          paragraphs: uniqueTexts([
+            ...content.paragraphs,
             `BelaClub organiza perfiles aprobados de ${route.pluralNoun} por ciudad para que puedas revisar opciones activas, fotos publicas, zonas disponibles y contacto directo por WhatsApp.`,
             `También puedes explorar búsquedas relacionadas de ${relatedSearchText} en las ciudades principales de BelaClub.`,
             "En Rionegro se conectan busquedas frecuentes del oriente antioqueño como escorts rionegro, escorts en rionegro, prepagos rionegro y putas rionegro.",
-          ],
-          zones: [
+          ]),
+          zones: content.zones || [
             "Rionegro",
             "San Antonio de Pereira",
             "Llanogrande",
@@ -228,6 +295,7 @@ export default async function ProviderSearchLandingPage({
             "Medellín",
           ],
           searchTerms,
+          faqs: content.faqs,
           relatedLinks: relatedCitySearchLinks,
         }}
       />

@@ -31,3 +31,14 @@ export const isTimeoutError = (error: unknown) =>
     error !== null &&
     "name" in error &&
     (error as { name?: unknown }).name === "TimeoutError");
+
+export const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+
+  if (typeof error === "object" && error !== null) {
+    const typed = error as { details?: unknown; message?: unknown };
+    return String(typed.details || typed.message || "Unknown error");
+  }
+
+  return String(error);
+};

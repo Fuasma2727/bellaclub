@@ -1,4 +1,8 @@
-import { isTimeoutError, withTimeout } from "@/lib/asyncTimeout";
+import {
+  getErrorMessage,
+  isTimeoutError,
+  withTimeout,
+} from "@/lib/asyncTimeout";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
 
@@ -89,6 +93,8 @@ export const targetSeoCities: ProviderCitySeo[] = [
         "Para escorts en Medellin, el valor esta en diferenciar zonas y perfiles activos dentro de una ciudad con mucha oferta.",
       prepagos:
         "Para prepagos en Medellin, BelaClub organiza perfiles aprobados por ciudad y zonas principales para reducir busquedas repetidas.",
+      putas:
+        "Para busquedas como putas Medellin, la pagina conecta una intencion amplia con perfiles visibles, categorias cercanas y zonas principales de la ciudad.",
       acompanantes:
         "Para acompanantes en Medellin, la pagina conecta busquedas amplias con perfiles visibles y contacto directo.",
       "damas-de-compania":
@@ -123,10 +129,81 @@ export const targetSeoCities: ProviderCitySeo[] = [
         "Para escorts en La Ceja, la pagina concentra perfiles locales y busquedas cercanas del oriente antioqueno.",
       prepagos:
         "Para prepagos en La Ceja, el foco esta en perfiles aprobados, contacto visible y zonas cercanas.",
+      putas:
+        "Para busquedas como putas La Ceja, BelaClub ofrece una pagina local con perfiles aprobados y enlaces hacia escorts y prepagos cercanos.",
     },
     zones: ["Centro", "zonas cercanas", "oriente antioqueno"],
     seoIntro:
       "La Ceja conecta usuarios que buscan perfiles en el oriente antioqueño con opciones cercanas y contacto directo.",
+  },
+  {
+    city: "Bello",
+    department: "Antioquia",
+    slug: "bello",
+    count: 0,
+    priority: 0.72,
+    nearbyCities: ["Medellin", "Copacabana", "Itagui", "Envigado"],
+    localContext:
+      "Bello aparece en busquedas del norte del area metropolitana de Medellin, donde conviene separar perfiles locales de resultados generales de Antioquia.",
+    mobilityContext:
+      "La cercania con Medellin, Copacabana e Itagui hace que los enlaces por ciudad ayuden a comparar ubicacion antes de contactar.",
+    trustContext:
+      "BelaClub prioriza perfiles aprobados, fotos publicas y datos de contacto para que la busqueda local sea mas clara desde movil.",
+    routeNotes: {
+      acompanantes:
+        "Para acompanantes en Bello, la pagina responde a busquedas locales con perfiles visibles y rutas relacionadas en Medellin y el area metropolitana.",
+      prepagos:
+        "Para prepagos en Bello, BelaClub ordena perfiles aprobados por ciudad y conecta opciones cercanas cuando el usuario quiere ampliar la busqueda.",
+      escorts:
+        "Para escorts en Bello, el objetivo es distinguir perfiles locales de los resultados generales de Medellin.",
+      chicas:
+        "Para chicas en Bello, la pagina mantiene una entrada local hacia perfiles activos y categorias relacionadas dentro de BelaClub.",
+    },
+    zones: ["Centro", "Niquia", "Cabanas", "Madera", "zonas cercanas"],
+    searchFocus: [
+      "acompanantes bello",
+      "acompañantes bello",
+      "prepagos bello",
+      "escorts bello",
+      "chicas bello",
+    ],
+    seoIntro:
+      "Bello suma busquedas locales dentro del area metropolitana de Medellin. BelaClub agrupa perfiles aprobados y categorias relacionadas para usuarios que buscan acompanantes, prepagos, escorts o chicas en Bello.",
+  },
+  {
+    city: "Zipaquirá",
+    department: "Cundinamarca",
+    slug: "zipaquira",
+    count: 0,
+    priority: 0.7,
+    nearbyCities: ["Bogota", "Chia", "Cajica", "Tocancipa"],
+    localContext:
+      "Zipaquira concentra busquedas locales de Cundinamarca, especialmente cuando el usuario quiere evitar resultados amplios de Bogota.",
+    mobilityContext:
+      "La ciudad se conecta con Chia, Cajica, Tocancipa y Bogota, por eso conviene revisar ubicacion declarada y disponibilidad antes de contactar.",
+    trustContext:
+      "Las paginas locales de BelaClub muestran perfiles visibles y aprobados cuando estan disponibles, con enlaces a categorias relacionadas.",
+    routeNotes: {
+      acompanantes:
+        "Para acompanantes en Zipaquira, la pagina atiende busquedas locales con perfiles visibles y alternativas cercanas en Cundinamarca.",
+      prepagos:
+        "Para prepagos en Zipaquira, BelaClub prepara una busqueda local conectada con perfiles aprobados y categorias relacionadas.",
+      "damas-de-compania":
+        "Para damas de compania en Zipaquira, la pagina ayuda a diferenciar una busqueda local de resultados generales de Bogota.",
+      chicas:
+        "Para chicas en Zipaquira, BelaClub mantiene una entrada local hacia perfiles visibles y opciones cercanas.",
+    },
+    zones: ["Centro", "zonas cercanas", "Sabana Centro", "Cundinamarca"],
+    searchFocus: [
+      "acompanantes zipaquira",
+      "acompañantes zipaquira",
+      "acompañantes en zipaquirá",
+      "prepagos zipaquira",
+      "damas de compania zipaquira",
+      "chicas zipaquira",
+    ],
+    seoIntro:
+      "Zipaquira tiene busquedas locales que necesitan una pagina separada de Bogota. BelaClub conecta esas busquedas con perfiles aprobados, categorias relacionadas y enlaces hacia ciudades cercanas.",
   },
 ];
 
@@ -255,9 +332,10 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
         providerCityCache.cities.length > 0 &&
         providerCityCache.staleUntil > Date.now()
       ) {
-        console.error(
-          "Error refreshing provider city cache; serving stale cities:",
-          error
+        console.warn(
+          `Error refreshing provider city cache; serving stale cities: ${getErrorMessage(
+            error
+          )}`
         );
         return providerCityCache.cities;
       }
@@ -268,9 +346,10 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
         providerCityCache.cities = targetSeoCities;
         providerCityCache.expiresAt = failedAt + PROVIDER_CITY_CACHE_TTL_MS;
         providerCityCache.staleUntil = failedAt + PROVIDER_CITY_STALE_TTL_MS;
-        console.error(
-          "Provider cities unavailable because Firestore quota is exhausted:",
-          error
+        console.warn(
+          `Provider cities unavailable because Firestore quota is exhausted: ${getErrorMessage(
+            error
+          )}`
         );
         return targetSeoCities;
       }
@@ -281,9 +360,10 @@ export async function getPublicProviderCities(): Promise<ProviderCitySeo[]> {
         providerCityCache.cities = targetSeoCities;
         providerCityCache.expiresAt = failedAt + PROVIDER_CITY_CACHE_TTL_MS;
         providerCityCache.staleUntil = failedAt + PROVIDER_CITY_STALE_TTL_MS;
-        console.error(
-          "Provider cities timed out; serving target SEO cities:",
-          error
+        console.warn(
+          `Provider cities timed out; serving target SEO cities: ${getErrorMessage(
+            error
+          )}`
         );
         return targetSeoCities;
       }

@@ -9,9 +9,9 @@ import { absoluteSiteUrl, siteHomeUrl } from "@/lib/siteUrl";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Escorts en Colombia",
+  title: "Escorts en Rionegro, Medellín y La Ceja",
   description:
-    "Encuentra escorts en Rionegro, Medellín, La Ceja y otras ciudades de Colombia. Perfiles aprobados, galerías públicas, zonas disponibles y contacto por WhatsApp en BelaClub.",
+    "Encuentra escorts en Rionegro, Medellín, La Ceja, Bello y Zipaquirá. Perfiles aprobados, fotos públicas, zonas disponibles y contacto por WhatsApp.",
   keywords: [
     "escorts en Medellín",
      "escorts en Medellin",
@@ -47,9 +47,9 @@ export const metadata: Metadata = {
     canonical: "/escorts",
   },
   openGraph: {
-    title: "Escorts en Colombia | BelaClub",
+    title: "Escorts en Rionegro, Medellín y La Ceja | BelaClub",
     description:
-      "Escorts en Rionegro, Medellín y La Ceja con perfiles aprobados y contacto directo por WhatsApp.",
+      "Escorts en Rionegro, Medellín, La Ceja, Bello y Zipaquirá con perfiles aprobados y contacto directo por WhatsApp.",
     url: "/escorts",
     siteName: "BelaClub",
     images: [
@@ -65,9 +65,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Escorts en Colombia | BelaClub",
+    title: "Escorts en Rionegro, Medellín y La Ceja | BelaClub",
     description:
-      "Explora escorts, prepagos y acompañantes por ciudad.",
+      "Explora escorts, prepagos y acompañantes por ciudad en BelaClub.",
     images: ["/og-image.png"],
   },
 };
@@ -92,9 +92,9 @@ export default async function EscortsPage() {
         data={{
           "@context": "https://schema.org",
           "@type": "CollectionPage",
-          name: "Escorts en Colombia",
+          name: "Escorts en Rionegro, Medellín y La Ceja",
           description:
-            "Perfiles aprobados en BelaClub por ciudad, con galerías públicas y contacto por WhatsApp.",
+            "Perfiles aprobados en BelaClub por ciudad, con fotos públicas, zonas disponibles y contacto por WhatsApp.",
           url: pageUrl,
           isPartOf: {
             "@type": "WebSite",
@@ -104,9 +104,9 @@ export default async function EscortsPage() {
         }}
       />
       <PrestadoresPage
-        pageTitle="Escorts en Colombia"
+        pageTitle="Escorts en Rionegro, Medellín y La Ceja"
         pageEyebrow="Explora por ciudad"
-        pageDescription="Encuentra escorts verificadas en Rionegro, Medellín, La Ceja y otras ciudades. Revisa galerías públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
+        pageDescription="Encuentra escorts verificadas en Rionegro, Medellín, La Ceja, Bello y Zipaquirá. Revisa fotos públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
         initialProviders={initialProviders}
         seoCityLinks={[
           ...cityLinks,
@@ -118,11 +118,21 @@ export default async function EscortsPage() {
         seoContent={{
           heading: "Escorts por ciudad en BelaClub",
           paragraphs: [
-            "BelaClub organiza perfiles aprobados por ciudad para facilitar búsquedas como escorts rionegro, escorts en rionegro, prepagos rionegro, putas rionegro, escorts Medellín y prepagos Medellín.",
+            "BelaClub organiza perfiles aprobados por ciudad para facilitar búsquedas como escorts rionegro, escorts en rionegro, escorts Medellín, prepagos Medellín, prepagos rionegro y putas rionegro.",
             "Rionegro concentra busquedas del oriente antioqueño en zonas como San Antonio de Pereira, Centro, Llanogrande y el sector del Aeropuerto Jose Maria Cordova.",
+            "Medellín, La Ceja, Bello y Zipaquirá tambien tienen paginas locales para comparar perfiles visibles, ubicacion declarada y categorias relacionadas sin salir del contexto de ciudad.",
             "Cada página de ciudad permite revisar perfiles, fotos públicas, ubicación, zonas disponibles y contacto directo por WhatsApp.",
           ],
-          zones: ["Rionegro", "San Antonio de Pereira", "Llanogrande", "Centro", "Medellín", "La Ceja"],
+          zones: [
+            "Rionegro",
+            "San Antonio de Pereira",
+            "Llanogrande",
+            "Centro",
+            "Medellín",
+            "La Ceja",
+            "Bello",
+            "Zipaquirá",
+          ],
           relatedLinks: relatedCitySearchLinks,
         }}
       />

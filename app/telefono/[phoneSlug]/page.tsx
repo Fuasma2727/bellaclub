@@ -51,8 +51,8 @@ export async function generateMetadata({
   const place = [provider.city, provider.department].filter(Boolean).join(", ");
   const phonePath = getProviderPhonePath(provider);
   const phone = phoneSeo.canonicalDigits || phoneSeo.raw;
-  const title = `${phone} - ${name}${place ? ` en ${place}` : ""}`;
-  const description = `Perfil de ${name} asociado al WhatsApp ${phone}${place ? ` en ${place}` : ""}. Revisa fotos publicas, ubicacion y contacto directo en BelaClub.`;
+  const title = `${phone} WhatsApp - ${name}${place ? ` en ${place}` : ""}`;
+  const description = `Consulta el perfil de ${name} asociado al WhatsApp ${phone}${place ? ` en ${place}` : ""}. Fotos publicas, ubicacion y contacto directo en BelaClub.`;
 
   return {
     title,

@@ -72,6 +72,9 @@ const footerSeoLinks: CitySeoLink[] = [
   { href: "/prepagos/medellin", label: "Prepagos en Medellin" },
   { href: "/escorts/la-ceja", label: "Escorts en La Ceja" },
   { href: "/prepagos/la-ceja", label: "Prepagos en La Ceja" },
+  { href: "/acompanantes/bello", label: "Acompañantes en Bello" },
+  { href: "/prepagos/bello", label: "Prepagos en Bello" },
+  { href: "/acompanantes/zipaquira", label: "Acompañantes en Zipaquirá" },
 ];
 
 const readApiJson = async <T extends { error?: string }>(

@@ -39,16 +39,131 @@ type CityFaq = {
 const uniqueTexts = (items: string[]) =>
   Array.from(new Set(items.filter(Boolean)));
 
-const rionegroFocusRouteKeys = new Set<ProviderSearchRouteKey>([
-  "escorts",
-  "prepagos",
-  "putas",
+const localCtrFocusRoutes = new Set<string>([
+  "escorts:rionegro",
+  "prepagos:rionegro",
+  "putas:rionegro",
+  "escorts:medellin",
+  "prepagos:medellin",
+  "putas:medellin",
+  "escorts:la-ceja",
+  "prepagos:la-ceja",
+  "putas:la-ceja",
+  "acompanantes:bello",
+  "prepagos:bello",
+  "escorts:bello",
+  "acompanantes:zipaquira",
+  "prepagos:zipaquira",
+  "damas-de-compania:zipaquira",
 ]);
 
-const isRionegroFocusRoute = (
+const localCtrFocusTerms: Record<string, string[]> = {
+  "escorts:rionegro": [
+    "escorts rionegro",
+    "escorts en rionegro",
+    "prepagos rionegro",
+    "putas rionegro",
+  ],
+  "prepagos:rionegro": [
+    "prepagos rionegro",
+    "prepagos en rionegro",
+    "escorts rionegro",
+    "putas rionegro",
+  ],
+  "putas:rionegro": [
+    "putas rionegro",
+    "putas en rionegro",
+    "escorts rionegro",
+    "prepagos rionegro",
+  ],
+  "escorts:medellin": [
+    "escorts medellin",
+    "escorts en medellin",
+    "prepagos medellin",
+    "acompanantes medellin",
+  ],
+  "prepagos:medellin": [
+    "prepagos medellin",
+    "prepagos en medellin",
+    "escorts medellin",
+    "acompanantes medellin",
+  ],
+  "putas:medellin": [
+    "putas medellin",
+    "putas en medellin",
+    "escorts medellin",
+    "prepagos medellin",
+  ],
+  "escorts:la-ceja": [
+    "escorts la ceja",
+    "escorts en la ceja",
+    "prepagos la ceja",
+    "putas la ceja",
+  ],
+  "prepagos:la-ceja": [
+    "prepagos la ceja",
+    "prepagos en la ceja",
+    "escorts la ceja",
+    "putas la ceja",
+  ],
+  "putas:la-ceja": [
+    "putas la ceja",
+    "putas en la ceja",
+    "escorts la ceja",
+    "prepagos la ceja",
+  ],
+  "acompanantes:bello": [
+    "acompanantes bello",
+    "acompañantes bello",
+    "acompanantes en bello",
+    "prepagos bello",
+  ],
+  "prepagos:bello": [
+    "prepagos bello",
+    "prepagos en bello",
+    "escorts bello",
+    "acompanantes bello",
+  ],
+  "escorts:bello": [
+    "escorts bello",
+    "escorts en bello",
+    "prepagos bello",
+    "acompanantes bello",
+  ],
+  "acompanantes:zipaquira": [
+    "acompanantes zipaquira",
+    "acompañantes zipaquira",
+    "acompañantes en zipaquirá",
+    "damas de compania zipaquira",
+  ],
+  "prepagos:zipaquira": [
+    "prepagos zipaquira",
+    "prepagos en zipaquira",
+    "acompanantes zipaquira",
+    "damas de compania zipaquira",
+  ],
+  "damas-de-compania:zipaquira": [
+    "damas de compania zipaquira",
+    "damas de compañía zipaquira",
+    "acompanantes zipaquira",
+    "prepagos zipaquira",
+  ],
+};
+
+const getLocalCtrFocusKey = (
   routeKey: ProviderSearchRouteKey,
   citySlug: string
-) => citySlug === "rionegro" && rionegroFocusRouteKeys.has(routeKey);
+) => `${routeKey}:${citySlug}`;
+
+const isLocalCtrFocusRoute = (
+  routeKey: ProviderSearchRouteKey,
+  citySlug: string
+) => localCtrFocusRoutes.has(getLocalCtrFocusKey(routeKey, citySlug));
+
+const getLocalCtrFocusTerms = (
+  routeKey: ProviderSearchRouteKey,
+  citySlug: string
+) => localCtrFocusTerms[getLocalCtrFocusKey(routeKey, citySlug)] || [];
 
 const formatList = (items: string[]) => {
   if (items.length <= 1) return items[0] || "";
@@ -81,7 +196,7 @@ const buildCityMetaTitle = (
 ) => {
   const title = `${route.title} en ${city.city}`;
 
-  if (isRionegroFocusRoute(route.key, city.slug)) {
+  if (isLocalCtrFocusRoute(route.key, city.slug)) {
     return `${route.title} ${city.city} | ${title}`;
   }
 
@@ -93,8 +208,14 @@ const buildCityMetaDescription = (
   city: ProviderCitySeo,
   place: string
 ) => {
-  if (isRionegroFocusRoute(route.key, city.slug)) {
-    return `Encuentra ${route.pluralNoun} en ${place}: perfiles aprobados, fotos publicas, zonas como San Antonio de Pereira, Centro y Llanogrande, y contacto directo por WhatsApp. Busquedas relacionadas: escorts rionegro, escorts en rionegro, prepagos rionegro y putas rionegro en BelaClub.`;
+  if (isLocalCtrFocusRoute(route.key, city.slug)) {
+    const focusTerms = getLocalCtrFocusTerms(route.key, city.slug);
+    const focusText =
+      focusTerms.length > 0
+        ? ` Busquedas relacionadas: ${formatList(focusTerms.slice(0, 4))}.`
+        : "";
+
+    return `Encuentra ${route.pluralNoun} en ${place}: perfiles aprobados, fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.${focusText}`;
   }
 
   const relatedSearchText = getRelatedProviderSearchText(route.key);
@@ -111,6 +232,7 @@ const buildCitySearchTerms = (
     `${route.title} ${city.city}`,
     `${route.pluralNoun} en ${city.city}`,
     `${route.pluralNoun} ${city.city}`,
+    ...getLocalCtrFocusTerms(route.key, city.slug),
     ...(city.searchFocus || []),
     `escorts en ${city.city}`,
     `escorts ${city.city}`,
@@ -231,6 +353,7 @@ export async function generateProviderCityMetadata(
   const description = buildCityMetaDescription(route, city, place);
   const keywords = uniqueTexts([
     ...getProviderSearchKeywords(route, city.city),
+    ...getLocalCtrFocusTerms(route.key, city.slug),
     ...(city.searchFocus || []),
   ]);
 
@@ -309,8 +432,10 @@ export default async function ProviderCitySearchPage({
     href: `/${route.segment}/${item.slug}`,
     label: `${route.title} en ${item.city}`,
   }));
-  const cityDescription = isRionegroFocusRoute(route.key, city.slug)
-    ? `Perfiles aprobados en Rionegro, Antioquia, para busquedas como escorts rionegro, escorts en rionegro, prepagos rionegro y putas rionegro, con fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`
+  const cityDescription = isLocalCtrFocusRoute(route.key, city.slug)
+    ? `Perfiles aprobados en ${place}, para busquedas como ${formatList(
+        getLocalCtrFocusTerms(route.key, city.slug).slice(0, 4)
+      )}, con fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`
     : `Perfiles aprobados en ${city.city}${
         city.department ? `, ${city.department}` : ""
       }, con fotos publicas, zonas disponibles y contacto directo por WhatsApp en BelaClub.`;

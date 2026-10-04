@@ -1,7 +1,11 @@
 import type { MediaItem, Prestador } from "@/app/prestadores/_components/types";
 import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
-import { isTimeoutError, withTimeout } from "@/lib/asyncTimeout";
+import {
+  getErrorMessage,
+  isTimeoutError,
+  withTimeout,
+} from "@/lib/asyncTimeout";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { citySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
@@ -162,7 +166,9 @@ const writePublicProviderDiskCache = async (
       "utf8"
     );
   } catch (error) {
-    console.error("Error writing public provider disk cache:", error);
+    console.warn(
+      `Error writing public provider disk cache: ${getErrorMessage(error)}`
+    );
   }
 };
 
@@ -546,9 +552,10 @@ const refreshPublicProviderCache = () => {
         publicProviderCache.providers.length > 0 &&
         publicProviderCache.staleUntil > Date.now()
       ) {
-        console.error(
-          "Error refreshing public provider cache; serving stale providers:",
-          error
+        console.warn(
+          `Error refreshing public provider cache; serving stale providers: ${getErrorMessage(
+            error
+          )}`
         );
         publicProviderCache.mustRefresh = false;
         return publicProviderCache.providers;
@@ -564,9 +571,10 @@ const refreshPublicProviderCache = () => {
           failedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
         publicProviderCache.loaded = true;
         publicProviderCache.mustRefresh = false;
-        console.error(
-          "Public providers unavailable because Firestore quota is exhausted:",
-          error
+        console.warn(
+          `Public providers unavailable because Firestore quota is exhausted: ${getErrorMessage(
+            error
+          )}`
         );
         return [];
       }
@@ -581,9 +589,10 @@ const refreshPublicProviderCache = () => {
           failedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
         publicProviderCache.loaded = true;
         publicProviderCache.mustRefresh = false;
-        console.error(
-          "Public providers timed out; serving an empty cache for now:",
-          error
+        console.warn(
+          `Public providers timed out; serving an empty cache for now: ${getErrorMessage(
+            error
+          )}`
         );
         return [];
       }
@@ -687,17 +696,19 @@ export async function getPublicProviderProfileById(id: string) {
     const cachedProfile = await getCachedPublicProviderProfile(id);
 
     if (cachedProfile) {
-      console.error(
-        "Error loading fresh public provider profile; serving cached profile:",
-        error
+      console.warn(
+        `Error loading fresh public provider profile; serving cached profile: ${getErrorMessage(
+          error
+        )}`
       );
       return cachedProfile;
     }
 
     if (isTimeoutError(error)) {
-      console.error(
-        "Public provider profile timed out with no cached fallback:",
-        error
+      console.warn(
+        `Public provider profile timed out with no cached fallback: ${getErrorMessage(
+          error
+        )}`
       );
       return null;
     }
