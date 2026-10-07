@@ -162,6 +162,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /wompiPayoutEvents/{eventId} {
+      allow read, write: if false;
+    }
+
     match /reports/{reportId} {
       allow read, write: if false;
     }

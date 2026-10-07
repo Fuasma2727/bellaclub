@@ -15,6 +15,13 @@ import { getProviderZoneOptions } from "@/lib/providerZones";
 type VerificationStatus = "pending" | "approved" | "rejected";
 type BadgeVerificationStatus = "none" | "pending" | "approved" | "rejected";
 type VerificationBadge = "bronze" | "silver" | "gold" | "platinum";
+type WithdrawalStatus =
+  | "pending_wompi"
+  | "processing_wompi"
+  | "failed_wompi"
+  | "paid"
+  | "rejected";
+type WithdrawalAction = "approveWompi" | "markPaid" | "reject";
 
 type AdminMediaItem = {
   id: string;
@@ -109,8 +116,18 @@ type WithdrawalItem = {
   payoutAccount?: string;
   payoutAccountType?: string;
   accountHolder?: string;
-  status?: "pending_wompi" | "paid" | "rejected";
+  legalIdType?: string;
+  legalIdLast4?: string;
+  status?: WithdrawalStatus;
+  wompiReference?: string | null;
+  wompiPayoutId?: string | null;
+  wompiTransactionId?: string | null;
+  wompiStatus?: string | null;
+  wompiTransactionStatus?: string | null;
+  wompiError?: string | null;
   createdAt?: string | null;
+  approvedAt?: string | null;
+  failedAt?: string | null;
 };
 
 type WithdrawalsListResponse = {
@@ -264,6 +281,22 @@ const statusClass: Record<VerificationStatus, string> = {
 const statusLabel: Record<VerificationStatus, string> = {
   pending: "Pendiente",
   approved: "Publicado",
+  rejected: "Rechazado",
+};
+
+const withdrawalStatusClass: Record<WithdrawalStatus, string> = {
+  pending_wompi: "border-blue-400/30 bg-blue-400/10 text-blue-100",
+  processing_wompi: "border-amber-400/30 bg-amber-400/10 text-amber-100",
+  failed_wompi: "border-red-400/30 bg-red-400/10 text-red-100",
+  paid: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+  rejected: "border-red-500/30 bg-red-500/10 text-red-200",
+};
+
+const withdrawalStatusLabel: Record<WithdrawalStatus, string> = {
+  pending_wompi: "Pendiente",
+  processing_wompi: "En Wompi",
+  failed_wompi: "Fallido",
+  paid: "Pagado",
   rejected: "Rechazado",
 };
 
@@ -926,7 +959,7 @@ export default function AdminVerificationsPage() {
       }
 
       if (activeView === "withdrawals") {
-        params.set("status", "pending_wompi");
+        params.set("status", "reviewable");
         const queryString = params.toString() ? `?${params.toString()}` : "";
         const [res, summaryRes] = await Promise.all([
           fetch(`/api/admin/withdrawals${queryString}`, {
@@ -1876,14 +1909,16 @@ export default function AdminVerificationsPage() {
 
   const handleWithdrawalAction = async (
     withdrawal: WithdrawalItem,
-    action: "markPaid" | "reject"
+    action: WithdrawalAction
   ) => {
     if (!user) return;
 
     const confirmed = window.confirm(
-      action === "markPaid"
-        ? "Confirma que ya enviaste este dinero al prestador?"
-        : "Seguro que quieres rechazar este retiro y devolver el saldo?"
+      action === "approveWompi"
+        ? "Esto enviara una transferencia real desde Wompi al prestador. Continuar?"
+        : action === "markPaid"
+          ? "Confirma que ya enviaste este dinero al prestador por fuera de Wompi?"
+          : "Seguro que quieres rechazar este retiro y devolver el saldo?"
     );
 
     if (!confirmed) return;
@@ -1906,6 +1941,13 @@ export default function AdminVerificationsPage() {
         "No pudimos actualizar el retiro"
       );
 
+      setMessage(
+        action === "approveWompi"
+          ? "Retiro enviado a Wompi. El estado final se actualizara con el webhook."
+          : action === "markPaid"
+            ? "Retiro marcado como pagado."
+            : "Retiro rechazado y saldo devuelto."
+      );
       setWithdrawals((current) =>
         current.filter((item) => item.id !== withdrawal.id)
       );
@@ -3330,11 +3372,16 @@ export default function AdminVerificationsPage() {
           activeView === "withdrawals" &&
           withdrawals.length > 0 && (
             <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {withdrawals.map((withdrawal) => (
-                <article
-                  key={withdrawal.id}
-                  className="overflow-hidden rounded-lg border border-white/10 bg-neutral-950"
-                >
+              {withdrawals.map((withdrawal) => {
+                const status = withdrawal.status || "pending_wompi";
+                const isFailed = status === "failed_wompi";
+                const isProcessing = status === "processing_wompi";
+
+                return (
+                  <article
+                    key={withdrawal.id}
+                    className="overflow-hidden rounded-lg border border-white/10 bg-neutral-950"
+                  >
                   <div className="border-b border-white/10 bg-white/[0.03] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -3347,8 +3394,10 @@ export default function AdminVerificationsPage() {
                           </p>
                         )}
                       </div>
-                      <span className="rounded-full border border-blue-400/30 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-100">
-                        Pendiente
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${withdrawalStatusClass[status]}`}
+                      >
+                        {withdrawalStatusLabel[status]}
                       </span>
                     </div>
 
@@ -3398,6 +3447,10 @@ export default function AdminVerificationsPage() {
                       <div className="mt-3 space-y-1 text-neutral-300">
                         <p>Titular: {withdrawal.accountHolder || "Sin dato"}</p>
                         <p>
+                          Documento: {withdrawal.legalIdType || "Sin dato"}{" "}
+                          {withdrawal.legalIdLast4 || ""}
+                        </p>
+                        <p>
                           Metodo: {withdrawal.payoutMethod || "Sin dato"}
                         </p>
                         <p>
@@ -3410,25 +3463,47 @@ export default function AdminVerificationsPage() {
                         <p className="text-neutral-500">
                           Proveedor: {withdrawal.payoutProvider || "wompi"}
                         </p>
+                        {withdrawal.wompiReference && (
+                          <p className="text-neutral-500">
+                            Ref Wompi: {withdrawal.wompiReference}
+                          </p>
+                        )}
+                        {withdrawal.wompiError && (
+                          <p className="rounded-md border border-red-500/25 bg-red-500/10 p-2 text-xs leading-5 text-red-100">
+                            Wompi: {withdrawal.wompiError}
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <button
+                        type="button"
+                        disabled={actionId === withdrawal.id || isProcessing}
+                        onClick={() =>
+                          void handleWithdrawalAction(withdrawal, "approveWompi")
+                        }
+                        className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {actionId === withdrawal.id
+                          ? "Procesando..."
+                          : isFailed
+                            ? "Reintentar Wompi"
+                            : "Pagar con Wompi"}
+                      </button>
                       <button
                         type="button"
                         disabled={actionId === withdrawal.id}
                         onClick={() =>
                           void handleWithdrawalAction(withdrawal, "markPaid")
                         }
-                        className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-lg border border-emerald-500/40 px-4 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {actionId === withdrawal.id
-                          ? "Procesando..."
-                          : "Marcar pagado"}
+                        Manual
                       </button>
                       <button
                         type="button"
-                        disabled={actionId === withdrawal.id}
+                        disabled={actionId === withdrawal.id || isProcessing}
                         onClick={() =>
                           void handleWithdrawalAction(withdrawal, "reject")
                         }
@@ -3439,7 +3514,8 @@ export default function AdminVerificationsPage() {
                     </div>
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </section>
           )}
 

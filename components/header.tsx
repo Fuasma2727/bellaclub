@@ -21,6 +21,11 @@ const accountTypes = [
   { value: "ahorros", label: "Ahorros" },
   { value: "corriente", label: "Corriente" },
 ];
+const legalIdTypes = [
+  { value: "cc", label: "CC" },
+  { value: "ce", label: "CE" },
+  { value: "nit", label: "NIT" },
+];
 const publicSearchLinks = [
   { href: "/escorts/rionegro", label: "Escorts Rionegro" },
   { href: "/prepagos/rionegro", label: "Prepagos Rionegro" },
@@ -118,6 +123,8 @@ export default function Header() {
   const [withdrawalMethod, setWithdrawalMethod] = useState("");
   const [withdrawalAccount, setWithdrawalAccount] = useState("");
   const [withdrawalAccountType, setWithdrawalAccountType] = useState("");
+  const [withdrawalLegalIdType, setWithdrawalLegalIdType] = useState("");
+  const [withdrawalLegalId, setWithdrawalLegalId] = useState("");
   const [balanceMessage, setBalanceMessage] = useState("");
   const [balanceSubmitting, setBalanceSubmitting] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -292,6 +299,8 @@ export default function Header() {
     setWithdrawalMethod("");
     setWithdrawalAccount("");
     setWithdrawalAccountType("");
+    setWithdrawalLegalIdType("");
+    setWithdrawalLegalId("");
     setBalanceMessage("");
     setBalanceSubmitting(false);
     setBalanceContext(null);
@@ -431,7 +440,9 @@ export default function Header() {
       !withdrawalHolder.trim() ||
       !withdrawalMethod.trim() ||
       !withdrawalAccount.trim() ||
-      !withdrawalAccountType.trim()
+      !withdrawalAccountType.trim() ||
+      !withdrawalLegalIdType.trim() ||
+      !withdrawalLegalId.trim()
     ) {
       setBalanceMessage("Completa los datos para enviar el retiro");
       return;
@@ -453,6 +464,8 @@ export default function Header() {
           payoutMethod: withdrawalMethod,
           payoutAccount: withdrawalAccount,
           payoutAccountType: withdrawalAccountType,
+          legalIdType: withdrawalLegalIdType,
+          legalId: withdrawalLegalId,
         }),
       });
       const data = await res.json();
@@ -472,6 +485,8 @@ export default function Header() {
       setWithdrawalMethod("");
       setWithdrawalAccount("");
       setWithdrawalAccountType("");
+      setWithdrawalLegalIdType("");
+      setWithdrawalLegalId("");
     } catch {
       setBalanceMessage("No pudimos crear el retiro. Intentalo de nuevo.");
     } finally {
@@ -992,7 +1007,8 @@ export default function Header() {
               ) : (
                 <div className="mt-5 rounded-lg border border-blue-400/20 bg-blue-400/10 p-4">
                   <p className="text-xs text-blue-100/70">
-                    Retiro por Wompi con comisión BelaClub del 5%
+                    Retiro por Wompi con comisión BelaClub del 5%. Wompi pide
+                    documento del titular para enviar la transferencia.
                   </p>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                     <div className="rounded-md bg-black/25 p-2">
@@ -1143,6 +1159,45 @@ export default function Header() {
                       />
                     </label>
 
+                    <div className="grid gap-3 min-[420px]:grid-cols-[0.7fr_1.3fr]">
+                      <label className="block">
+                        <span className="text-xs font-medium text-zinc-400">
+                          Documento
+                        </span>
+                        <select
+                          value={withdrawalLegalIdType}
+                          onChange={(event) =>
+                            setWithdrawalLegalIdType(event.target.value)
+                          }
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                        >
+                          <option value="">Tipo</option>
+                          {legalIdTypes.map((type) => (
+                            <option key={type.value} value={type.value}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="block">
+                        <span className="text-xs font-medium text-zinc-400">
+                          Numero de documento
+                        </span>
+                        <input
+                          value={withdrawalLegalId}
+                          onChange={(event) =>
+                            setWithdrawalLegalId(
+                              event.target.value.replace(/\D/g, "")
+                            )
+                          }
+                          inputMode="numeric"
+                          placeholder="Solo numeros"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </label>
+                    </div>
+
                     <div className="grid gap-3 min-[420px]:grid-cols-2">
                       <label className="block">
                         <span className="text-xs font-medium text-zinc-400">
@@ -1150,9 +1205,12 @@ export default function Header() {
                         </span>
                         <select
                           value={withdrawalMethod}
-                          onChange={(event) =>
-                            setWithdrawalMethod(event.target.value)
-                          }
+                          onChange={(event) => {
+                            setWithdrawalMethod(event.target.value);
+                            if (event.target.value === "nequi") {
+                              setWithdrawalAccountType("ahorros");
+                            }
+                          }}
                           className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
                         >
                           <option value="">Selecciona</option>

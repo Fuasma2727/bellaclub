@@ -67,7 +67,6 @@ export default function ScreenProtection({
       clearClipboard();
     };
 
-    document.addEventListener("contextmenu", blockEvent);
     document.addEventListener("dragstart", blockEvent);
     document.addEventListener("copy", blockEvent);
     document.addEventListener("cut", blockEvent);
@@ -80,7 +79,6 @@ export default function ScreenProtection({
         window.clearTimeout(timeoutRef.current);
       }
 
-      document.removeEventListener("contextmenu", blockEvent);
       document.removeEventListener("dragstart", blockEvent);
       document.removeEventListener("copy", blockEvent);
       document.removeEventListener("cut", blockEvent);

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
@@ -188,6 +188,35 @@ export default function ProviderCard({
     (item) => item.type === "video"
   );
   const hasDailyVideo = Boolean(provider.dailyVideo?.url);
+  const openProfileFromLink = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.stopPropagation();
+
+    if (
+      !onOpen ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    onOpen(provider.id);
+  };
+  const imageContent = (
+    <Image
+      src={provider.photoUrl || "/default-avatar.png"}
+      alt={imageAlt}
+      fill
+      draggable={false}
+      className="pointer-events-none select-none object-cover transition duration-300 group-hover:scale-105"
+      sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+      quality={72}
+      priority={imagePriority}
+    />
+  );
 
   return (
     <article
@@ -206,17 +235,17 @@ export default function ProviderCard({
       }}
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-zinc-900">
-        <Image
-          src={provider.photoUrl || "/default-avatar.png"}
-          alt={imageAlt}
-          fill
-          draggable={false}
-          onContextMenu={(event) => event.preventDefault()}
-          className="object-cover transition duration-300 group-hover:scale-105"
-          sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-          quality={72}
-          priority={imagePriority}
-        />
+        {imageContent}
+
+        {profileHref && (
+          <Link
+            href={profileHref}
+            prefetch={false}
+            onClick={openProfileFromLink}
+            className="absolute inset-0 z-10 block"
+            aria-label={`Abrir perfil de ${name}`}
+          />
+        )}
 
         {hasDailyVideo && (
           <button
@@ -226,7 +255,7 @@ export default function ProviderCard({
               event.stopPropagation();
               onOpenDailyVideo?.(provider);
             }}
-            className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/48 text-white shadow-2xl shadow-black/45 backdrop-blur transition hover:scale-105 hover:border-sky-200/50 hover:bg-black/65 sm:h-14 sm:w-14"
+            className="absolute left-1/2 top-1/2 z-20 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/48 text-white shadow-2xl shadow-black/45 backdrop-blur transition hover:scale-105 hover:border-sky-200/50 hover:bg-black/65 sm:h-14 sm:w-14"
           >
             <span className="absolute inset-0 rounded-full bg-sky-300/10 blur-md" />
             <svg
@@ -242,7 +271,7 @@ export default function ProviderCard({
 
         {privateCount > 0 && (
           <div
-            className={`absolute inset-x-0 bottom-0 bg-gradient-to-t p-2 ${
+            className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t p-2 ${
               highlightPrivateCount
                 ? "from-emerald-950/95 via-emerald-500/25 to-transparent"
                 : "from-black/80 via-black/25 to-transparent"
@@ -263,7 +292,7 @@ export default function ProviderCard({
         )}
 
         {isOpening && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm text-white">
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 text-sm text-white">
             Abriendo...
           </div>
         )}

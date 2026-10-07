@@ -15,6 +15,12 @@ const toDateString = (value: unknown) => {
   return null;
 };
 
+const reservedWithdrawalStatuses = new Set([
+  "pending_wompi",
+  "processing_wompi",
+  "failed_wompi",
+]);
+
 export async function GET(request: Request) {
   try {
     const decoded = await requireAuthenticatedUser(request);
@@ -113,7 +119,7 @@ export async function GET(request: Request) {
     );
 
     const pendingWithdrawals = withdrawals
-      .filter((withdrawal) => withdrawal.status === "pending_wompi")
+      .filter((withdrawal) => reservedWithdrawalStatuses.has(withdrawal.status))
       .reduce((total, withdrawal) => total + withdrawal.releasedAmount, 0);
     const privateContentIncome = privateSalesSnap.docs.reduce((total, doc) => {
       const data = doc.data();

@@ -878,7 +878,6 @@ export default function PrestadoresPage({
     <div
       className="min-h-screen bg-[#050505] pb-16 pt-14 text-white sm:pt-16"
       suppressHydrationWarning
-      onContextMenu={(event) => event.preventDefault()}
       onDragStart={(event) => event.preventDefault()}
     >
       <ScreenProtection active />

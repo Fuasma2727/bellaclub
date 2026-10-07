@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "preflight": "node scripts/preflight.mjs",
+    "security:check": "node scripts/security-check.mjs",
     "bunny:check": "node scripts/check-bunny.mjs"
   },
   "dependencies": {

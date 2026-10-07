@@ -14,14 +14,16 @@ const buckets =
 globalForRateLimit.__belaclubRateLimit = buckets;
 
 export const getClientIp = (request: Request) => {
+  const cloudflareIp = request.headers.get("cf-connecting-ip");
   const forwardedFor = request.headers.get("x-forwarded-for");
   const realIp = request.headers.get("x-real-ip");
 
   return (
+    cloudflareIp ||
     forwardedFor?.split(",")[0]?.trim() ||
     realIp ||
     "unknown"
-  );
+  ).replace(/^::ffff:/, "");
 };
 
 export const checkRateLimit = (

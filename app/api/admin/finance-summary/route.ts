@@ -46,7 +46,11 @@ const loadFinanceSummary = async (): Promise<FinanceSummary> => {
       adminDb.collection("users").get(),
       adminDb
         .collection("withdrawals")
-        .where("status", "==", "pending_wompi")
+        .where("status", "in", [
+          "pending_wompi",
+          "processing_wompi",
+          "failed_wompi",
+        ])
         .get(),
       adminDb.collection("ledger").where("direction", "==", "commission").get(),
       adminDb

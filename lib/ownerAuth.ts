@@ -1,4 +1,5 @@
 import { adminAuth } from "@/lib/firebaseAdmin";
+import { adminIpEnvKeys, assertIpAllowed } from "@/lib/ipAccess";
 
 export type OwnerUser = {
   uid: string;
@@ -66,6 +67,12 @@ const verifyOwnerToken = async (token: string) => {
 };
 
 export const requireOwner = async (request: Request): Promise<OwnerUser> => {
+  try {
+    assertIpAllowed(request, adminIpEnvKeys);
+  } catch {
+    throw new Error("ADMIN_IP_NOT_ALLOWED");
+  }
+
   const { ownerUid, ownerEmail } = getOwnerConfig();
 
   if (!ownerUid && !ownerEmail) {
@@ -111,6 +118,13 @@ export const ownerAuthError = (error: unknown) => {
     return {
       message: "Configura OWNER_EMAIL u OWNER_UID en .env.local",
       status: 500,
+    };
+  }
+
+  if (error.message === "ADMIN_IP_NOT_ALLOWED") {
+    return {
+      message: "Este equipo no esta autorizado para el panel.",
+      status: 403,
     };
   }
 

@@ -12,6 +12,7 @@ const MIN_WITHDRAWAL_AMOUNT = 50000;
 const MAX_WITHDRAWAL_AMOUNT = 5000000;
 const allowedPayoutMethods = ["nequi", "bancolombia"] as const;
 const allowedAccountTypes = ["ahorros", "corriente"] as const;
+const allowedLegalIdTypes = ["cc", "ce", "nit"] as const;
 
 const cleanText = (value: unknown, maxLength = 120) => {
   return String(value || "")
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
       payoutMethod?: string;
       payoutAccount?: string;
       payoutAccountType?: string;
+      legalIdType?: string;
+      legalId?: string;
     };
 
     const amount = Math.floor(Number(body.amount || 0));
@@ -53,6 +56,8 @@ export async function POST(request: Request) {
     const payoutMethod = cleanText(body.payoutMethod).toLowerCase();
     const payoutAccount = String(body.payoutAccount || "").replace(/\D/g, "");
     const payoutAccountType = cleanText(body.payoutAccountType).toLowerCase();
+    const legalIdType = cleanText(body.legalIdType).toLowerCase();
+    const legalId = String(body.legalId || "").replace(/\D/g, "");
 
     if (!amount || amount < MIN_WITHDRAWAL_AMOUNT) {
       return NextResponse.json(
@@ -76,7 +81,14 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!accountHolder || !payoutMethod || !payoutAccount || !payoutAccountType) {
+    if (
+      !accountHolder ||
+      !payoutMethod ||
+      !payoutAccount ||
+      !payoutAccountType ||
+      !legalIdType ||
+      !legalId
+    ) {
       return NextResponse.json(
         { error: "Completa los datos de retiro" },
         { status: 400 }
@@ -97,6 +109,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!isAllowedValue(legalIdType, allowedLegalIdTypes)) {
+      return NextResponse.json(
+        { error: "Selecciona CC, CE o NIT" },
+        { status: 400 }
+      );
+    }
+
     if (!isValidPayoutText(accountHolder)) {
       return NextResponse.json(
         { error: "Los datos de retiro tienen caracteres no validos" },
@@ -107,6 +126,13 @@ export async function POST(request: Request) {
     if (!/^\d{10,16}$/.test(payoutAccount)) {
       return NextResponse.json(
         { error: "El numero debe tener entre 10 y 16 digitos" },
+        { status: 400 }
+      );
+    }
+
+    if (!/^\d{5,15}$/.test(legalId)) {
+      return NextResponse.json(
+        { error: "El documento debe tener entre 5 y 15 digitos" },
         { status: 400 }
       );
     }
@@ -157,6 +183,8 @@ export async function POST(request: Request) {
         payoutMethod,
         payoutAccount,
         payoutAccountType,
+        legalIdType: legalIdType.toUpperCase(),
+        legalId,
         accountHolder,
         status: "pending_wompi",
         createdAt: adminFieldValue.serverTimestamp(),

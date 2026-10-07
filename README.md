@@ -25,6 +25,7 @@ npm.cmd run dev
 ```bash
 node_modules\.bin\eslint.cmd app lib components
 node_modules\.bin\tsc.cmd --noEmit
+npm.cmd run security:check
 npm.cmd run build
 ```
 
@@ -38,6 +39,11 @@ NEXT_PUBLIC_OWNER_EMAIL=correo-del-dueno@dominio.com
 
 OWNER_EMAIL=correo-del-dueno@dominio.com
 # o OWNER_UID=uid-del-dueno
+# Opcional: limita panel admin y /api/admin a tu IP publica.
+ADMIN_ALLOWED_IPS=203.0.113.10
+# Opcional extremo: pone el sitio completo en modo privado por IP.
+# No lo actives si quieres que clientes/SEO puedan ver las paginas publicas.
+SITE_ALLOWED_IPS=
 
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
@@ -54,6 +60,16 @@ WOMPI_PUBLIC_KEY=
 WOMPI_INTEGRITY_SECRET=
 WOMPI_EVENTS_SECRET=
 
+# Wompi Pagos a Terceros / Payouts para retiros automaticos
+WOMPI_PAYOUTS_ENV=sandbox
+WOMPI_PAYOUTS_API_KEY=
+WOMPI_PAYOUTS_USER_PRINCIPAL_ID=
+WOMPI_PAYOUTS_ACCOUNT_ID=
+WOMPI_PAYOUTS_EVENTS_SECRET=
+# Opcional si quieres fijar los bankId en vez de resolverlos con /banks
+WOMPI_PAYOUTS_BANCOLOMBIA_BANK_ID=
+WOMPI_PAYOUTS_NEQUI_BANK_ID=
+
 # Requerido en produccion para proteger el cobro de mensualidades
 CRON_SECRET=
 ```
@@ -65,6 +81,7 @@ Antes de publicar:
 1. Valida variables criticas:
 
 ```bash
+npm.cmd run security:check
 npm.cmd run preflight
 ```
 
@@ -78,6 +95,12 @@ firebase deploy --only firestore:rules
 
 ```txt
 https://tu-dominio.com/api/wompi/webhook
+```
+
+Para Pagos a Terceros / Payouts configura tambien:
+
+```txt
+https://tu-dominio.com/api/wompi/payouts-webhook
 ```
 
 4. Haz una recarga real pequena y valida que el saldo se acredite.
@@ -100,6 +123,10 @@ https://tu-dominio.com/api/wompi/webhook
 - El webhook de Wompi valida checksum antes de acreditar saldo.
 - Las reglas de Firestore bloquean lectura publica directa de documentos sensibles.
 - Los reportes se guardan en Firestore y se revisan desde el panel admin.
+- `ADMIN_ALLOWED_IPS` bloquea `/admin` y `/api/admin` por IP antes de leer datos.
+- `SITE_ALLOWED_IPS` bloquea el sitio completo por IP cuando necesitas modo privado.
+- `npm.cmd run security:check` falla si un `.env` queda versionado o si detecta
+  secretos obvios dentro de archivos trackeados.
 - Next envia headers base de seguridad para bloquear iframes, sniffing y
   rastreo de rutas privadas/API.
 - Las mensualidades de prestadores se procesan con un cron del servidor que llama
