@@ -4416,6 +4416,7 @@ export default function PerfilPrestador() {
               {mediaList[currentIndex]?.type === "photo" ? (
                 <Image
                   src={mediaList[currentIndex].url}
+                  unoptimized
                   alt="Contenido ampliado"
                   width={1400}
                   height={1400}

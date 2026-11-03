@@ -47,6 +47,11 @@ const explicitPublicRouteSources = [
 ];
 
 const nextConfig: NextConfig = {
+  // Keep the native decoder and its executable available in the server build.
+  serverExternalPackages: ["ffmpeg-static"],
+  outputFileTracingIncludes: {
+    "/api/media-preview": ["./node_modules/ffmpeg-static/ffmpeg*"],
+  },
   experimental: {
     proxyClientMaxBodySize: "170mb",
   },
@@ -167,14 +172,25 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
-    unoptimized: true,
+    formats: ["image/webp"],
+    minimumCacheTTL: 3600,
+    maximumRedirects: 0,
     qualities: [72, 75],
+    // Never proxy authenticated API responses into the public image cache.
+    localPatterns: [
+      { pathname: "/default-avatar.png", search: "" },
+      { pathname: "/logo.png", search: "" },
+      { pathname: "/logo.jpg", search: "" },
+      { pathname: "/og-image.png", search: "" },
+      { pathname: "/_next/static/media/**", search: "" },
+    ],
     remotePatterns: [
       {
         protocol: "https",
         hostname: "pp-profile-photos-cdn.b-cdn.net",
         port: "",
         pathname: "/**",
+        search: "",
       },
     ],
   },

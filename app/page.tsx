@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
 import { targetSeoCities } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
+import { toProviderListingCard } from "@/lib/providerListing";
 import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
 import { siteHomeUrl } from "@/lib/siteUrl";
 import PrestadoresClientPage from "./prestadores/PrestadoresClientPage";
@@ -69,7 +70,7 @@ export default async function Home() {
         pageTitle="BelaClub: Escorts verificadas"
         pageEyebrow="Perfiles activos"
         pageDescription="Explora perfiles aprobados en Colombia con fotos publicas, zonas disponibles y contacto directo por WhatsApp."
-        initialProviders={initialProviders}
+        initialProviders={initialProviders.map(toProviderListingCard)}
         seoCityLinks={cityLinks}
       />
     </>

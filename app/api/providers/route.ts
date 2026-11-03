@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { getPublicProviderCards } from "@/lib/publicProviders";
+import {
+  getPublicProviderCards,
+  PublicProvidersUnavailableError,
+} from "@/lib/publicProviders";
 
 export async function GET() {
   try {
-    const providers = await getPublicProviderCards();
+    const providers = await getPublicProviderCards({ requireAvailable: true });
 
     return NextResponse.json(
       { providers },
@@ -16,9 +19,17 @@ export async function GET() {
     );
   } catch (error) {
     console.error("Error loading providers:", error);
+    const unavailable = error instanceof PublicProvidersUnavailableError;
+
     return NextResponse.json(
       { error: "No pudimos cargar los perfiles" },
-      { status: 500 }
+      {
+        status: unavailable ? 503 : 500,
+        headers: {
+          "Cache-Control": "no-store",
+          ...(unavailable ? { "Retry-After": "5" } : {}),
+        },
+      }
     );
   }
 }

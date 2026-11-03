@@ -349,17 +349,18 @@ export default function ProviderProfileModal({
                           onContextMenu={(event) => event.preventDefault()}
                         >
                           {previewUrl &&
-                          item.type === "photo" &&
+                          (item.type === "photo" || isPrivate) &&
                           (isPrivate || isPrivateMediaUrl(previewUrl)) ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={previewUrl}
                               alt="Contenido"
                               draggable={false}
+                              loading="lazy"
                               onContextMenu={(event) => event.preventDefault()}
                               className={`absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105 ${
                                 isPrivate
-                                  ? "scale-105 opacity-45 blur-[2px] saturate-75"
+                                  ? "scale-105 opacity-80 blur-[2px] saturate-75"
                                   : ""
                               }`}
                             />
@@ -440,7 +441,7 @@ export default function ProviderProfileModal({
 
                           {isPrivate && (
                             <>
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10 transition group-hover:from-black/80 group-hover:via-black/38" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/5 transition group-hover:from-black/80 group-hover:via-black/15" />
                               <span
                                 aria-label="Contenido bloqueado"
                                 className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white shadow-lg shadow-black/40 backdrop-blur"

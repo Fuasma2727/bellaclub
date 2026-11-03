@@ -29,6 +29,22 @@ npm.cmd run security:check
 npm.cmd run build
 ```
 
+Para comprobar las imagenes publicas y el resumen de datos del listado:
+
+```bash
+npm.cmd run test:performance
+```
+
+Para medir tres respuestas HTTP de una pagina (servidor local o produccion):
+
+```bash
+npm.cmd run perf:measure -- http://127.0.0.1:3010/ 3
+```
+
+El informe separa la primera conexion de las reutilizadas y muestra tiempos,
+compresion, peso del HTML, imagenes adaptativas y fuentes precargadas. No mide
+la carga completa del navegador ni sustituye las Core Web Vitals.
+
 ## Variables de entorno
 
 Configura estas variables en `.env.local` y tambien en produccion:

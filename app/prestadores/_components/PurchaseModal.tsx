@@ -7,6 +7,7 @@ type PurchaseModalProps = {
   purchaseLoading: boolean;
   onClose: () => void;
   onPurchase: () => void;
+  onRecharge?: () => void;
 };
 
 export default function PurchaseModal({
@@ -15,8 +16,12 @@ export default function PurchaseModal({
   purchaseLoading,
   onClose,
   onPurchase,
+  onRecharge,
 }: PurchaseModalProps) {
   const privateDescription = pendingPurchase.item.description?.trim();
+  const canRecharge =
+    Boolean(onRecharge) &&
+    purchaseError.toLowerCase().includes("saldo insuficiente");
 
   return (
     <div
@@ -51,6 +56,16 @@ export default function PurchaseModal({
           <div className="mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-100">
             {purchaseError}
           </div>
+        )}
+
+        {canRecharge && (
+          <button
+            type="button"
+            onClick={onRecharge}
+            className="mt-3 w-full rounded-md border border-emerald-300/25 bg-emerald-400/12 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/40 hover:bg-emerald-400/18"
+          >
+            Recargar saldo
+          </button>
         )}
 
         <div className="mt-5 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">

@@ -42,7 +42,8 @@ const trackedFiles = runGit(["ls-files", "-z"])
 const tokenPatterns = [
   {
     type: "Firebase private key",
-    regex: /-----BEGIN PRIVATE KEY-----/g,
+    // Keep the rule from matching its own source while detecting the same header.
+    regex: /-----BEGIN [P]RIVATE KEY-----/g,
   },
   {
     type: "Wompi private key",

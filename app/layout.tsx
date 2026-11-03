@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/context/AuthContext";
@@ -8,16 +7,6 @@ import AgeGate from "@/components/AgeGate";
 import JsonLd from "@/components/JsonLd";
 import { explicitContentMetadata } from "@/lib/explicitContentSeo";
 import { siteHomeUrl, siteUrl } from "@/lib/siteUrl";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -118,10 +107,7 @@ export default function RootLayout({
 
   return (
     <html lang="es" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        suppressHydrationWarning
-      >
+      <body className="antialiased" suppressHydrationWarning>
         <Script
           async
           src="https://www.googletagmanager.com/gtag/js?id=AW-18196881969"

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Header from "@/components/header";
-import PlayableVideo from "@/components/PlayableVideo";
 import { useAuth } from "@/context/AuthContext";
 import FiltersBar from "./_components/FiltersBar";
 import ProviderCard from "./_components/ProviderCard";
@@ -19,6 +18,7 @@ import {
   Prestador,
 } from "./_components/types";
 
+const PlayableVideo = dynamic(() => import("@/components/PlayableVideo"));
 const AuthRequiredModal = dynamic(
   () => import("./_components/AuthRequiredModal")
 );
@@ -113,7 +113,8 @@ export default function PrestadoresPage({
   const [prestadores, setPrestadores] = useState<Prestador[]>(
     initialProviders || []
   );
-  const [loading, setLoading] = useState(!initialProviders);
+  const [loading, setLoading] = useState(!initialProviders?.length);
+  const [providersRetry, setProvidersRetry] = useState(0);
   const [pageError, setPageError] = useState("");
   const [profileError, setProfileError] = useState("");
 
@@ -420,26 +421,39 @@ export default function PrestadoresPage({
   }, [expandedMedia, mediaList.length, moveExpandedMedia]);
 
   useEffect(() => {
-    const shouldFetchProviders = !initialProviders;
+    const shouldFetchProviders = !initialProviders?.length;
 
     if (!shouldFetchProviders) return;
 
     let cancelled = false;
+    const controller = new AbortController();
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const fetchPrestadores = async () => {
-      if (!initialProviders) {
-        setLoading(true);
-        setPageError("");
-      }
+    const fetchPrestadores = async (attempt = 0) => {
+      setLoading(true);
+      setPageError("");
 
       try {
-        const res = await fetch("/api/providers", { cache: "no-store" });
+        const res = await fetch("/api/providers", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         const payload = await readApiJson<{
           providers?: Prestador[];
           error?: string;
         }>(res, "No pudimos cargar los perfiles");
 
+        if (cancelled) return;
+
         if (!res.ok) {
+          if (res.status === 503 && attempt < 2) {
+            retryTimer = setTimeout(() => {
+              retryTimer = undefined;
+              void fetchPrestadores(attempt + 1);
+            }, 5000);
+            return;
+          }
+
           throw new Error(payload.error || "No pudimos cargar los perfiles");
         }
 
@@ -448,7 +462,7 @@ export default function PrestadoresPage({
           setProfileError("");
         }
       } catch (error) {
-        if (initialProviders || cancelled) return;
+        if (cancelled) return;
 
         const message =
           error instanceof Error
@@ -456,7 +470,7 @@ export default function PrestadoresPage({
             : "No pudimos cargar los perfiles";
         setPageError(message);
       } finally {
-        if (!initialProviders && !cancelled) {
+        if (!cancelled && !retryTimer) {
           setLoading(false);
         }
       }
@@ -466,8 +480,10 @@ export default function PrestadoresPage({
 
     return () => {
       cancelled = true;
+      controller.abort();
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [initialCity, initialProviders]);
+  }, [initialCity, initialProviders, providersRetry]);
 
   const openModal = useCallback(async (id: string) => {
     setOpeningProfileId(id);
@@ -587,6 +603,9 @@ export default function PrestadoresPage({
                 media: (provider.media || []).filter(
                   (candidate) => !matchesItem(candidate)
                 ),
+                hasProfileVideo: (modalData?.media || provider.media || []).some(
+                  (candidate) => candidate.type === "video" && !matchesItem(candidate)
+                ),
               }
             : provider
         )
@@ -596,7 +615,7 @@ export default function PrestadoresPage({
         reportPlaybackFailure({ providerId, kind: "media", mediaId: item.id });
       }
     },
-    [modalData?.id, reportPlaybackFailure]
+    [modalData?.id, modalData?.media, reportPlaybackFailure]
   );
 
   useEffect(() => {
@@ -947,7 +966,14 @@ export default function PrestadoresPage({
 
           {!loading && pageError && (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-100">
-              {pageError}
+              <p>{pageError}</p>
+              <button
+                type="button"
+                onClick={() => setProvidersRetry((attempt) => attempt + 1)}
+                className="mt-3 rounded-md border border-rose-300/30 px-3 py-2 font-semibold transition hover:bg-rose-400/10"
+              >
+                Reintentar
+              </button>
             </div>
           )}
 

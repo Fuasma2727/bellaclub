@@ -7,6 +7,7 @@ import {
   withTimeout,
 } from "@/lib/asyncTimeout";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { withPrivateMediaPreviews } from "@/lib/mediaPreviewUrl";
 import { citySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import {
@@ -56,12 +57,20 @@ type PublicProviderCache = {
   loaded?: boolean;
   diskLoaded?: boolean;
   mustRefresh?: boolean;
+  retryAt?: number;
 };
+
+export class PublicProvidersUnavailableError extends Error {
+  constructor() {
+    super("Public providers are temporarily unavailable");
+    this.name = "PublicProvidersUnavailableError";
+  }
+}
 
 const PUBLIC_PROVIDER_CACHE_VERSION = 8;
 const PUBLIC_PROVIDER_CACHE_TTL_MS = 60 * 60 * 1000;
 const PUBLIC_PROVIDER_STALE_TTL_MS = 72 * 60 * 60 * 1000;
-const PUBLIC_PROVIDER_TIMEOUT_RETRY_TTL_MS = 60 * 1000;
+const PUBLIC_PROVIDER_ERROR_RETRY_TTL_MS = 60 * 1000;
 const PUBLIC_PROVIDER_FIRESTORE_TIMEOUT_MS = Number(
   process.env.PUBLIC_PROVIDER_FIRESTORE_TIMEOUT_MS || 4500
 );
@@ -460,8 +469,17 @@ const sortProviders = (
 export async function getPublicProviderCards(options?: {
   citySlug?: string;
   limit?: number;
+  requireAvailable?: boolean;
 }) {
   const providers = await readPublicProviderCards();
+
+  if (
+    options?.requireAvailable &&
+    (!publicProviderCache.loaded || publicProviderCache.staleUntil <= Date.now())
+  ) {
+    throw new PublicProvidersUnavailableError();
+  }
+
   const filtered = options?.citySlug
     ? providers.filter(
         (provider) => citySlug(provider.city || "") === options.citySlug
@@ -472,21 +490,20 @@ export async function getPublicProviderCards(options?: {
       ? filtered.slice(0, options.limit)
       : filtered;
 
-  return limited;
+  return limited.map((provider) => ({
+    ...provider,
+    media: withPrivateMediaPreviews(provider.id, provider.media || []),
+  }));
 }
 
 async function fetchPublicProviderCards() {
+  const snapshot = await adminDb
+    .collection("users")
+    .where("role", "==", "prestador")
+    .where("profileVisible", "==", true)
+    .where("verificationStatus", "==", "approved")
+    .get();
   const now = Date.now();
-  const snapshot = await withTimeout(
-    adminDb
-      .collection("users")
-      .where("role", "==", "prestador")
-      .where("profileVisible", "==", true)
-      .where("verificationStatus", "==", "approved")
-      .get(),
-    PUBLIC_PROVIDER_FIRESTORE_TIMEOUT_MS,
-    "Public provider Firestore query"
-  );
 
   const providers = snapshot.docs
     .map((doc) => {
@@ -542,6 +559,7 @@ const refreshPublicProviderCache = () => {
         refreshedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
       publicProviderCache.loaded = true;
       publicProviderCache.mustRefresh = false;
+      publicProviderCache.retryAt = 0;
 
       void writePublicProviderDiskCache(providers);
 
@@ -565,32 +583,14 @@ const refreshPublicProviderCache = () => {
         const failedAt = Date.now();
 
         publicProviderCache.providers = [];
-        publicProviderCache.expiresAt =
-          failedAt + PUBLIC_PROVIDER_CACHE_TTL_MS;
-        publicProviderCache.staleUntil =
-          failedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
-        publicProviderCache.loaded = true;
+        publicProviderCache.expiresAt = 0;
+        publicProviderCache.staleUntil = 0;
+        publicProviderCache.retryAt =
+          failedAt + PUBLIC_PROVIDER_ERROR_RETRY_TTL_MS;
+        publicProviderCache.loaded = false;
         publicProviderCache.mustRefresh = false;
         console.warn(
           `Public providers unavailable because Firestore quota is exhausted: ${getErrorMessage(
-            error
-          )}`
-        );
-        return [];
-      }
-
-      if (isTimeoutError(error)) {
-        const failedAt = Date.now();
-
-        publicProviderCache.providers = [];
-        publicProviderCache.expiresAt =
-          failedAt + PUBLIC_PROVIDER_TIMEOUT_RETRY_TTL_MS;
-        publicProviderCache.staleUntil =
-          failedAt + PUBLIC_PROVIDER_STALE_TTL_MS;
-        publicProviderCache.loaded = true;
-        publicProviderCache.mustRefresh = false;
-        console.warn(
-          `Public providers timed out; serving an empty cache for now: ${getErrorMessage(
             error
           )}`
         );
@@ -644,11 +644,30 @@ async function readPublicProviderCards() {
     }
   }
 
-  if (publicProviderCache.inFlight) {
-    return publicProviderCache.inFlight;
+  if (
+    !publicProviderCache.mustRefresh &&
+    (publicProviderCache.retryAt || 0) > now
+  ) {
+    return [];
   }
 
-  return refreshPublicProviderCache();
+  try {
+    // Bound the request wait while allowing a slow query to populate the cache.
+    return await withTimeout(
+      refreshPublicProviderCache(),
+      PUBLIC_PROVIDER_FIRESTORE_TIMEOUT_MS,
+      "Public provider Firestore query"
+    );
+  } catch (error) {
+    if (!isTimeoutError(error)) throw error;
+
+    console.warn(
+      `Public providers timed out; query continues in the background: ${getErrorMessage(error)}`
+    );
+    return publicProviderCache.loaded && publicProviderCache.staleUntil > Date.now()
+      ? publicProviderCache.providers
+      : [];
+  }
 }
 
 const toPublicProviderProfile = (
@@ -656,7 +675,7 @@ const toPublicProviderProfile = (
   media: MediaItem[]
 ): PublicProviderProfile => ({
   ...provider,
-  media,
+  media: withPrivateMediaPreviews(provider.id, media),
   publicMedia: media.filter((item) => !item.private && Boolean(item.url)),
   privateMediaCount: media.filter((item) => item.private).length,
 });

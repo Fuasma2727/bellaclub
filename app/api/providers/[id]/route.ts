@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { createPrivateMediaUrl } from "@/lib/privateMediaAccess";
+import { getMediaPreviewUrl } from "@/lib/mediaPreviewUrl";
 import {
   getPublicVerificationBadge,
   getVerificationLevelFromBadge,
@@ -195,7 +196,7 @@ export async function GET(request: Request, { params }: Params) {
           private: isPrivate,
           price: isPrivate ? item.price || 0 : null,
           description: isPrivate ? item.description || "" : "",
-          previewUrl: isPrivate ? item.previewUrl || "" : "",
+          previewUrl: isPrivate ? getMediaPreviewUrl(id, mediaId) : "",
           duration:
             type === "video" ? Number(item.duration || 0) || null : null,
           playbackStatus: type === "video" ? item.playbackStatus || null : null,

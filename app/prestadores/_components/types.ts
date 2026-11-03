@@ -40,6 +40,8 @@ export type Prestador = {
   whatsapp?: string;
   description?: string;
   media?: MediaItem[];
+  privateMediaCount?: number;
+  hasProfileVideo?: boolean;
   profileVisible?: boolean;
   verificationStatus?: VerificationStatus;
   visitVerified?: boolean;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import Header from "@/components/header";
 import JsonLd from "@/components/JsonLd";
+import ScreenProtection from "@/app/prestadores/_components/ScreenProtection";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import {
   getProviderPhonePath,
@@ -138,6 +139,7 @@ export default async function PhoneLookupPage({ params }: PhonePageProps) {
 
   return (
     <div className="min-h-screen bg-[#050505] pb-12 pt-14 text-white sm:pt-16">
+      <ScreenProtection active />
       <JsonLd
         data={[
           {

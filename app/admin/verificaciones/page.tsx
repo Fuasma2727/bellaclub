@@ -2052,6 +2052,7 @@ export default function AdminVerificationsPage() {
                     >
                       <Image
                         src={item.url}
+                        unoptimized
                         alt={item.description}
                         fill
                         className="object-cover transition duration-300 group-hover/media:scale-105"
@@ -2084,6 +2085,7 @@ export default function AdminVerificationsPage() {
                 >
                   <Image
                     src={provider.photoUrl}
+                    unoptimized
                     alt="Foto principal"
                     fill
                     className="object-cover transition duration-300 group-hover/media:scale-105"
@@ -2158,6 +2160,7 @@ export default function AdminVerificationsPage() {
                       >
                         <Image
                           src={media.url || "/default-avatar.png"}
+                          unoptimized
                           alt={media.description || "Contenido del perfil"}
                           fill
                           className="object-cover transition duration-300 group-hover/media:scale-105"
@@ -2550,6 +2553,7 @@ export default function AdminVerificationsPage() {
               >
                 <Image
                   src={evidenceUrl}
+                  unoptimized
                   alt={`Evidencia de verificacion de ${
                     provider.email || "prestador"
                   }`}
@@ -3240,6 +3244,7 @@ export default function AdminVerificationsPage() {
                           {catador.photoUrl ? (
                             <Image
                               src={catador.photoUrl}
+                              unoptimized
                               alt={catador.name}
                               fill
                               className="object-cover"
@@ -3533,6 +3538,7 @@ export default function AdminVerificationsPage() {
                     {report.providerPhotoUrl ? (
                       <Image
                         src={report.providerPhotoUrl}
+                        unoptimized
                         alt={report.providerName || "Prestador reportado"}
                         fill
                         className="object-cover"

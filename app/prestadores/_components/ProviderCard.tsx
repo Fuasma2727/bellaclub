@@ -182,11 +182,12 @@ export default function ProviderCard({
                 "border-white/90 bg-[radial-gradient(circle_at_28%_16%,rgba(255,255,255,0.9),rgba(186,230,253,0.34)_34%,rgba(125,211,252,0.24)_58%,rgba(139,92,246,0.22)_100%)] text-white shadow-[0_0_28px_rgba(125,211,252,0.62)] ring-1 ring-white/35 hover:border-white hover:shadow-[0_0_40px_rgba(125,211,252,0.9)]",
               gem: "h-4 w-4 sm:h-[18px] sm:w-[18px]",
             };
-  const privateCount = (provider.media || []).filter((item) => item.private)
-    .length;
-  const hasProfileVideo = (provider.media || []).some(
-    (item) => item.type === "video"
-  );
+  const privateCount =
+    provider.privateMediaCount ??
+    (provider.media || []).filter((item) => item.private).length;
+  const hasProfileVideo =
+    provider.hasProfileVideo ??
+    (provider.media || []).some((item) => item.type === "video");
   const hasDailyVideo = Boolean(provider.dailyVideo?.url);
   const openProfileFromLink = (event: MouseEvent<HTMLAnchorElement>) => {
     event.stopPropagation();

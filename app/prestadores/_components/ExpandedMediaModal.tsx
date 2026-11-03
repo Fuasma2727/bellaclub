@@ -53,6 +53,28 @@ export default function ExpandedMediaModal({
 
     const blockKeys = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
+
+      if (key === "arrowright" && canGoNext) {
+        event.preventDefault();
+        event.stopPropagation();
+        onNext?.();
+        return;
+      }
+
+      if (key === "arrowleft" && canGoPrevious) {
+        event.preventDefault();
+        event.stopPropagation();
+        onPrevious?.();
+        return;
+      }
+
+      if (key === "escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+
       const blockedCombo =
         (event.ctrlKey || event.metaKey) &&
         ["s", "p", "u", "c"].includes(key);
@@ -125,7 +147,7 @@ export default function ExpandedMediaModal({
       window.removeEventListener("blur", protectOnFocusLoss);
       window.removeEventListener("beforeprint", protectBeforePrint);
     };
-  }, [protectedContent]);
+  }, [canGoNext, canGoPrevious, onClose, onNext, onPrevious, protectedContent]);
 
   if (!item.url) return null;
 

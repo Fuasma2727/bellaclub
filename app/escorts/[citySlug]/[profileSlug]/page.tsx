@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import Header from "@/components/header";
 import JsonLd from "@/components/JsonLd";
+import ScreenProtection from "@/app/prestadores/_components/ScreenProtection";
+import PublicProfileMediaViewer from "./PublicProfileMediaViewer";
 import { citySlug as toCitySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import {
@@ -132,13 +133,18 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
       url: provider.photoUrl || "",
       description: `Foto principal de ${name}`,
     },
-    ...provider.publicMedia.filter((item) => item.url !== provider.photoUrl),
-  ].filter((item) => Boolean(item.url));
+    ...(provider.media || []).filter(
+      (item) =>
+        item.url !== provider.photoUrl &&
+        (item.url || item.previewUrl || item.private)
+    ),
+  ];
   const pageUrl = `${siteUrl}${provider.profilePath}`;
   const cityPath = `/escorts/${toCitySlug(provider.city || "colombia")}`;
 
   return (
     <div className="min-h-screen bg-[#050505] pb-12 pt-14 text-white sm:pt-16">
+      <ScreenProtection active />
       <JsonLd
         data={[
           {
@@ -237,18 +243,13 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
         </nav>
 
         <section className="grid gap-5 lg:grid-cols-[minmax(280px,420px)_1fr]">
-          <div className="overflow-hidden rounded-md border border-white/[0.08] bg-[#101012]">
-            <div className="relative aspect-[3/4] bg-zinc-900">
-              <Image
-                src={provider.photoUrl || "/default-avatar.png"}
-                alt={`${name} en ${provider.city || "BelaClub"}`}
-                fill
-                priority
-                className="object-cover"
-                sizes="(min-width: 1024px) 420px, 100vw"
-              />
-            </div>
-          </div>
+          <PublicProfileMediaViewer
+            items={gallery}
+            providerId={provider.id}
+            name={name}
+            city={provider.city || ""}
+            variant="hero"
+          />
 
           <div className="flex flex-col justify-between rounded-md border border-white/[0.08] bg-[#101012] p-4 sm:p-5">
             <div>
@@ -341,47 +342,13 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
           </div>
         </section>
 
-        {gallery.length > 0 && (
-          <section className="mt-6">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-white">
-                Galería pública
-              </h2>
-              <span className="text-xs text-neutral-500">
-                {gallery.length} archivo{gallery.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {gallery.map((item, index) => (
-                <div
-                  key={`${item.id || item.url}-${index}`}
-                  className="overflow-hidden rounded-md border border-white/[0.08] bg-[#101012]"
-                >
-                  <div className="relative aspect-[3/4] bg-zinc-900">
-                    {item.type === "video" ? (
-                      <video
-                        src={item.url}
-                        controls
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <Image
-                        src={item.url || "/default-avatar.png"}
-                        alt={
-                          item.description ||
-                          `${name} en ${provider.city || "BelaClub"}`
-                        }
-                        fill
-                        className="object-cover"
-                        sizes="(min-width: 1024px) 25vw, 50vw"
-                      />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        <PublicProfileMediaViewer
+          items={gallery}
+          providerId={provider.id}
+          name={name}
+          city={provider.city || ""}
+          variant="gallery"
+        />
       </main>
     </div>
   );
