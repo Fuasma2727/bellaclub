@@ -1,0 +1,55 @@
+Revisi?n de indexaci?n de BelaClub ? 10 de noviembre de 2026
+
+Alcance: cinco exportaciones de Google Search Console, 45 URLs distintas. Comprobaci?n HTTP con GET, cabeceras, HTML, canonical, robots, redirecciones y contraste con el sitemap p?blico. Once comprobaciones complementarias. Revisi?n del c?digo local para localizar causas. No se modific? el c?digo de la aplicaci?n ni se public? ning?n cambio.
+Los resultados HTTP son observaciones de esta revisi?n. No confirman por s? solos el estado actual en el ?ndice de Google. Las solicitudes con user-agent Googlebot simulan ese encabezado; no son solicitudes originadas por Google.
+
+PROBLEMAS CONFIRMADOS
+
+1. Variantes con www: https://www.belaclub.co/ redirige a https://belaclub.co:3000/. Las URLs http://www.belaclub.co/ y https://www.belaclub.co/prestadores tambi?n terminan intentando acceder al puerto 3000. La conexi?n agota el tiempo de espera. En proxy.ts, la URL clonada conserva el puerto al sustituir protocol y host. Debe fijarse el origen p?blico sin el puerto interno.
+
+2. Alana: la ruta antigua devuelve 308 sin Location, tanto con GET, HEAD como con el user-agent Googlebot. El HTML contiene NEXT_REDIRECT hacia la ficha actual de Alin. La ficha actual devuelve 200. El fallo HTTP est? confirmado; la raz?n concreta por la que se perdi? la cabecera requiere revisar el renderizado y cach? de esa ruta.
+   Antigua: https://belaclub.co/escorts/medellin/alana-3015431277--3K7b791e6fPIl4xOne570EJgLOS2
+   Actual: https://belaclub.co/escorts/medellin/alin-5553698075--3K7b791e6fPIl4xOne570EJgLOS2
+
+3. Cambios de ciudad: las rutas antiguas de Maya, Jade y Stefa devuelven 404 aunque las fichas actuales en Buga, Zipaquir? y Sabaneta devuelven 200. getPublicProviderProfileBySlug rechaza la ciudad antigua antes de que la p?gina pueda redirigir. Debe conservarse la validaci?n de visibilidad p?blica y resolverse por el ID estable para redirigir a la ruta can?nica actual.
+
+4. Celeste y Vanessa: sus URLs /escorts/colombia/... aparecen en el sitemap y devuelven 404. Las fichas de ambos perfiles por tel?fono devuelven 200. El generador de URL usa colombia como respaldo para ciudad vac?a, mientras que el validador compara con una cadena vac?a. Deben usar el mismo criterio. Las rutas antiguas de Celeste tambi?n deben conducir a un destino v?lido.
+
+CLASIFICACI?N DE LAS EXPORTACIONES
+
+- 18 No se ha encontrado: todas siguen devolviendo 404. Cinco son rutas antiguas de perfiles presentes en el sitemap con otro destino; dos son las fichas /colombia que el propio sitemap publica. Las otras once requieren confirmar si el contenido o el n?mero fueron retirados. Los n?meros hist?ricos no deben redirigirse autom?ticamente sin verificar su relaci?n actual.
+- 9 P?gina con redirecci?n: siete redirigen correctamente a destinos 200. Dos ahora devuelven 404 por cambios de ciudad (Maya y Stefa).
+- 1 Error de redirecci?n: Alana, descrita arriba.
+- 14 Rastreada sin indexar: seis p?ginas actuales 200; cuatro archivos t?cnicos (dos variantes de favicon, manifiesto y fuente antigua); cuatro rutas antiguas (dos variantes www defectuosas, /prestadores/medellin con redirecci?n correcta, y Stefa en la ciudad antigua con 404).
+- 3 Descubierta sin indexar: Camila, Lunavip y Mar?a Victoria en Bogot?. Las tres devuelven 200, tienen canonical propia, permiten indexaci?n, aparecen en el sitemap y est?n enlazadas desde /escorts/bogota. La fecha 1969-12-31 del CSV no debe interpretarse como un rastreo hist?rico real.
+
+P?GINAS ACTUALES CUYO MOTIVO DE NO INDEXACI?N A?N REQUIERE SEARCH CONSOLE
+- https://belaclub.co/chicas/bello (Rastreada: actualmente sin indexar; fecha exportada: 2026-10-06)
+- https://belaclub.co/acompanantes/medellin (Rastreada: actualmente sin indexar; fecha exportada: 2026-10-06)
+- https://belaclub.co/escorts/rionegro/cherry-3008687715--KQZPCrftm7UCLwNRYVnEFW6N8Tg2 (Rastreada: actualmente sin indexar; fecha exportada: 2026-09-10)
+- https://belaclub.co/prepagos (Rastreada: actualmente sin indexar; fecha exportada: 2026-09-07)
+- https://belaclub.co/putas (Rastreada: actualmente sin indexar; fecha exportada: 2026-08-29)
+- https://belaclub.co/escorts/rionegro/camila-3234296686--KYlyTbWSH8SIxtUaD51aZCpkC0m1 (Rastreada: actualmente sin indexar; fecha exportada: 2026-08-12)
+- https://belaclub.co/escorts/bogota/camila-3177041071--0VZjbnh4jOc4sp7CjHlSgLIsPFW2 (Descubierta: actualmente sin indexar; fecha exportada: 1969-12-31)
+- https://belaclub.co/escorts/bogota/lunavip-3160826641--7cTiipX0SyabquZsRAnmOuXUWOq1 (Descubierta: actualmente sin indexar; fecha exportada: 1969-12-31)
+- https://belaclub.co/escorts/bogota/maria-victoria-3013390692--sfOozWS0WvdZQYjH2r0k5VFQG3K2 (Descubierta: actualmente sin indexar; fecha exportada: 1969-12-31)
+
+POSIBLE FACTOR EDITORIAL, NO CAUSA CONFIRMADA
+
+Las portadas /escorts, /prepagos y /putas enlazan exactamente las mismas 60 fichas en el HTML revisado. Esto justifica estudiar diferenciaci?n de contenido y selecci?n de canonical por Google; no prueba que Google las haya excluido por duplicaci?n. No se recomienda redirigir o desindexar categor?as ?nicamente a partir de este dato.
+
+DATOS PENDIENTES
+
+Inspecci?n de /prepagos y de la ficha de Camila en Bogot?: Indexaci?n de p?ginas desplegada, canonical declarada y elegida, ?ltimo rastreo y resultado de Probar URL publicada. Captura del informe Sitemaps para confirmar recepci?n y ?ltima lectura de Google. Si esos ejemplos muestran resultados distintos, ampliar la inspecci?n a las dem?s p?ginas actuales.
+
+ORDEN PROPUESTO
+
+Corregir www y el puerto, la respuesta de Alana, las redirecciones tras cambio de ciudad y el respaldo colombia; verificar de nuevo las rutas anteriores y sus destinos; despu?s validar la correcci?n aplicable en Search Console y solicitar rastreo de p?ginas can?nicas v?lidas. No solicitar indexaci?n de archivos t?cnicos, destinos 404 o URLs antiguas que redirigen correctamente.
+
+REFERENCIAS
+
+https://support.google.com/webmasters/answer/7440203?hl=es
+https://developers.google.com/search/docs/crawling-indexing/301-redirects?hl=es
+https://developers.google.com/search/docs/crawling-indexing/ask-google-to-recrawl?hl=es
+
+Evidencia: audit.json, audit-followup.json, responses/ y revision-urls.csv en esta carpeta.

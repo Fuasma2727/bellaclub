@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:profiles": "node --test scripts/public-providers.test.mjs",
+    "test:routing": "node --test scripts/public-routing-http.test.mjs",
     "test:previews": "node --test scripts/media-preview.test.mjs",
     "test:performance": "node --test scripts/performance.test.mjs",
     "perf:measure": "node scripts/measure-page.mjs",

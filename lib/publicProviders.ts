@@ -300,7 +300,7 @@ export const getProviderProfilePath = (provider: {
   name?: string;
   city?: string;
   whatsapp?: string;
-}) => `/escorts/${citySlug(provider.city || "colombia")}/${getProviderProfileSlug(provider)}`;
+}) => `/escorts/${citySlug(provider.city || "") || "colombia"}/${getProviderProfileSlug(provider)}`;
 
 export const getProviderPhonePath = (provider: { whatsapp?: string }) => {
   const phoneSlug = getPhoneSeoValues(provider.whatsapp).canonicalDigits;
@@ -736,19 +736,11 @@ export async function getPublicProviderProfileById(id: string) {
   }
 }
 
-export async function getPublicProviderProfileBySlug(
-  profileSlug: string,
-  expectedCitySlug?: string
-) {
+export async function getPublicProviderProfileBySlug(profileSlug: string) {
   const id = getProviderIdFromProfileSlug(profileSlug);
-  const provider = await getPublicProviderProfileById(id);
-
-  if (!provider) return null;
-  if (expectedCitySlug && citySlug(provider.city || "") !== expectedCitySlug) {
-    return null;
-  }
-
-  return provider;
+  // The ID remains stable when the public name, phone or city changes.
+  // Proxy redirects outdated paths after checking public visibility.
+  return getPublicProviderProfileById(id);
 }
 
 export async function getPublicProviderProfileByPhone(phoneSlug: string) {

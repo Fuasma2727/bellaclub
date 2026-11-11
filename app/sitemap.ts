@@ -7,6 +7,7 @@ import {
 } from "@/lib/providerCitySeo";
 import {
   getProviderPhonePath,
+  getProviderProfilePath,
   getPublicProviderCards,
 } from "@/lib/publicProviders";
 import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
@@ -95,7 +96,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }))
   );
   const profileRoutes: MetadataRoute.Sitemap = providers.map((provider) => ({
-    url: `${baseUrl}${provider.profilePath}`,
+    url: `${baseUrl}${getProviderProfilePath(provider)}`,
     lastModified: provider.updatedAt ? new Date(provider.updatedAt) : now,
     changeFrequency: "weekly",
     priority:

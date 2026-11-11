@@ -34,7 +34,7 @@ const normalizeHost = (value: string) =>
     .toLowerCase()
     .replace(/:\d+$/, "");
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const hasDotfileSegment = pathname
     .split("/")
@@ -82,15 +82,36 @@ export function proxy(request: NextRequest) {
   const isBelaClubHost =
     host === CANONICAL_HOST || host === `www.${CANONICAL_HOST}`;
 
-  if (!isBelaClubHost || (host === CANONICAL_HOST && protocol === "https")) {
-    return NextResponse.next();
+  if (isBelaClubHost && (host !== CANONICAL_HOST || protocol !== "https")) {
+    const canonicalUrl = request.nextUrl.clone();
+    canonicalUrl.protocol = "https:";
+    canonicalUrl.host = CANONICAL_HOST;
+    canonicalUrl.port = "";
+
+    return NextResponse.redirect(canonicalUrl, 308);
   }
 
-  const canonicalUrl = request.nextUrl.clone();
-  canonicalUrl.protocol = "https:";
-  canonicalUrl.host = CANONICAL_HOST;
+  if (pathname.startsWith("/escorts/") && pathname.includes("--")) {
+    const { getPublicProfileRedirectPath } = await import(
+      "./lib/publicProfileRoute"
+    );
+    const redirectPath = await getPublicProfileRedirectPath(pathname);
 
-  return NextResponse.redirect(canonicalUrl, 308);
+    if (redirectPath) {
+      // Run before the page/ISR cache: cached render headers must never
+      // remove or duplicate the HTTP redirect's Location.
+      const destination = request.nextUrl.clone();
+      destination.pathname = redirectPath;
+      if (isBelaClubHost) {
+        destination.protocol = "https:";
+        destination.host = CANONICAL_HOST;
+        destination.port = "";
+      }
+      return NextResponse.redirect(destination, 308);
+    }
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

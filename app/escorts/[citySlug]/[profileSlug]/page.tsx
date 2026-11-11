@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Header from "@/components/header";
 import JsonLd from "@/components/JsonLd";
 import ScreenProtection from "@/app/prestadores/_components/ScreenProtection";
 import PublicProfileMediaViewer from "./PublicProfileMediaViewer";
 import { citySlug as toCitySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
-import {
-  getProviderPhonePath,
-  getPublicProviderProfileBySlug,
-} from "@/lib/publicProviders";
+import { getProviderPhonePath } from "@/lib/publicProviders";
+import { resolvePublicProfileRoute } from "@/lib/publicProfileRoute";
 import {
   formatMoney,
   getWhatsAppMessage,
@@ -36,8 +34,8 @@ export async function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: ProfilePageProps): Promise<Metadata> {
-  const { citySlug, profileSlug } = await params;
-  const provider = await getPublicProviderProfileBySlug(profileSlug, citySlug);
+  const { profileSlug } = await params;
+  const provider = await resolvePublicProfileRoute(profileSlug);
 
   if (!provider) {
     return {
@@ -107,14 +105,10 @@ export async function generateMetadata({
 }
 
 export default async function EscortProfilePage({ params }: ProfilePageProps) {
-  const { citySlug, profileSlug } = await params;
-  const provider = await getPublicProviderProfileBySlug(profileSlug, citySlug);
+  const { profileSlug } = await params;
+  const provider = await resolvePublicProfileRoute(profileSlug);
 
   if (!provider) notFound();
-
-  if (profileSlug !== provider.profileSlug) {
-    permanentRedirect(provider.profilePath);
-  }
 
   const name = provider.name?.trim() || "Escort verificada";
   const location = [provider.zone, provider.city, provider.department]
@@ -140,7 +134,10 @@ export default async function EscortProfilePage({ params }: ProfilePageProps) {
     ),
   ];
   const pageUrl = `${siteUrl}${provider.profilePath}`;
-  const cityPath = `/escorts/${toCitySlug(provider.city || "colombia")}`;
+  const providerCitySlug = toCitySlug(provider.city || "");
+  const cityPath = providerCitySlug
+    ? `/escorts/${providerCitySlug}`
+    : "/escorts";
 
   return (
     <div className="min-h-screen bg-[#050505] pb-12 pt-14 text-white sm:pt-16">

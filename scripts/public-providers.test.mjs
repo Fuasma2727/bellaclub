@@ -35,7 +35,7 @@ const snapshot = (ids = ["provider-1"]) => ({
 });
 
 // Execute the actual cache and API code with isolated Firestore and disk I/O.
-const setup = ({ query, diskCache } = {}) => {
+const setup = ({ query, diskCache, documents = {} } = {}) => {
   let clock = Date.now();
   let queries = 0;
   const writes = [];
@@ -53,6 +53,15 @@ const setup = ({ query, diskCache } = {}) => {
   });
   const firestore = {
     collection() { return this; },
+    doc(id) {
+      return {
+        get: async () => ({
+          id,
+          exists: Boolean(documents[id]),
+          data: () => documents[id],
+        }),
+      };
+    },
     where() { return this; },
     get() {
       queries += 1;
@@ -70,7 +79,6 @@ const setup = ({ query, diskCache } = {}) => {
       writeFile: async (_file, contents) => { writes.push(JSON.parse(contents)); },
     },
     "@/lib/firebaseAdmin": { adminDb: firestore },
-    "@/lib/providerCitySeo": { citySlug: (city) => city.toLowerCase() },
     "@/lib/providerPhoneSeo": { getPhoneSeoValues: () => ({ canonicalDigits: "" }) },
     "@/lib/providerPromotion": {
       getAdminQualityRank: () => 0,
@@ -107,6 +115,7 @@ const setup = ({ query, diskCache } = {}) => {
   return {
     providers: load("lib/publicProviders.ts"),
     api: load("app/api/providers/route.ts"),
+    sitemap: load("app/sitemap.ts").default,
     writes,
     get queries() { return queries; },
     advance: (ms) => { clock += ms; },
@@ -204,4 +213,52 @@ test("unexpected query failures are not cached as empty profiles", async () => {
   assert.equal((await app.api.GET()).status, 500);
   assert.equal((await app.api.GET()).status, 200);
   assert.equal(app.queries, 2);
+});
+
+test("profile IDs still resolve after name or city changes and without a city", async () => {
+  const publicData = snapshot().docs[0].data();
+  const app = setup({ documents: {
+    moved: { ...publicData, name: "Nombre actual", city: "Buga" },
+    missingCity: { ...publicData, city: "" },
+    blankCity: { ...publicData, city: "   " },
+  } });
+
+  const moved = await app.providers.getPublicProviderProfileBySlug("nombre-anterior--moved");
+  assert.equal(moved.profilePath, "/escorts/buga/nombre-actual--moved");
+  for (const id of ["missingCity", "blankCity"]) {
+    const provider = await app.providers.getPublicProviderProfileBySlug(`perfil--${id}`);
+    assert.equal(provider.profilePath, `/escorts/colombia/perfil-de-prueba--${id}`);
+  }
+});
+
+test("old slugs never resolve missing, hidden, blocked or unapproved profiles", async () => {
+  const publicData = snapshot().docs[0].data();
+  const app = setup({ documents: {
+    hidden: { ...publicData, profileVisible: false },
+    blocked: { ...publicData, blocked: true },
+    unapproved: { ...publicData, verificationStatus: "pending" },
+    noPhoto: { ...publicData, photoUrl: "" },
+  } });
+
+  for (const id of ["missing", "hidden", "blocked", "unapproved", "noPhoto"]) {
+    assert.equal(await app.providers.getPublicProviderProfileBySlug(`anterior--${id}`), null);
+  }
+  assert.equal(await app.providers.getPublicProviderProfileBySlug("sin-identificador"), null);
+});
+
+test("sitemap rebuilds profile paths from records instead of trusting obsolete cached URLs", async () => {
+  const app = setup({ diskCache: {
+    updatedAt: new Date().toISOString(),
+    providers: [{
+      id: "no-city",
+      name: "Perfil",
+      city: "   ",
+      profilePath: "/escorts//perfil--no-city",
+      media: [],
+    }],
+  } });
+  const entries = await app.sitemap();
+  const profileUrls = entries.filter(entry => entry.url.includes("--"));
+  assert.equal(profileUrls.length, 1);
+  assert.equal(profileUrls[0].url, "https://belaclub.co/escorts/colombia/perfil--no-city");
 });
