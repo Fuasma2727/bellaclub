@@ -11,6 +11,7 @@
     "test:routing": "node --test scripts/public-routing-http.test.mjs",
     "test:previews": "node --test scripts/media-preview.test.mjs",
     "test:performance": "node --test scripts/performance.test.mjs",
+    "test:support": "node --test scripts/support-advisors.test.mjs",
     "perf:measure": "node scripts/measure-page.mjs",
     "preflight": "node scripts/preflight.mjs",
     "security:check": "node scripts/security-check.mjs",

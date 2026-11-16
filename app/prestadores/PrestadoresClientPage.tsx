@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -33,6 +34,7 @@ const PurchaseModal = dynamic(() => import("./_components/PurchaseModal"));
 const ReportModal = dynamic(() => import("./_components/ReportModal"));
 
 export type PrestadoresPageProps = {
+  supportContent?: ReactNode;
   initialCity?: string;
   initialDepartment?: string;
   pageTitle?: string;
@@ -104,6 +106,7 @@ export default function PrestadoresPage({
   showPageIntro = true,
   initialProviders,
   seoContent,
+  supportContent,
 }: PrestadoresPageProps = {}) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -1139,10 +1142,13 @@ export default function PrestadoresPage({
               <Link href="/reembolsos" className="transition hover:text-white">
                 Reembolsos
               </Link>
-              <Link href="/soporte" className="transition hover:text-white">
-                Soporte
-              </Link>
+              {!supportContent && (
+                <Link href="/soporte" className="transition hover:text-white">
+                  Soporte
+                </Link>
+              )}
             </nav>
+            {supportContent}
           </div>
         </div>
       </footer>

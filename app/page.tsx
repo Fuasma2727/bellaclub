@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 
 import JsonLd from "@/components/JsonLd";
+import SupportAdvisors from "@/components/SupportAdvisors";
+import { getPublicSupportAdvisors } from "@/lib/supportAdvisors.server";
 import { targetSeoCities } from "@/lib/providerCitySeo";
 import { getPublicProviderCards } from "@/lib/publicProviders";
 import { toProviderListingCard } from "@/lib/providerListing";
 import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
-import { siteHomeUrl } from "@/lib/siteUrl";
+import { siteHomeUrl, siteUrl } from "@/lib/siteUrl";
 import PrestadoresClientPage from "./prestadores/PrestadoresClientPage";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +41,10 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  const initialProviders = await getPublicProviderCards({ limit: 60 });
+  const [initialProviders, advisors] = await Promise.all([
+    getPublicProviderCards({ limit: 60 }),
+    getPublicSupportAdvisors(),
+  ]);
   const cityLinks = targetSeoCities.flatMap((city) =>
     providerSearchRoutes
       .filter((route) => route.key === "escorts" || route.key === "prepagos")
@@ -66,12 +71,32 @@ export default async function Home() {
           },
         }}
       />
+      {advisors.length > 0 && (
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "@id": `${siteUrl}/#organization`,
+            name: "BelaClub",
+            url: siteHomeUrl,
+            contactPoint: advisors.map((advisor) => ({
+              "@type": "ContactPoint",
+              name: advisor.name,
+              telephone: advisor.phone,
+              contactType: "customer support",
+              availableLanguage: "Spanish",
+              url: siteHomeUrl,
+            })),
+          }}
+        />
+      )}
       <PrestadoresClientPage
         pageTitle="BelaClub: Escorts verificadas"
         pageEyebrow="Perfiles activos"
         pageDescription="Explora perfiles aprobados en Colombia con fotos publicas, zonas disponibles y contacto directo por WhatsApp."
         initialProviders={initialProviders.map(toProviderListingCard)}
         seoCityLinks={cityLinks}
+        supportContent={<SupportAdvisors advisors={advisors} />}
       />
     </>
   );

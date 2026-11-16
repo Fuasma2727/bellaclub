@@ -10,6 +10,10 @@ import {
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Header from "@/components/header";
+import ProfileOverview from "./_components/ProfileOverview";
+import GalleryPanel, { type GalleryFilter } from "./_components/GalleryPanel";
+import ProfileIcon from "./_components/ProfileIcon";
+import styles from "./profile-dashboard.module.css";
 import PlayableVideo from "@/components/PlayableVideo";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -962,6 +966,9 @@ export default function PerfilPrestador() {
   const [showDailyVideoModal, setShowDailyVideoModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showQuickGuide, setShowQuickGuide] = useState(false);
+  const [galleryFilter, setGalleryFilter] = useState<GalleryFilter>("all");
+  const publicUploadRef = useRef<HTMLInputElement>(null);
+  const privateUploadRef = useRef<HTMLInputElement>(null);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [onboardingError, setOnboardingError] = useState("");
   const [inviteCopyMessage, setInviteCopyMessage] = useState("");
@@ -1090,7 +1097,7 @@ export default function PerfilPrestador() {
           ? "Plan pendiente"
           : subscriptionStatus === "admin_override"
             ? "Activada por admin"
-            : "Pendiente de activar";
+            : "Activar plan";
   const subscriptionIsOk =
     subscriptionStatus === "active" ||
     subscriptionStatus === "admin_override" ||
@@ -1108,7 +1115,7 @@ export default function PerfilPrestador() {
             ? "Verificacion pendiente"
             : "Perfil oculto";
   const profileIndicatorText = profileIndicatorIsOk
-    ? "Perfil"
+    ? "Perfil visible"
     : profilePaused
       ? "Pausado"
       : !hasProfilePhoto
@@ -1116,7 +1123,7 @@ export default function PerfilPrestador() {
         : verificationStatus === "rejected"
           ? "Rechazado"
           : verificationStatus === "pending"
-            ? "Pendiente"
+            ? "En revisión"
             : "Oculto";
   const profileIndicatorTone = profileIndicatorIsOk
     ? "ok"
@@ -1131,28 +1138,24 @@ export default function PerfilPrestador() {
   const profileLocationLabel = [zone, city || department]
     .filter(Boolean)
     .join(", ");
-  const profileMetaLabel =
-    [profileLocationLabel, profilePriceLabel].filter(Boolean).join(" · ") ||
-    "Datos por completar";
-  const profileStats = [
-    {
-      label: "Vistas del perfil",
-      value: profileViews.toLocaleString("es-CO"),
-      helper: "Aperturas",
-    },
-    {
-      label: "Ganado privado",
-      value: `$${privateContentIncome.toLocaleString("es-CO")}`,
-      helper: "Contenido",
-    },
-  ];
+  const galleryCounts = {
+    all: media.length,
+    public: media.filter((item) => !item.private).length,
+    private: media.filter((item) => item.private).length,
+  };
+  const filteredMedia = media
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => galleryFilter === "all" || (galleryFilter === "private" ? item.private : !item.private));
+  const filteredUploads = mediaUploadItems.filter((item) =>
+    galleryFilter === "all" || (galleryFilter === "private" ? item.private : !item.private)
+  );
   const inviteLink =
     typeof window !== "undefined" && user?.uid
       ? `${window.location.origin}/register?ref=${encodeURIComponent(user.uid)}`
       : "";
   const onboardingSteps = [
     {
-      label: "Datos publicos",
+      label: "Datos del perfil",
       description: hasBasicInfo
         ? "Nombre, ubicacion, precio y WhatsApp completos."
         : "Completa nombre, ubicacion, precio, WhatsApp y descripcion.",
@@ -1161,7 +1164,7 @@ export default function PerfilPrestador() {
       cta: "Completar datos",
     },
     {
-      label: "Verificacion",
+      label: "Verificación",
       description:
         verificationStatus === "approved"
           ? "Tu perfil ya fue aprobado."
@@ -1171,7 +1174,7 @@ export default function PerfilPrestador() {
       cta: "Solicitar",
     },
     {
-      label: "Galeria",
+      label: "Contenido",
       description: hasGalleryContent
         ? "Ya tienes contenido visible para clientes."
         : "Sube contenido publico o privado para mejorar tu perfil.",
@@ -1180,7 +1183,7 @@ export default function PerfilPrestador() {
       cta: "Ir a galeria",
     },
     {
-      label: "Publicacion",
+      label: "Publicación",
       description: visiblePublicly
         ? "Tu perfil esta visible publicamente."
         : "Cuando todo este listo aparecera en la pagina principal.",
@@ -2725,7 +2728,9 @@ export default function PerfilPrestador() {
     >
       <Header />
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+      <main
+        className={`${styles.dashboard} mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-9`}
+      >
         {(message || error) && (
           <div
             className={`mb-4 rounded-md border px-4 py-3 text-sm ${
@@ -2738,464 +2743,89 @@ export default function PerfilPrestador() {
           </div>
         )}
 
-        {profileReadiness < onboardingSteps.length && (
-          <section className="mb-4 rounded-lg border border-white/[0.08] bg-[#101012] p-3 shadow-xl shadow-black/20">
-            <button
-              type="button"
-              onClick={() => setShowQuickGuide((value) => !value)}
-              className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left transition hover:bg-white/[0.035]"
+        <section id="estado-perfil" className="scroll-mt-24">
+          <ProfileOverview
+            name={name}
+            photoUrl={photoUrl}
+            location={profileLocationLabel}
+            price={profilePriceLabel}
+            uploadingPhoto={uploadingProfile}
+            editMode={editMode}
+            onPhotoChange={handleProfilePhoto}
+            onPhotoOpen={() => openExpanded(0)}
+            onEdit={() => {
+              setEditMode((value) => !value);
+              if (!editMode) scrollToProfileSection("datos-publicos");
+            }}
+            status={profileIndicatorText}
+            statusDetail={profileIndicatorLabel}
+            statusTone={profileIndicatorTone}
+            subscription={subscriptionLabel}
+            subscriptionOk={subscriptionIsOk}
+            onRecharge={openRechargeBalanceModal}
+            views={profileViews.toLocaleString("es-CO")}
+            income={`$${privateContentIncome.toLocaleString("es-CO")}`}
+            badge={
+              effectiveVerificationBadge && (
+                <span className={styles.badge}>
+                  <VerificationGem
+                    badge={effectiveVerificationBadge}
+                    className={
+                      effectiveVerificationBadge === "gold"
+                        ? "text-amber-200"
+                        : effectiveVerificationBadge === "bronze"
+                          ? "text-[#d79263]"
+                          : "text-slate-100"
+                    }
+                  />
+                  Nivel {effectiveBadgeLabel}
+                </span>
+              )
+            }
+            verificationLabel={
+              requestingBadgeVerification
+                ? "Procesando…"
+                : badgeVerificationStatus === "pending"
+                  ? "Nivel en revisión"
+                  : effectiveVerificationBadge
+                    ? canUpgradeVerification
+                      ? "Subir de nivel"
+                      : `Nivel ${effectiveBadgeLabel}`
+                    : "Verificar perfil"
+            }
+            verificationDisabled={
+              requestingBadgeVerification ||
+              badgeVerificationStatus === "pending" ||
+              (!!effectiveVerificationBadge && !canUpgradeVerification)
+            }
+            onVerification={openVerificationRequest}
+            promotionActive={promotionActive}
+            promotionDisabled={
+              buyingPromotion || verificationStatus !== "approved" || !hasProfilePhoto
+            }
+            promotionHint={
+              verificationStatus !== "approved"
+                ? "Disponible con tu perfil aprobado"
+                : !hasProfilePhoto
+                  ? "Agrega tu foto principal para promocionar"
+                  : promotionActive
+                    ? "Extender tu promoción"
+                    : "Destaca tu perfil"
+            }
+            onPromote={() => {
+              setPromotionError("");
+              setShowPromotionModal(true);
+            }}
+            onInvite={() => setShowInviteModal(true)}
+            paused={profilePaused}
+            pauseDisabled={updatingPause || verificationStatus !== "approved"}
+            onPause={() => setShowPauseModal(true)}
+          >
+            <div
+              className={
+                editMode ? "border-t border-white/[0.08] p-4 sm:p-6" : undefined
+              }
             >
-              <span>
-                <span className="block text-sm font-semibold text-white">
-                  Guia rapida para completar perfil
-                </span>
-                <span className="mt-0.5 block text-xs text-neutral-500">
-                  {profileReadiness}/{onboardingSteps.length} pasos listos
-                </span>
-              </span>
-              <span className="rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-100">
-                {Math.round((profileReadiness / onboardingSteps.length) * 100)}%
-              </span>
-            </button>
-
-            {showQuickGuide && (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {onboardingSteps.map((step) => (
-                  <div
-                    key={step.label}
-                    className={`rounded-md border p-3 ${
-                      step.done
-                        ? "border-emerald-400/15 bg-emerald-400/[0.05]"
-                        : "border-white/[0.08] bg-black/25"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-bold ${
-                          step.done
-                            ? "border-emerald-300/40 bg-emerald-400/20 text-emerald-100"
-                            : "border-white/10 bg-white/[0.04] text-neutral-500"
-                        }`}
-                      >
-                        {step.done ? "OK" : "-"}
-                      </span>
-                      <p className="text-sm font-semibold text-neutral-100">
-                        {step.label}
-                      </p>
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-neutral-500">
-                      {step.description}
-                    </p>
-                    {!step.done && (
-                      <button
-                        type="button"
-                        onClick={() => handleOnboardingAction(step.action)}
-                        className="mt-3 inline-flex h-8 items-center justify-center rounded-md border border-blue-300/20 bg-blue-400/10 px-3 text-xs font-semibold text-blue-100 transition hover:border-blue-200/35 hover:bg-blue-400/15"
-                      >
-                        {step.cta}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        <section
-          id="estado-perfil"
-          className="scroll-mt-24 overflow-hidden rounded-xl border border-white/[0.09] bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.10),transparent_36%),linear-gradient(135deg,#121214,#09090a_58%,#050505)] shadow-2xl shadow-black/30"
-        >
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-            <div className="px-3 py-3 sm:px-4 sm:py-4">
-              <div className="flex items-start gap-3 sm:gap-4">
-                <div className="flex shrink-0 flex-col items-center gap-1.5">
-                  {hasProfilePhoto ? (
-                    <button
-                      type="button"
-                      className="relative h-24 w-24 overflow-hidden rounded-full border-2 border-white/80 bg-zinc-900 shadow-xl shadow-black/35 ring-4 ring-white/[0.04] transition hover:border-white sm:h-28 sm:w-28"
-                      onClick={() => openExpanded(0)}
-                      aria-label="Ver foto principal"
-                    >
-                      <Image
-                        src={photoUrl}
-                        alt="Foto principal del perfil"
-                        fill
-                        className="object-cover"
-                        sizes="112px"
-                        priority
-                      />
-                      {uploadingProfile && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-xs">
-                          Subiendo...
-                        </div>
-                      )}
-                    </button>
-                  ) : (
-                    <label className="group relative flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-amber-200/80 bg-amber-300/10 shadow-[0_0_34px_rgba(251,191,36,0.34)] ring-4 ring-amber-300/25 transition hover:border-amber-100 hover:bg-amber-300/15 hover:shadow-[0_0_42px_rgba(251,191,36,0.48)] sm:h-28 sm:w-28">
-                      <Image
-                        src="/default-avatar.png"
-                        alt="Foto principal del perfil"
-                        fill
-                        className="object-cover opacity-35 transition group-hover:opacity-45"
-                        sizes="112px"
-                        priority
-                      />
-                      <span className="absolute inset-0 bg-amber-300/10" />
-                      <span className="relative rounded-full border border-amber-100/30 bg-black/55 px-3 py-1.5 text-xs font-semibold text-amber-50 shadow-lg shadow-black/30 backdrop-blur">
-                        {uploadingProfile ? "Subiendo..." : "Subir foto"}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        disabled={uploadingProfile}
-                        onChange={handleProfilePhoto}
-                      />
-                    </label>
-                  )}
-
-                  {effectiveVerificationBadge &&
-                    (canUpgradeVerification ? (
-                      <button
-                        type="button"
-                        onClick={openVerificationRequest}
-                        disabled={requestingBadgeVerification}
-                        className="inline-flex h-6 max-w-24 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-28"
-                        aria-label={`Nivel ${effectiveBadgeLabel}. Subir de nivel`}
-                        title={`Nivel ${effectiveBadgeLabel}. Subir de nivel`}
-                      >
-                        <VerificationGem
-                          badge={effectiveVerificationBadge}
-                          className={
-                            effectiveVerificationBadge === "platinum"
-                              ? "h-3.5 w-3.5 shrink-0 text-white"
-                              : effectiveVerificationBadge === "gold"
-                                ? "h-3.5 w-3.5 shrink-0 text-amber-200"
-                                : effectiveVerificationBadge === "silver"
-                                  ? "h-3.5 w-3.5 shrink-0 text-slate-100"
-                                  : "h-3.5 w-3.5 shrink-0 text-[#d79263]"
-                          }
-                        />
-                        <span className="truncate">{effectiveBadgeLabel}</span>
-                      </button>
-                    ) : (
-                      <span
-                        className="inline-flex h-6 max-w-24 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold text-neutral-200 shadow-lg shadow-black/15 sm:max-w-28"
-                        aria-label={`Nivel ${effectiveBadgeLabel}`}
-                        title={`Nivel ${effectiveBadgeLabel}`}
-                      >
-                        <VerificationGem
-                          badge={effectiveVerificationBadge}
-                          className={
-                            effectiveVerificationBadge === "platinum"
-                              ? "h-3.5 w-3.5 shrink-0 text-white"
-                              : effectiveVerificationBadge === "gold"
-                                ? "h-3.5 w-3.5 shrink-0 text-amber-200"
-                                : effectiveVerificationBadge === "silver"
-                                  ? "h-3.5 w-3.5 shrink-0 text-slate-100"
-                                  : "h-3.5 w-3.5 shrink-0 text-[#d79263]"
-                          }
-                        />
-                        <span className="truncate">{effectiveBadgeLabel}</span>
-                      </span>
-                    ))}
-
-                  {editMode && hasProfilePhoto && (
-                    <label className="inline-flex h-7 w-24 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.035] px-2 text-[11px] font-semibold text-neutral-100 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white sm:w-28">
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-3.5 w-3.5 text-neutral-300"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                      </svg>
-                      Cambiar
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        disabled={uploadingProfile}
-                        onChange={handleProfilePhoto}
-                      />
-                    </label>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1 self-stretch">
-                  <div className="flex min-h-24 flex-col justify-between gap-3 sm:min-h-28">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 pr-1">
-                        <h1 className="truncate text-base font-semibold text-neutral-50 sm:text-lg">
-                          {name || "Tu perfil"}
-                        </h1>
-                        <p className="mt-1 truncate text-xs text-neutral-500">
-                          {profileMetaLabel}
-                        </p>
-                      </div>
-
-                      <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                        <button
-                          type="button"
-                          onClick={openRechargeBalanceModal}
-                          title={subscriptionLabel}
-                          aria-label={`${subscriptionLabel}. Abrir recarga de saldo`}
-                          className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
-                        >
-                          <span>Plan</span>
-                          <span
-                            className={`h-2.5 w-2.5 rounded-full ${
-                              subscriptionIsOk
-                                ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
-                                : "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
-                            }`}
-                          />
-                        </button>
-
-                        {profilePaused ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowPauseModal(true)}
-                            title="Perfil pausado. Reactivar perfil"
-                            aria-label="Perfil pausado. Abrir modal para reactivar perfil"
-                            className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
-                          >
-                            <span>{profileIndicatorText}</span>
-                            <span
-                              className={`h-2.5 w-2.5 rounded-full ${
-                                profileIndicatorTone === "ok"
-                                  ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
-                                  : profileIndicatorTone === "error"
-                                    ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
-                                    : "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.68)]"
-                              }`}
-                            />
-                          </button>
-                        ) : (
-                          <span
-                            title={profileIndicatorLabel}
-                            aria-label={profileIndicatorLabel}
-                            className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[11px] font-semibold text-neutral-200 shadow-lg shadow-black/15"
-                          >
-                            <span>{profileIndicatorText}</span>
-                            <span
-                              className={`h-2.5 w-2.5 rounded-full ${
-                                profileIndicatorTone === "ok"
-                                  ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.65)]"
-                                  : profileIndicatorTone === "error"
-                                    ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.72)]"
-                                    : "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.68)]"
-                              }`}
-                            />
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid w-full max-w-xs grid-cols-2 divide-x divide-white/[0.08] rounded-lg border border-white/[0.09] bg-black/20 px-1.5 py-1.5 shadow-inner shadow-black/20 sm:max-w-sm">
-                      {profileStats.map((item) => (
-                        <div
-                          key={item.label}
-                          className="min-w-0 px-1.5 text-left last:text-right sm:px-3"
-                        >
-                          <span className="block truncate text-[10px] font-medium uppercase text-neutral-500">
-                            {item.label}
-                          </span>
-                          <span className="mt-1 block truncate text-base font-semibold text-neutral-50">
-                            {item.value}
-                          </span>
-                          <span className="mt-0.5 block truncate text-[10px] text-neutral-600">
-                            {item.helper}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <p className="hidden" aria-hidden="true">
-                      {visiblePublicly ? "Visible públicamente" : "Oculto"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowInviteModal(true)}
-                  className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-violet-300/20 bg-violet-400/[0.07] px-2.5 text-xs font-semibold text-violet-50 transition hover:border-violet-200/35 hover:bg-violet-400/12 sm:px-3"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-3.5 w-3.5 text-violet-200"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M19 8v6" />
-                    <path d="M22 11h-6" />
-                  </svg>
-                  Invitar
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setEditMode((value) => !value)}
-                  className={`group inline-flex h-8 items-center justify-center gap-2 rounded-md border px-2.5 text-xs font-semibold transition sm:px-3 ${
-                    editMode
-                      ? "border-white/15 bg-white/[0.06] text-neutral-100 hover:bg-white/[0.09]"
-                      : "border-blue-300/15 bg-blue-400/[0.06] text-neutral-100 hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100"
-                  }`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-3.5 w-3.5 text-blue-300"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                  {editMode ? "Cerrar" : "Editar"}
-                </button>
-
-                <button
-                  type="button"
-                  disabled={updatingPause || verificationStatus !== "approved"}
-                  onClick={() => setShowPauseModal(true)}
-                  className={`inline-flex h-8 items-center justify-center gap-2 rounded-md border px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 ${
-                    profilePaused
-                      ? "border-emerald-300/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/12"
-                      : "border-amber-300/15 bg-amber-400/[0.06] text-neutral-100 hover:border-amber-300/30 hover:bg-amber-400/10 hover:text-amber-100"
-                  }`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className={`h-3.5 w-3.5 ${
-                      profilePaused ? "text-emerald-300" : "text-amber-300"
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    {profilePaused ? (
-                      <path d="m5 3 14 9-14 9V3Z" />
-                    ) : (
-                      <>
-                        <path d="M10 4H6v16h4V4Z" />
-                        <path d="M18 4h-4v16h4V4Z" />
-                      </>
-                    )}
-                  </svg>
-                  {profilePaused ? "Reactivar" : "Pausar"}
-                </button>
-
-                <button
-                  type="button"
-                  disabled={
-                    buyingPromotion ||
-                    verificationStatus !== "approved" ||
-                    !hasProfilePhoto
-                  }
-                  onClick={() => {
-                    setPromotionError("");
-                    setShowPromotionModal(true);
-                  }}
-                  className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-cyan-300/15 bg-cyan-400/[0.06] px-2.5 text-xs font-semibold text-neutral-100 transition hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-3.5 w-3.5 text-cyan-300"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 3v18" />
-                    <path d="m6 9 6-6 6 6" />
-                    <path d="M5 21h14" />
-                  </svg>
-                  {promotionActive ? "Extender" : "Promocionar"}
-                </button>
-
-                {effectiveVerificationBadge ? (
-                  badgeVerificationStatus === "pending" ? (
-                    <span
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-amber-400/25 bg-amber-400/10 px-2.5 text-xs font-semibold text-amber-200 sm:px-3"
-                      title="Nivel en revision"
-                    >
-                      {badgeVerificationLevel
-                        ? `Nivel ${badgeVerificationLevel}`
-                        : "En revision"}
-                    </span>
-                  ) : canUpgradeVerification ? (
-                    <button
-                      type="button"
-                      onClick={openVerificationRequest}
-                      disabled={requestingBadgeVerification}
-                      title={`Nivel ${effectiveBadgeLabel}. Subir de nivel`}
-                      className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-blue-300/15 bg-blue-400/[0.06] px-2.5 text-xs font-semibold text-neutral-100 transition hover:border-blue-300/30 hover:bg-blue-500/10 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-60 sm:px-3"
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-3.5 w-3.5 text-blue-300"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M12 3v18" />
-                        <path d="m6 9 6-6 6 6" />
-                      </svg>
-                      {requestingBadgeVerification
-                        ? "Procesando..."
-                        : `Nivel ${effectiveBadgeLabel}`}
-                    </button>
-                  ) : (
-                    <span className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 text-xs font-semibold text-emerald-100 sm:px-3">
-                      Nivel {effectiveBadgeLabel}
-                    </span>
-                  )
-                ) : badgeVerificationStatus === "pending" ? (
-                  <span
-                    className="inline-flex h-8 items-center justify-center rounded-md border border-amber-400/25 bg-amber-400/10 px-2.5 text-xs font-semibold text-amber-200 sm:px-3"
-                    title="Nivel en revision"
-                  >
-                    {badgeVerificationLevel
-                      ? `Nivel ${badgeVerificationLevel}`
-                      : "En revision"}
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={openVerificationRequest}
-                    disabled={requestingBadgeVerification}
-                    className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-emerald-400/20 bg-emerald-400/[0.07] px-2.5 text-xs font-semibold text-emerald-100 transition hover:border-emerald-300/40 hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-60 sm:px-3"
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                    {requestingBadgeVerification ? "Procesando..." : "Subir Nivel"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="px-4 pb-4 sm:px-5 sm:pb-5">
               {editMode && (
                 <div className="rounded-lg border border-white/[0.08] bg-black/25 p-2">
                   <button
@@ -3223,447 +2853,357 @@ export default function PerfilPrestador() {
               )}
 
               {editMode && (
-              <div
-                id="datos-publicos"
-                className="mt-3 scroll-mt-24 rounded-lg border border-white/[0.08] bg-black/25 p-3"
-              >
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="sm:col-span-2">
-                <label
-                  htmlFor="name"
-                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                <div
+                  id="datos-publicos"
+                  className="mt-3 scroll-mt-24 rounded-lg border border-white/[0.08] bg-black/25 p-3"
                 >
-                  Nombre público
-                </label>
-                {editMode ? (
-                  <input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className={fieldBaseClass}
-                    placeholder="Tu nombre o nombre artístico"
-                  />
-                ) : (
-                  <p className={readOnlyFieldClass}>
-                    {name || "Sin completar"}
-                  </p>
-                )}
-              </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="sm:col-span-2">
+                      <label
+                        htmlFor="name"
+                        className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                      >
+                        Nombre público
+                      </label>
+                      {editMode ? (
+                        <input
+                          id="name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className={fieldBaseClass}
+                          placeholder="Tu nombre o nombre artístico"
+                        />
+                      ) : (
+                        <p className={readOnlyFieldClass}>
+                          {name || "Sin completar"}
+                        </p>
+                      )}
+                    </div>
 
-              <div>
-                <label
-                  htmlFor="department"
-                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
-                >
-                  Departamento
-                </label>
-                {editMode ? (
-                  <select
-                    id="department"
-                    value={department}
-                    onChange={(e) => {
-                      setDepartment(e.target.value);
-                      setCity("");
-                      setZone("");
-                    }}
-                    className={fieldBaseClass}
-                  >
-                    <option value="">Selecciona</option>
-                    {colombia.departments.map((item) => (
-                      <option key={item.name} value={item.name}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className={readOnlyFieldClass}>
-                    {department || "Sin completar"}
-                  </p>
-                )}
-              </div>
+                    <div>
+                      <label
+                        htmlFor="department"
+                        className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                      >
+                        Departamento
+                      </label>
+                      {editMode ? (
+                        <select
+                          id="department"
+                          value={department}
+                          onChange={(e) => {
+                            setDepartment(e.target.value);
+                            setCity("");
+                            setZone("");
+                          }}
+                          className={fieldBaseClass}
+                        >
+                          <option value="">Selecciona</option>
+                          {colombia.departments.map((item) => (
+                            <option key={item.name} value={item.name}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className={readOnlyFieldClass}>
+                          {department || "Sin completar"}
+                        </p>
+                      )}
+                    </div>
 
-              <div>
-                <label
-                  htmlFor="city"
-                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
-                >
-                  Ciudad
-                </label>
-                {editMode ? (
-                  <select
-                    id="city"
-                    value={city}
-                    onChange={(e) => {
-                      setCity(e.target.value);
-                      setZone("");
-                    }}
-                    disabled={!department}
-                    className={`${fieldBaseClass} disabled:cursor-not-allowed disabled:opacity-50`}
-                  >
-                    <option value="">Selecciona</option>
-                    {cities.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className={readOnlyFieldClass}>
-                    {city || "Sin completar"}
-                  </p>
-                )}
-              </div>
+                    <div>
+                      <label
+                        htmlFor="city"
+                        className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                      >
+                        Ciudad
+                      </label>
+                      {editMode ? (
+                        <select
+                          id="city"
+                          value={city}
+                          onChange={(e) => {
+                            setCity(e.target.value);
+                            setZone("");
+                          }}
+                          disabled={!department}
+                          className={`${fieldBaseClass} disabled:cursor-not-allowed disabled:opacity-50`}
+                        >
+                          <option value="">Selecciona</option>
+                          {cities.map((item) => (
+                            <option key={item} value={item}>
+                              {item}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className={readOnlyFieldClass}>
+                          {city || "Sin completar"}
+                        </p>
+                      )}
+                    </div>
 
-              {zoneOptions.length > 0 && (
-                <div>
-                  <label
-                    htmlFor="zone"
-                    className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
-                  >
-                    Zona
-                  </label>
-                  <select
-                    id="zone"
-                    value={zone}
-                    onChange={(e) => setZone(e.target.value)}
-                    className={fieldBaseClass}
-                  >
-                    <option value="">Selecciona</option>
-                    {zoneOptions.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
+                    {zoneOptions.length > 0 && (
+                      <div>
+                        <label
+                          htmlFor="zone"
+                          className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                        >
+                          Zona
+                        </label>
+                        <select
+                          id="zone"
+                          value={zone}
+                          onChange={(e) => setZone(e.target.value)}
+                          className={fieldBaseClass}
+                        >
+                          <option value="">Selecciona</option>
+                          {zoneOptions.map((item) => (
+                            <option key={item} value={item}>
+                              {item}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label
+                        htmlFor="price"
+                        className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                      >
+                        Precio base
+                      </label>
+                      {editMode ? (
+                        <div className="flex items-center rounded-lg border border-white/10 bg-[#09090a] px-3 transition focus-within:border-blue-400/70 focus-within:ring-2 focus-within:ring-blue-500/15">
+                          <span className="text-neutral-500">$</span>
+                          <input
+                            id="price"
+                            type="number"
+                            min={0}
+                            step={10000}
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            className="w-full bg-transparent px-2 py-2 text-[13px] outline-none"
+                            placeholder="50000"
+                          />
+                          <span className="text-sm text-neutral-500">COP</span>
+                        </div>
+                      ) : (
+                        <p className={readOnlyFieldClass}>
+                          {price
+                            ? `$${Number(price).toLocaleString("es-CO")}`
+                            : "Sin completar"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="whatsapp"
+                        className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                      >
+                        WhatsApp
+                      </label>
+                      {editMode ? (
+                        <div className="flex items-center rounded-lg border border-white/10 bg-[#09090a] px-3 transition focus-within:border-emerald-400/70 focus-within:ring-2 focus-within:ring-emerald-500/15">
+                          <span className="text-sm font-semibold text-emerald-300">
+                            WA
+                          </span>
+                          <input
+                            id="whatsapp"
+                            type="tel"
+                            value={whatsapp}
+                            onChange={(e) => setWhatsapp(e.target.value)}
+                            className="w-full bg-transparent px-2 py-2 text-[13px] outline-none placeholder:text-neutral-600"
+                            placeholder="3001234567"
+                          />
+                        </div>
+                      ) : (
+                        <p className={readOnlyFieldClass}>
+                          {whatsapp || "Sin completar"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label
+                        htmlFor="description"
+                        className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                      >
+                        Descripción
+                      </label>
+                      {editMode ? (
+                        <textarea
+                          id="description"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          rows={4}
+                          className={`${fieldBaseClass} resize-none leading-6`}
+                          placeholder="Cuenta qué servicios ofreces y qué pueden esperar los clientes."
+                        />
+                      ) : (
+                        <p className="min-h-20 rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-sm leading-6 text-neutral-300 lg:min-h-0">
+                          {description || "Sin descripción"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
-
-              <div>
-                <label
-                  htmlFor="price"
-                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
-                >
-                  Precio base
-                </label>
-                {editMode ? (
-                  <div className="flex items-center rounded-lg border border-white/10 bg-[#09090a] px-3 transition focus-within:border-blue-400/70 focus-within:ring-2 focus-within:ring-blue-500/15">
-                    <span className="text-neutral-500">$</span>
-                    <input
-                      id="price"
-                      type="number"
-                      min={0}
-                      step={10000}
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      className="w-full bg-transparent px-2 py-2 text-[13px] outline-none"
-                      placeholder="50000"
-                    />
-                    <span className="text-sm text-neutral-500">COP</span>
-                  </div>
-                ) : (
-                  <p className={readOnlyFieldClass}>
-                    {price
-                      ? `$${Number(price).toLocaleString("es-CO")}`
-                      : "Sin completar"}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="whatsapp"
-                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
-                >
-                  WhatsApp
-                </label>
-                {editMode ? (
-                  <div className="flex items-center rounded-lg border border-white/10 bg-[#09090a] px-3 transition focus-within:border-emerald-400/70 focus-within:ring-2 focus-within:ring-emerald-500/15">
-                    <span className="text-sm font-semibold text-emerald-300">
-                      WA
-                    </span>
-                    <input
-                      id="whatsapp"
-                      type="tel"
-                      value={whatsapp}
-                      onChange={(e) => setWhatsapp(e.target.value)}
-                      className="w-full bg-transparent px-2 py-2 text-[13px] outline-none placeholder:text-neutral-600"
-                      placeholder="3001234567"
-                    />
-                  </div>
-                ) : (
-                  <p className={readOnlyFieldClass}>
-                    {whatsapp || "Sin completar"}
-                  </p>
-                )}
-              </div>
-
-              <div className="sm:col-span-2">
-                <label
-                  htmlFor="description"
-                  className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500"
-                >
-                  Descripción
-                </label>
-                {editMode ? (
-                  <textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={4}
-                    className={`${fieldBaseClass} resize-none leading-6`}
-                    placeholder="Cuenta qué servicios ofreces y qué pueden esperar los clientes."
-                  />
-                ) : (
-                  <p className="min-h-20 rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-sm leading-6 text-neutral-300 lg:min-h-0">
-                    {description || "Sin descripción"}
-                  </p>
-                )}
-              </div>
-              </div>
-              </div>
-              )}
             </div>
-          </div>
+          </ProfileOverview>
         </section>
 
-        <section className="hidden">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">
-                Pausa temporal
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-neutral-50">
-                {profilePaused ? "Perfil pausado" : "Pausar mi perfil"}
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-400">
-                Si vas a tomar vacaciones o no quieres aparecer por unos dias,
-                puedes pausar tu perfil. Mientras este pausado no aparece en
-                escorts y la mensualidad queda detenida. Puedes usar esta
-                opcion maximo 6 veces por mes.
-              </p>
-              <p className="mt-2 text-xs text-neutral-500">
-                Estado de mensualidad:{" "}
-                <span className="font-semibold text-neutral-300">
-                  {subscriptionStatus === "paused"
-                    ? "Pausada"
-                    : subscriptionStatus === "past_due"
-                      ? "Pendiente"
-                      : subscriptionStatus === "admin_override"
-                        ? "Desactivada"
-                        : "Activa"}
+        {profileReadiness < onboardingSteps.length && (
+          <section className={styles.progress} aria-label="Progreso del perfil">
+            <button
+              type="button"
+              className={styles.progressToggle}
+              onClick={() => setShowQuickGuide((value) => !value)}
+              aria-expanded={showQuickGuide}
+              aria-controls="profile-steps"
+            >
+              <span className={styles.progressSymbol}>
+                <ProfileIcon name="shield" />
+              </span>
+              <span className={styles.progressTitle}>
+                Completa tu perfil{" "}
+                <small>
+                  {profileReadiness} de {onboardingSteps.length} pasos
+                </small>
+              </span>
+              <span className={styles.progressRight}>
+                <span className={styles.progressTrack} aria-hidden="true">
+                  {onboardingSteps.map((step) => (
+                    <i
+                      key={step.label}
+                      className={step.done ? styles.stepComplete : undefined}
+                    />
+                  ))}
                 </span>
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={updatingPause || verificationStatus !== "approved"}
-              onClick={() => void toggleProfilePause()}
-              className={`rounded-full px-5 py-3 text-sm font-semibold shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
-                profilePaused
-                  ? "border border-emerald-300/30 bg-emerald-600 text-white shadow-emerald-950/25 hover:bg-emerald-500"
-                  : "border border-amber-300/30 bg-amber-400/10 text-amber-100 shadow-amber-950/15 hover:bg-amber-400/15"
-              }`}
-            >
-              {updatingPause
-                ? "Procesando..."
-                : profilePaused
-                  ? "Reactivar perfil"
-                  : "Pausar perfil"}
+                <span>{showQuickGuide ? "Ocultar" : "Ver pasos"}</span>
+                <ProfileIcon
+                  name="chevron"
+                  className={showQuickGuide ? styles.expandedChevron : undefined}
+                />
+              </span>
             </button>
-          </div>
-        </section>
+            {showQuickGuide && (
+              <div id="profile-steps" className={styles.steps}>
+                {onboardingSteps.map((step, index) => (
+                  <button
+                    key={step.label}
+                    type="button"
+                    className={styles.step}
+                    disabled={step.done}
+                    onClick={() => handleOnboardingAction(step.action)}
+                    title={step.description}
+                  >
+                    <span className={styles.stepNumber}>
+                      {step.done ? <ProfileIcon name="check" /> : index + 1}
+                    </span>
+                    <span>
+                      <strong>{step.label}</strong>
+                      <small>
+                        {step.done
+                          ? "Listo"
+                          : step.action === "verification" &&
+                              verificationStatus === "pending"
+                            ? "Solicitar revisión"
+                            : step.action === "status"
+                              ? "Ver estado"
+                              : "Completar"}
+                      </small>
+                    </span>
+                    {!step.done && <ProfileIcon name="arrow" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
-        <section className="hidden">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">
-                Visibilidad
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-neutral-50">
-                Promocionar mi perfil
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-400">
-                Por ${PROVIDER_PROMOTION_PRICE.toLocaleString("es-CO")} tu
-                perfil aparecera entre los primeros durante{" "}
-                {PROVIDER_PROMOTION_DAYS} dias. Primero se muestran los perfiles
-                promocionados y luego el orden va de Diamante a no verificados.
-              </p>
-              {promotionActive && promotedUntil && (
-                <p className="mt-2 text-xs font-semibold text-emerald-200">
-                  Promocion activa hasta{" "}
-                  {new Date(promotedUntil).toLocaleString("es-CO")}
-                </p>
-              )}
-            </div>
-
-            <button
-              type="button"
-              disabled={
-                buyingPromotion ||
-                verificationStatus !== "approved" ||
-                !hasProfilePhoto
-              }
-              onClick={() => void buyPromotion()}
-              className="rounded-full border border-blue-300/30 bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-950/25 transition hover:-translate-y-0.5 hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-            >
-              {buyingPromotion
-                ? "Procesando..."
-                : promotionActive
-                  ? "Extender promocion"
-                  : "Promocionar perfil"}
-            </button>
-          </div>
-        </section>
-
-        <section
-          id="galeria-perfil"
-          className="mt-4 scroll-mt-24 rounded-lg border border-white/[0.08] bg-[#101012] p-5 shadow-2xl shadow-black/20"
-        >
-          <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <h2 className="text-2xl font-semibold text-neutral-50">Galería</h2>
-              <p className="mt-1 text-sm text-neutral-500">
-                Tiempo de video: {formatVideoTime(videoSecondsUsed)} /{" "}
-                {formatVideoTime(videoSecondsLimit)} incluido.
-              </p>
-            </div>
-
-            <div
-              className={`grid w-full gap-2 sm:w-auto ${
-                showVideoTimeAction
-                  ? "sm:grid-cols-2 xl:grid-cols-4"
-                  : "sm:grid-cols-3"
-              }`}
-            >
-              {showVideoTimeAction && (
-                <button
-                  type="button"
-                  disabled={buyingVideoTime}
-                  onClick={() => void buyExtraVideoTime()}
-                  className="inline-flex h-12 items-center justify-center rounded-md border border-emerald-400/30 bg-emerald-400/10 px-4 text-center text-xs font-semibold text-emerald-100 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {buyingVideoTime
-                    ? "Comprando..."
-                    : `Comprar 1 min $${EXTRA_VIDEO_TIME_PRICE.toLocaleString(
-                        "es-CO"
-                      )}`}
-                </button>
-              )}
-
+        <input
+          ref={publicUploadRef}
+          type="file"
+          accept={MEDIA_UPLOAD_ACCEPT}
+          hidden
+          multiple
+          disabled={uploadingMedia}
+          onChange={(event) => {
+            const files = Array.from(event.target.files || []);
+            event.target.value = "";
+            if (files.length > 0) {
+              setGalleryFilter("all");
+              void handlePublicUpload(files);
+            }
+          }}
+        />
+        <input
+          ref={privateUploadRef}
+          type="file"
+          accept={MEDIA_UPLOAD_ACCEPT}
+          hidden
+          multiple
+          disabled={uploadingMedia}
+          onChange={(event) => {
+            const files = Array.from(event.target.files || []);
+            event.target.value = "";
+            if (files.length === 0) return;
+            setGalleryFilter("all");
+            setPendingFiles(files);
+            setContentPrice("");
+            setContentDescription("");
+            setPrivateDescriptionError("");
+            setMediaUploadError("");
+            setShowPriceModal(true);
+          }}
+        />
+        <GalleryPanel
+          filter={galleryFilter}
+          onFilter={setGalleryFilter}
+          counts={galleryCounts}
+          videoUsed={formatVideoTime(videoSecondsUsed)}
+          videoLimit={formatVideoTime(videoSecondsLimit)}
+          videoPercent={
+            videoSecondsLimit > 0 ? (videoSecondsUsed / videoSecondsLimit) * 100 : 0
+          }
+          videoTimeAction={
+            showVideoTimeAction && (
               <button
                 type="button"
-                id="video-del-dia"
-                disabled={
-                  uploadingDailyVideo ||
-                  verificationStatus !== "approved" ||
-                  !hasProfilePhoto
-                }
-                onClick={() => setShowDailyVideoUploadModal(true)}
-                className={`group flex h-12 scroll-mt-24 items-center justify-center gap-2 rounded-md border px-4 text-center text-xs font-semibold transition ${
-                  uploadingDailyVideo ||
-                  verificationStatus !== "approved" ||
-                  !hasProfilePhoto
-                    ? "cursor-not-allowed border-sky-300/15 bg-sky-700/20 text-sky-100/60 opacity-70"
-                    : "cursor-pointer border-sky-300/25 bg-sky-500/12 text-sky-100 hover:border-sky-200/45 hover:bg-sky-500/18"
-                }`}
+                disabled={buyingVideoTime}
+                onClick={() => void buyExtraVideoTime()}
               >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-sky-200/20 bg-sky-400/10 text-sky-200 transition group-hover:border-sky-200/35 group-hover:text-sky-100">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                    fill="currentColor"
-                  >
-                    <path d="M8 5.2v13.6L18.8 12 8 5.2Z" />
-                  </svg>
-                </span>
-                <span className="flex flex-col items-start leading-tight">
-                  <span>
-                    {uploadingDailyVideo
-                      ? "Subiendo..."
-                      : dailyVideoActive
-                        ? "Reemplazar video"
-                        : "Video del dia"}
-                  </span>
-                  <span className="text-[10px] font-medium text-sky-100/60">
-                    {dailyVideoActive
-                      ? "Activo 4 horas"
-                      : dailyVideoRewardEligible
-                        ? `Bono $${DAILY_VIDEO_REWARD_AMOUNT.toLocaleString(
-                            "es-CO"
-                          )}`
-                        : "Bono desde bronce"}
-                  </span>
-                </span>
+                {buyingVideoTime
+                  ? "Comprando…"
+                  : `+1 min · $${EXTRA_VIDEO_TIME_PRICE.toLocaleString("es-CO")}`}
               </button>
-
-              <label className="group flex h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.035] px-4 text-center text-xs font-semibold text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition group-hover:border-white/20 group-hover:text-white">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <path d="m17 8-5-5-5 5" />
-                    <path d="M12 3v12" />
-                  </svg>
-                </span>
-                <span className="flex flex-col items-start leading-tight">
-                  <span>Subir publico</span>
-                  <span className="text-[10px] font-medium text-neutral-500">
-                    Visible gratis
-                  </span>
-                </span>
-                <input
-                  type="file"
-                  accept={MEDIA_UPLOAD_ACCEPT}
-                  hidden
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    e.target.value = "";
-                    if (files.length > 0) void handlePublicUpload(files);
-                  }}
-                />
-              </label>
-
-              <label className="group relative flex h-12 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-md border border-emerald-300/30 bg-emerald-500 px-4 text-center text-xs font-semibold text-white shadow-lg shadow-emerald-950/30 transition hover:-translate-y-0.5 hover:border-emerald-100/50 hover:bg-emerald-400">
-                <span className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.22),transparent_34%)] opacity-80" />
-                <span className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-black/15 text-sm shadow-inner">
-                  $
-                </span>
-                <span className="relative flex flex-col items-start leading-tight">
-                  <span>Subir privado</span>
-                  <span className="text-[10px] font-medium text-emerald-950/80">
-                    Contenido pago
-                  </span>
-                </span>
-                <input
-                  type="file"
-                  accept={MEDIA_UPLOAD_ACCEPT}
-                  hidden
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    e.target.value = "";
-                    if (files.length === 0) return;
-                    setPendingFiles(files);
-                    setContentPrice("");
-                    setContentDescription("");
-                    setPrivateDescriptionError("");
-                    setMediaUploadError("");
-                    setShowPriceModal(true);
-                  }}
-                />
-              </label>
-            </div>
-          </div>
-
+            )
+          }
+          dailyVideoDisabled={
+            uploadingDailyVideo ||
+            verificationStatus !== "approved" ||
+            !hasProfilePhoto
+          }
+          dailyVideoActive={dailyVideoActive}
+          dailyVideoUploading={uploadingDailyVideo}
+          dailyVideoHint={
+            verificationStatus !== "approved" || !hasProfilePhoto
+              ? "Disponible con tu perfil aprobado y tu foto principal."
+              : dailyVideoActive
+                ? "Tu video está destacado durante 4 horas."
+                : dailyVideoRewardEligible
+                  ? `Destácate por 4 horas · Bono de $${DAILY_VIDEO_REWARD_AMOUNT.toLocaleString("es-CO")}`
+                  : "Destácate por 4 horas · Bono desde nivel Bronce."
+          }
+          onDailyVideo={() => setShowDailyVideoUploadModal(true)}
+          onPublicUpload={() => publicUploadRef.current?.click()}
+          onPrivateUpload={() => privateUploadRef.current?.click()}
+          uploading={uploadingMedia}
+        >
           {uploadingMedia && (
             <div className="mt-4 rounded-md border border-blue-500/25 bg-blue-500/10 p-3 text-sm text-blue-100">
               Subiendo contenido...
@@ -3676,17 +3216,49 @@ export default function PerfilPrestador() {
             </div>
           )}
 
-          {mediaUploadItems.length === 0 && media.length === 0 ? (
-            <div className="mt-5 rounded-md border border-dashed border-white/[0.08] bg-black/20 p-10 text-center text-sm text-neutral-500">
-              Todavía no tienes contenido en tu galería.
+          {filteredUploads.length === 0 && filteredMedia.length === 0 ? (
+            <div className={styles.empty}>
+              <div className={styles.emptyArtwork} aria-hidden="true">
+                <span>
+                  <ProfileIcon
+                    name={galleryFilter === "private" ? "lock" : "image"}
+                  />
+                </span>
+              </div>
+              <h3>
+                {galleryFilter === "all"
+                  ? "Tu galería empieza aquí"
+                  : galleryFilter === "private"
+                    ? "Tu espacio de contenido exclusivo"
+                    : "Muestra lo mejor de ti"}
+              </h3>
+              <p>
+                {galleryFilter === "private"
+                  ? "Comparte contenido exclusivo y elige tu precio."
+                  : "Agrega fotos o videos para que conozcan tu perfil."}
+              </p>
+              <button
+                type="button"
+                disabled={uploadingMedia}
+                onClick={() =>
+                  galleryFilter === "private"
+                    ? privateUploadRef.current?.click()
+                    : publicUploadRef.current?.click()
+                }
+              >
+                <ProfileIcon name="plus" />
+                {galleryFilter === "private"
+                  ? "Subir contenido privado"
+                  : "Agregar fotos o videos"}
+              </button>
             </div>
           ) : (
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {mediaUploadItems.map((item) => (
+              {filteredUploads.map((item) => (
                 <UploadProgressGalleryItem key={item.id} item={item} />
               ))}
 
-              {media.map((item, index) => (
+              {filteredMedia.map(({ item, index }) => (
                 <ProfileGalleryItem
                   key={`${item.url}-${index}`}
                   item={item}
@@ -3697,7 +3269,7 @@ export default function PerfilPrestador() {
               ))}
             </div>
           )}
-        </section>
+        </GalleryPanel>
       </main>
 
       {showInviteModal && (

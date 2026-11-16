@@ -2982,6 +2982,12 @@ export default function AdminVerificationsPage() {
               >
                 Usuarios
               </button>
+              <Link
+                href="/admin/asesores"
+                className="rounded-md px-4 py-2 text-sm font-semibold text-neutral-400 transition hover:text-white"
+              >
+                Asesores
+              </Link>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">

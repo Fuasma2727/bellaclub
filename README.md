@@ -35,6 +35,12 @@ Para comprobar las imagenes publicas y el resumen de datos del listado:
 npm.cmd run test:performance
 ```
 
+Para validar la gestion de asesores, permisos y contactos publicos:
+
+```bash
+npm.cmd run test:support
+```
+
 Para medir tres respuestas HTTP de una pagina (servidor local o produccion):
 
 ```bash
@@ -44,6 +50,20 @@ npm.cmd run perf:measure -- http://127.0.0.1:3010/ 3
 El informe separa la primera conexion de las reutilizadas y muestra tiempos,
 compresion, peso del HTML, imagenes adaptativas y fuentes precargadas. No mide
 la carga completa del navegador ni sustituye las Core Web Vitals.
+
+## Asesores de soporte
+
+En el panel de control, entra a **Asesores** (`/admin/asesores`) con la cuenta
+administradora. Puedes agregar nombres y numeros de WhatsApp, cambiar su orden,
+ocultarlos o eliminarlos. Pulsa **Guardar asesores** para publicar los cambios.
+Los celulares colombianos de 10 digitos reciben automaticamente el indicativo +57.
+Para otros paises, incluye el indicativo internacional.
+
+Los contactos visibles aparecen al desplegar **Soporte** en el pie de pagina y
+en `/soporte`. Tambien se incluyen en el HTML y los datos estructurados de la
+pagina principal para facilitar su rastreo por buscadores; Google decide cuando
+indexarlos y que pagina mostrar. No es necesario cambiar reglas de Firestore:
+la gestion usa la API protegida del administrador.
 
 ## Variables de entorno
 

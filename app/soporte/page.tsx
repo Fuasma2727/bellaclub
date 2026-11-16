@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import LegalPageShell from "@/components/LegalPageShell";
+import SupportAdvisors from "@/components/SupportAdvisors";
+import { getPublicSupportAdvisors } from "@/lib/supportAdvisors.server";
 
 export const metadata: Metadata = {
   title: "Soporte",
@@ -44,10 +46,11 @@ const supportTopics = [
   },
 ];
 
-export default function SoportePage() {
+export default async function SoportePage() {
+  const advisors = await getPublicSupportAdvisors();
   return (
     <LegalPageShell>
-        <Link href="/escorts" className="text-sm font-semibold text-blue-300">
+        <Link href="/" className="text-sm font-semibold text-blue-300">
           Volver a BelaClub
         </Link>
         <p className="mt-8 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
@@ -59,6 +62,10 @@ export default function SoportePage() {
           correo de la cuenta, fecha, monto, codigo de abono, captura del error
           y una descripcion breve del problema.
         </p>
+
+        <div className="mt-6">
+          <SupportAdvisors advisors={advisors} collapsible={false} />
+        </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
           <a
