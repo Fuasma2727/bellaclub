@@ -163,9 +163,9 @@ test("invalid numbers, duplicate contacts, invalid rows and oversized lists neve
   assert.equal(app.writes, 0);
 });
 
-test("a 228-contact import fits the API and preserves different names sharing a number", async () => {
+test("a 523-contact list fits the API and preserves different names sharing a number", async () => {
   const app = setup();
-  const contacts = Array.from({ length: 228 }, (_, index) => advisor({
+  const contacts = Array.from({ length: 523 }, (_, index) => advisor({
     id: `import-${index}`,
     name: `Asesor ${index + 1}`,
     phone: String(3000000000 + index),
@@ -178,13 +178,13 @@ test("a 228-contact import fits the API and preserves different names sharing a 
   }));
   assert.equal(response.status, 200);
   const visible = await app.public();
-  assert.equal(visible.length, 228);
+  assert.equal(visible.length, 523);
   assert.equal(visible[54].name, "Nathaly");
   assert.equal(visible[73].name, "Aida");
   assert.equal(visible[54].phone, visible[73].phone);
   const html = await app.home();
-  assert.match(html, /Asesor 228/);
-  assert.equal((html.match(/href="tel:/g) || []).length, 228);
+  assert.match(html, /Asesor 523/);
+  assert.equal((html.match(/href="tel:/g) || []).length, 523);
   assert.match(html, /max-h-\[60vh\] overflow-y-auto/);
 });
 

@@ -5,7 +5,7 @@ export type SupportAdvisor = {
   active: boolean;
 };
 
-export const MAX_SUPPORT_ADVISORS = 500;
+export const MAX_SUPPORT_ADVISORS = 550;
 export const MAX_SUPPORT_ADVISORS_BODY_BYTES = 256 * 1024;
 
 export class SupportAdvisorsValidationError extends Error {}
