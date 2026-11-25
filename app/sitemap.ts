@@ -12,6 +12,7 @@ import {
 } from "@/lib/publicProviders";
 import { providerSearchRoutes } from "@/lib/providerSearchRoutes";
 import { siteUrl } from "@/lib/siteUrl";
+import { latestProviderModification } from "@/lib/sitemapDates";
 
 export const dynamic = "force-dynamic";
 
@@ -36,51 +37,53 @@ const getSearchCityRoutePriority = (
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = siteUrl;
-  const now = new Date();
   const cities = await getPublicProviderCities();
-  const providers = await getPublicProviderCards();
+  const providers = await getPublicProviderCards({ requireAvailable: true });
+  const directoryModified = latestProviderModification(providers);
   const targetCitySlugs = new Set(targetSeoCities.map((city) => city.slug));
+  const cityModifications = new Map(
+    cities.map(({ slug }) => [
+      slug,
+      latestProviderModification(
+        providers.filter((provider) => citySlug(provider.city || "") === slug)
+      ),
+    ])
+  );
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: `${baseUrl}/`,
-      lastModified: now,
       changeFrequency: "weekly",
       priority: 0.8,
     },
     ...providerSearchRoutes.map((route) => ({
       url: `${baseUrl}/${route.segment}`,
-      lastModified: now,
+      lastModified: directoryModified,
       changeFrequency: "daily" as const,
       priority: route.key === "escorts" ? 1 : 0.9,
     })),
     {
       url: `${baseUrl}/terminos`,
-      lastModified: now,
       changeFrequency: "monthly",
       priority: 0.4,
     },
     {
       url: `${baseUrl}/privacidad`,
-      lastModified: now,
       changeFrequency: "monthly",
       priority: 0.4,
     },
     {
       url: `${baseUrl}/seguridad`,
-      lastModified: now,
       changeFrequency: "monthly",
       priority: 0.4,
     },
     {
       url: `${baseUrl}/reembolsos`,
-      lastModified: now,
       changeFrequency: "monthly",
       priority: 0.4,
     },
     {
       url: `${baseUrl}/soporte`,
-      lastModified: now,
       changeFrequency: "monthly",
       priority: 0.4,
     },
@@ -90,14 +93,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     (route) =>
       cities.map((city) => ({
         url: `${baseUrl}/${route.segment}/${city.slug}`,
-        lastModified: now,
+        lastModified: cityModifications.get(city.slug),
         changeFrequency: "daily" as const,
         priority: getSearchCityRoutePriority(route.key, city),
       }))
   );
   const profileRoutes: MetadataRoute.Sitemap = providers.map((provider) => ({
     url: `${baseUrl}${getProviderProfilePath(provider)}`,
-    lastModified: provider.updatedAt ? new Date(provider.updatedAt) : now,
+    lastModified: latestProviderModification([provider]),
     changeFrequency: "weekly",
     priority:
       citySlug(provider.city || "") === "rionegro"
@@ -115,7 +118,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     phoneRouteByPath.set(phonePath, {
       url: `${baseUrl}${phonePath}`,
-      lastModified: provider.updatedAt ? new Date(provider.updatedAt) : now,
+      lastModified: latestProviderModification([provider]),
       changeFrequency: "weekly",
       priority:
         citySlug(provider.city || "") === "rionegro"

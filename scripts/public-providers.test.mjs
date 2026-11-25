@@ -262,3 +262,31 @@ test("sitemap rebuilds profile paths from records instead of trusting obsolete c
   assert.equal(profileUrls.length, 1);
   assert.equal(profileUrls[0].url, "https://belaclub.co/escorts/colombia/perfil--no-city");
 });
+
+test("sitemap uses recorded modification dates and omits unknown dates", async () => {
+  const createdAt = "2026-08-01T00:00:00.000Z";
+  const updatedAt = "2026-08-02T00:00:00.000Z";
+  const app = setup({ diskCache: {
+    updatedAt: new Date().toISOString(),
+    providers: [
+      { id: "updated", name: "Perfil actualizado", city: "Medellin", media: [], createdAt, updatedAt },
+      { id: "created", name: "Perfil nuevo", city: "Rionegro", media: [], createdAt },
+      { id: "unknown", name: "Perfil sin fecha", city: "Rionegro", media: [], updatedAt: "invalid" },
+    ],
+  } });
+  const entries = await app.sitemap();
+  const modificationDate = (path) => {
+    const entry = entries.find(({ url }) => url === `https://belaclub.co${path}`);
+    assert.ok(entry, `${path} should appear in the sitemap`);
+    return entry.lastModified?.toISOString();
+  };
+  assert.equal(modificationDate("/escorts"), updatedAt);
+  assert.equal(modificationDate("/escorts/medellin"), updatedAt);
+  assert.equal(modificationDate("/prepagos/rionegro"), createdAt);
+  assert.equal(modificationDate("/escorts/rionegro/perfil-nuevo--created"), createdAt);
+  assert.equal(modificationDate("/escorts/rionegro/perfil-sin-fecha--unknown"), undefined);
+  assert.equal(modificationDate("/"), undefined);
+  assert.equal(modificationDate("/terminos"), undefined);
+  app.advance(1000);
+  assert.deepEqual(await app.sitemap(), entries);
+});
