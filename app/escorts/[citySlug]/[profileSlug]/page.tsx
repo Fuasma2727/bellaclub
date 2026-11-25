@@ -9,15 +9,15 @@ import { citySlug as toCitySlug } from "@/lib/providerCitySeo";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import { getProviderPhonePath } from "@/lib/publicProviders";
 import { resolvePublicProfileRoute } from "@/lib/publicProfileRoute";
+import { siteUrl } from "@/lib/siteUrl";
 import {
   formatMoney,
   getWhatsAppMessage,
   getWhatsAppUrl,
 } from "@/app/prestadores/_components/utils";
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
-
-export const revalidate = 300;
+// Visibility and URL changes must not wait behind an old cached 200 or 404.
+export const dynamic = "force-dynamic";
 export const dynamicParams = true;
 
 type ProfilePageProps = {

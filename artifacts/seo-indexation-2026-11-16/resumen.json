@@ -1,0 +1,17 @@
+{
+  "source": "belaclub.co-Coverage-Drilldown-2026-11-16.zip",
+  "reportDate": "2026-11-16",
+  "issue": "Rastreada: actualmente sin indexar",
+  "count": 33,
+  "groups": {
+    "Recurso tecnico": 4,
+    "Categoria nacional o por ciudad": 22,
+    "Pagina por telefono": 2,
+    "Perfil": 3,
+    "Ruta antigua de listado": 2
+  },
+  "homepage_included": false,
+  "oldest_reported_crawl": "2026-05-28",
+  "newest_reported_crawl": "2026-11-03",
+  "scope": "Clasificacion de la exportacion de 33 URLs y revision del codigo. Datos HTTP del 10 de noviembre son historicos; sin comprobacion en vivo ni causa confirmada por Google. La revision complementaria de los 15 casos 404 esta en revision-15-404.csv."
+}

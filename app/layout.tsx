@@ -33,7 +33,6 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   icons: {
-    icon: "/favicon.ico",
     apple: "/logo.jpg",
   },
   openGraph: {
@@ -70,7 +69,11 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  other: explicitContentMetadata,
+  other: {
+    ...explicitContentMetadata,
+    // Preserve the site's own colors before React hydrates in local development.
+    ...(process.env.NODE_ENV === "development" ? { "darkreader-lock": "true" } : {}),
+  },
 };
 
 export default function RootLayout({

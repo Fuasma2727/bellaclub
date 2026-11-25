@@ -1,0 +1,10 @@
+{
+  "reportDate": "2026-11-16",
+  "reviewedUrls": 48,
+  "byIssue": {
+    "Rastreada: actualmente sin indexar": 33,
+    "No se ha encontrado (404)": 15
+  },
+  "homepage_included": false,
+  "limits": "No se comprobaron las respuestas HTTP actuales por bloqueo del acceso web en este entorno. No se confirma el estado de indexacion del inicio. Las 14 redirecciones y 3 descubiertas sin indexar del resumen de Search Console no se aportaron como listas de URLs y no forman parte de estas 48."
+}

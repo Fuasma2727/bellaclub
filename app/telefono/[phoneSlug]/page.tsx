@@ -8,17 +8,16 @@ import ScreenProtection from "@/app/prestadores/_components/ScreenProtection";
 import { getPhoneSeoValues } from "@/lib/providerPhoneSeo";
 import {
   getProviderPhonePath,
-  getPublicProviderProfileByPhone,
 } from "@/lib/publicProviders";
+import { resolvePublicPhoneRoute } from "@/lib/publicProfileRoute";
+import { siteUrl } from "@/lib/siteUrl";
 import {
   formatMoney,
   getWhatsAppMessage,
   getWhatsAppUrl,
 } from "@/app/prestadores/_components/utils";
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://belaclub.co";
-
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 export const dynamicParams = true;
 
 type PhonePageProps = {
@@ -35,7 +34,7 @@ export async function generateMetadata({
   params,
 }: PhonePageProps): Promise<Metadata> {
   const { phoneSlug } = await params;
-  const provider = await getPublicProviderProfileByPhone(phoneSlug);
+  const provider = await resolvePublicPhoneRoute(phoneSlug);
 
   if (!provider) {
     return {
@@ -102,7 +101,7 @@ export async function generateMetadata({
 
 export default async function PhoneLookupPage({ params }: PhonePageProps) {
   const { phoneSlug } = await params;
-  const provider = await getPublicProviderProfileByPhone(phoneSlug);
+  const provider = await resolvePublicPhoneRoute(phoneSlug);
 
   if (!provider) notFound();
 

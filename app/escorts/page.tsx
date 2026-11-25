@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import CatadorSignupInvite from "@/app/prestadores/_components/CatadorSignupInvite";
 import PrestadoresPage from "@/app/prestadores/page";
 import JsonLd from "@/components/JsonLd";
 import { targetSeoCities } from "@/lib/providerCitySeo";
@@ -8,48 +9,19 @@ import { absoluteSiteUrl, siteHomeUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 
+const pageTitle = "Escorts verificadas en Rionegro, Medellín y La Ceja";
+const pageDescription =
+  "Compara perfiles verificados en Rionegro, Medellín y La Ceja. Revisa fotos, tarifas y zonas por ciudad y contacta directamente por WhatsApp.";
+
 export const metadata: Metadata = {
-  title: "Escorts en Rionegro, Medellín y La Ceja",
-  description:
-    "Encuentra escorts en Rionegro, Medellín, La Ceja, Bello y Zipaquirá. Perfiles aprobados, fotos públicas, zonas disponibles y contacto por WhatsApp.",
-  keywords: [
-    "escorts en Medellín",
-     "escorts en Medellin",
-    "escorts Medellín",
-     "escorts Medellin",
-     "escorts en medellín",
-     "escorts en medellin",
-    "escorts medellín",
-     "escorts medellin",
-    "escorts en La Ceja",
-    "escorts La Ceja",
-     "escorts en la ceja",
-    "escorts la ceja",
-    "escorts en Rionegro",
-    "escorts Rionegro",
-    "escorts en rionegro",
-    "escorts rionegro",
-    "escots Medellín",
-    "escots Rionegro",
-    "prepagos Medellín",
-    "prepagos Medellin",
-    "prepagos medellín",
-    "prepagos medellin",
-    "putas medellin",
-    "putas la ceja",
-    "putas rionegro",
-    "acompañantes Medellín",
-    "acompanantes Medellín",
-    "damas de compañía Medellín",
-    "damas de compania Medellín",
-  ],
+  title: pageTitle,
+  description: pageDescription,
   alternates: {
     canonical: "/escorts",
   },
   openGraph: {
-    title: "Escorts en Rionegro, Medellín y La Ceja | BelaClub",
-    description:
-      "Escorts en Rionegro, Medellín, La Ceja, Bello y Zipaquirá con perfiles aprobados y contacto directo por WhatsApp.",
+    title: `${pageTitle} | BelaClub`,
+    description: pageDescription,
     url: "/escorts",
     siteName: "BelaClub",
     images: [
@@ -65,9 +37,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Escorts en Rionegro, Medellín y La Ceja | BelaClub",
-    description:
-      "Explora escorts, prepagos y acompañantes por ciudad en BelaClub.",
+    title: `${pageTitle} | BelaClub`,
+    description: pageDescription,
     images: ["/og-image.png"],
   },
 };
@@ -92,9 +63,8 @@ export default async function EscortsPage() {
         data={{
           "@context": "https://schema.org",
           "@type": "CollectionPage",
-          name: "Escorts en Rionegro, Medellín y La Ceja",
-          description:
-            "Perfiles aprobados en BelaClub por ciudad, con fotos públicas, zonas disponibles y contacto por WhatsApp.",
+          name: pageTitle,
+          description: pageDescription,
           url: pageUrl,
           isPartOf: {
             "@type": "WebSite",
@@ -104,9 +74,10 @@ export default async function EscortsPage() {
         }}
       />
       <PrestadoresPage
-        pageTitle="Escorts en Rionegro, Medellín y La Ceja"
-        pageEyebrow="Explora por ciudad"
-        pageDescription="Encuentra escorts verificadas en Rionegro, Medellín, La Ceja, Bello y Zipaquirá. Revisa fotos públicas, filtra por departamento o ciudad y contacta directamente por WhatsApp."
+        filtersFirst
+        signupInvite={<CatadorSignupInvite />}
+        pageTitle={pageTitle}
+        pageDescription={pageDescription}
         initialProviders={initialProviders}
         seoCityLinks={[
           ...cityLinks,
@@ -116,12 +87,10 @@ export default async function EscortsPage() {
           })),
         ]}
         seoContent={{
-          heading: "Escorts por ciudad en BelaClub",
+          heading: "Qué puedes revisar en un perfil",
           paragraphs: [
-            "BelaClub organiza perfiles aprobados por ciudad para facilitar búsquedas como escorts rionegro, escorts en rionegro, escorts Medellín, prepagos Medellín, prepagos rionegro y putas rionegro.",
-            "Rionegro concentra busquedas del oriente antioqueño en zonas como San Antonio de Pereira, Centro, Llanogrande y el sector del Aeropuerto Jose Maria Cordova.",
-            "Medellín, La Ceja, Bello y Zipaquirá tambien tienen paginas locales para comparar perfiles visibles, ubicacion declarada y categorias relacionadas sin salir del contexto de ciudad.",
-            "Cada página de ciudad permite revisar perfiles, fotos públicas, ubicación, zonas disponibles y contacto directo por WhatsApp.",
+            "En cada ficha puedes ver fotos públicas y, si están publicadas, la tarifa y la zona. Si una tarjeta muestra un distintivo, púlsalo para conocer el tipo de verificación del perfil.",
+            "En Rionegro puedes comparar perfiles de zonas como San Antonio de Pereira, el Centro y Llanogrande. También puedes consultar los listados de Bello y Zipaquirá desde los enlaces por ciudad.",
           ],
           zones: [
             "Rionegro",

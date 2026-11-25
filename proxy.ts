@@ -91,11 +91,31 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(canonicalUrl, 308);
   }
 
-  if (pathname.startsWith("/escorts/") && pathname.includes("--")) {
-    const { getPublicProfileRedirectPath } = await import(
-      "./lib/publicProfileRoute"
-    );
-    const redirectPath = await getPublicProfileRedirectPath(pathname);
+  const isProfileRoute = /^\/escorts\/[^/]+\/[^/]+--[^/]+$/.test(pathname);
+  const isPhoneRoute = /^\/telefono\/[^/]+$/.test(pathname);
+  if (isProfileRoute || isPhoneRoute) {
+    let redirectPath: string | null;
+    try {
+      const { getPublicProfileRedirectPath, getPublicPhoneRedirectPath } = await import(
+        "./lib/publicProfileRoute"
+      );
+      redirectPath = await (isPhoneRoute
+        ? getPublicPhoneRedirectPath(pathname)
+        : getPublicProfileRedirectPath(pathname));
+    } catch (error) {
+      console.error("Public profile route temporarily unavailable:", error);
+      return new NextResponse(
+        "No pudimos cargar este perfil. Intenta de nuevo en unos minutos.",
+        {
+          status: 503,
+          headers: {
+            "Cache-Control": "no-store",
+            "Retry-After": "60",
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        }
+      );
+    }
 
     if (redirectPath) {
       // Run before the page/ISR cache: cached render headers must never

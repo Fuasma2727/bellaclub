@@ -1,0 +1,21 @@
+{
+  "reportDate": "2026-11-16",
+  "source": "belaclub.co-Coverage-Drilldown-2026-11-16(1).zip",
+  "sourceSha256": "0dbad1ac3cb4e6b7ece3de85df82949dfacb7b1e29587c2c789d171d770a5e9c",
+  "issue": "No se ha encontrado (404)",
+  "count": 15,
+  "phoneUrls": 8,
+  "profileUrls": 7,
+  "matchingPublicProfileUrls": 4,
+  "unmatchedPublicSnapshotUrls": 11,
+  "publicSnapshotUpdatedAtUTC": "2026-11-16T18:36:14.737Z",
+  "groups": {
+    "Sin coincidencia en copia publica; confirmar retirada": 11,
+    "Ruta anterior de una ficha publica; comprobar redireccion": 3,
+    "Ficha publica encontrada; comprobar respuesta": 1
+  },
+  "homepage_included": false,
+  "oldest_reported_crawl": "2026-08-14",
+  "newest_reported_crawl": "2026-11-13",
+  "scope": "Revision de las 15 URLs exportadas y cruce con copia local publica del 16 de noviembre y codigo actual. Sin comprobacion HTTP actual ni modificaciones de la aplicacion. La ausencia en copia local no confirma retirada."
+}

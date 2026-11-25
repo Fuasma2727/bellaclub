@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import CatadorSignupInvite from "@/app/prestadores/_components/CatadorSignupInvite";
 import JsonLd from "@/components/JsonLd";
 import SupportAdvisors from "@/components/SupportAdvisors";
 import { getPublicSupportAdvisors } from "@/lib/supportAdvisors.server";
@@ -91,9 +92,11 @@ export default async function Home() {
         />
       )}
       <PrestadoresClientPage
+        filtersFirst
         pageTitle="BelaClub: Escorts verificadas"
-        pageEyebrow="Perfiles activos"
-        pageDescription="Explora perfiles aprobados en Colombia con fotos publicas, zonas disponibles y contacto directo por WhatsApp."
+        pageEyebrow=""
+        pageDescription="Explora perfiles aprobados en Colombia con fotos públicas, zonas disponibles y contacto directo por WhatsApp."
+        signupInvite={<CatadorSignupInvite />}
         initialProviders={initialProviders.map(toProviderListingCard)}
         seoCityLinks={cityLinks}
         supportContent={<SupportAdvisors advisors={advisors} />}

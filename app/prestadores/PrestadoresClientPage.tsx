@@ -35,12 +35,14 @@ const ReportModal = dynamic(() => import("./_components/ReportModal"));
 
 export type PrestadoresPageProps = {
   supportContent?: ReactNode;
+  signupInvite?: ReactNode;
   initialCity?: string;
   initialDepartment?: string;
   pageTitle?: string;
   pageEyebrow?: string;
   pageDescription?: string;
   seoCityLinks?: CitySeoLink[];
+  filtersFirst?: boolean;
   showPageIntro?: boolean;
   initialProviders?: Prestador[];
   seoContent?: {
@@ -103,10 +105,12 @@ export default function PrestadoresPage({
   pageEyebrow = "Escorts por ciudad",
   pageDescription,
   seoCityLinks = [],
+  filtersFirst = false,
   showPageIntro = true,
   initialProviders,
   seoContent,
   supportContent,
+  signupInvite,
 }: PrestadoresPageProps = {}) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -152,6 +156,7 @@ export default function PrestadoresPage({
   const [purchaseError, setPurchaseError] = useState("");
   const [highlightPrivateBadges, setHighlightPrivateBadges] = useState(false);
   const hasPageIntroContent = Boolean(initialCity || pageTitle);
+  const visibleSignupInvite = !user && signupInvite;
   const resolvedPageTitle = pageTitle || `Escorts en ${initialCity}`;
   const resolvedPageDescription =
     pageDescription ||
@@ -188,7 +193,7 @@ export default function PrestadoresPage({
   }, [departmentFilter, prestadores]);
 
   const zones = useMemo(() => {
-    if (!cityFilter) return [];
+    if (filtersFirst || !cityFilter) return [];
 
     const selectedCity = normalizeLocationValue(cityFilter);
 
@@ -207,7 +212,7 @@ export default function PrestadoresPage({
           .filter((value): value is string => Boolean(value))
       )
     ).sort((a, b) => a.localeCompare(b, "es"));
-  }, [cityFilter, departmentFilter, prestadores]);
+  }, [cityFilter, departmentFilter, filtersFirst, prestadores]);
 
   const filtered = useMemo(() => {
     let results = [...prestadores];
@@ -896,6 +901,37 @@ export default function PrestadoresPage({
     }
   };
 
+  const pageIntro = hasPageIntroContent && (
+    <>
+      <div className="max-w-4xl">
+        {!filtersFirst && pageEyebrow && (
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+            {pageEyebrow}
+          </p>
+        )}
+        <h1 id="directory-title" className="text-2xl font-semibold text-white sm:text-3xl">
+          {resolvedPageTitle}
+        </h1>
+        <p className="mt-1.5 max-w-2xl text-sm leading-6 text-neutral-400">
+          {resolvedPageDescription}
+        </p>
+      </div>
+      {seoCityLinks.length > 0 && (
+        <nav aria-label="Ciudades populares" className="mt-4 flex flex-wrap gap-2">
+          {seoCityLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+      )}
+    </>
+  );
+
   return (
     <div
       className="min-h-screen bg-[#050505] pb-16 pt-14 text-white sm:pt-16"
@@ -903,40 +939,19 @@ export default function PrestadoresPage({
       onDragStart={(event) => event.preventDefault()}
     >
       <ScreenProtection active />
-      <Header />
+      <Header showSearchLinks={!filtersFirst} />
 
       <main>
-        {hasPageIntroContent && (
+        {!filtersFirst && pageIntro && (
           <section className="mx-auto w-full max-w-7xl px-3 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5 lg:px-8">
-            <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
-                {pageEyebrow}
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
-                {resolvedPageTitle}
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
-                {resolvedPageDescription}
-              </p>
-            </div>
-
-            {seoCityLinks.length > 0 && (
-              <nav
-                aria-label="Ciudades populares"
-                className="mt-4 flex flex-wrap gap-2"
-              >
-                {seoCityLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-blue-300/35 hover:bg-blue-400/10 hover:text-blue-100"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
-            )}
+            {pageIntro}
           </section>
+        )}
+
+        {visibleSignupInvite && (
+          <div className="mx-auto w-full max-w-7xl px-3 pt-4 sm:px-6 sm:pt-5 lg:px-8">
+            {visibleSignupInvite}
+          </div>
         )}
 
         <FiltersBar
@@ -946,7 +961,7 @@ export default function PrestadoresPage({
           departments={departments}
           cities={cities}
           zones={zones}
-          resultCount={filtered.length}
+          resultCount={filtersFirst ? undefined : filtered.length}
           onDepartmentChange={(value) => {
             setDepartmentFilter(value);
             setCityFilter("");
@@ -1019,6 +1034,12 @@ export default function PrestadoresPage({
                 ))}
               </div>
             </>
+          )}
+
+          {filtersFirst && pageIntro && (
+            <section aria-labelledby="directory-title" className="mt-8 border-t border-white/[0.08] pt-6 sm:mt-10 sm:pt-8">
+              {pageIntro}
+            </section>
           )}
 
           {seoContent && !loading && !pageError && (

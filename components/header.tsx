@@ -93,7 +93,7 @@ const isProviderSubscriptionPastDue = (data: Record<string, unknown>) => {
   return false;
 };
 
-export default function Header() {
+export default function Header({ showSearchLinks = true }: { showSearchLinks?: boolean } = {}) {
   const { user, loading: authLoading } = useAuth();
   const ownerEmail =
     process.env.NEXT_PUBLIC_OWNER_EMAIL?.toLowerCase() ||
@@ -152,7 +152,7 @@ export default function Header() {
     0
   );
   const supportHref = supportInstagramUrl;
-  const publicSearchNav = (
+  const publicSearchNav = showSearchLinks && (
     <nav
       aria-label="Busquedas populares"
       className="hidden flex-1 items-center justify-center gap-1 lg:flex"

@@ -723,16 +723,12 @@ export async function getPublicProviderProfileById(id: string) {
       return cachedProfile;
     }
 
-    if (isTimeoutError(error)) {
-      console.warn(
-        `Public provider profile timed out with no cached fallback: ${getErrorMessage(
-          error
-        )}`
-      );
-      return null;
-    }
-
-    throw error;
+    console.warn(
+      `Public provider profile unavailable without a cached fallback: ${getErrorMessage(error)}`
+    );
+    // Only an authoritative missing/private record should become a 404.
+    // A timeout or database outage must remain a retryable server error.
+    throw new PublicProvidersUnavailableError();
   }
 }
 
@@ -756,7 +752,7 @@ export async function getPublicProviderProfileByPhone(phoneSlug: string) {
 
   if (requestedVariants.size === 0) return null;
 
-  const providers = await getPublicProviderCards();
+  const providers = await getPublicProviderCards({ requireAvailable: true });
   const match = providers.find((provider) => {
     const providerPhone = getPhoneSeoValues(provider.whatsapp);
 
