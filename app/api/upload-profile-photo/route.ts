@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import { hasBunnyStorageCredentials, putUserFileInBunny } from "@/lib/bunnyStorage";
 import {
   guardMutationRequest,
   securityErrorResponse,
@@ -13,28 +14,6 @@ import {
 } from "@/lib/mediaCompatibility";
 
 export const runtime = "nodejs";
-
-const BUNNY_STORAGE_ZONE =
-  process.env.BUNNY_STORAGE_ZONE || "pp-profile-photos";
-const BUNNY_STORAGE_HOST =
-  process.env.BUNNY_STORAGE_HOST || "ny.storage.bunnycdn.com";
-const BUNNY_CDN_HOST =
-  process.env.BUNNY_CDN_HOST || "pp-profile-photos-cdn.b-cdn.net";
-const BUNNY_API_KEY = process.env.BUNNY_API_KEY;
-
-const getHost = (value: string) => {
-  return value.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-};
-
-const getSafeFilename = (filename: string) => {
-  const extension = filename.split(".").pop()?.toLowerCase() || "bin";
-  const random =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-  return `${Date.now()}-${random}.${extension}`;
-};
 
 const getMaxSizeMb = (contentType: string) => {
   return contentType.startsWith("video") ? 150 : 12;
@@ -115,33 +94,15 @@ const uploadToBunny = async ({
   filename: string;
   uid: string;
 }) => {
-  const storageHost = getHost(BUNNY_STORAGE_HOST);
-  const cdnHost = getHost(BUNNY_CDN_HOST);
-  const safeUid = uid.replace(/[^a-zA-Z0-9_-]/g, "");
-  const uploadPath = `users/${safeUid}/${getSafeFilename(filename)}`;
-  const uploadUrl = `https://${storageHost}/${BUNNY_STORAGE_ZONE}/${uploadPath}`;
-  const headers: Record<string, string> = {
-    AccessKey: BUNNY_API_KEY || "",
-    "Content-Type": contentType || "application/octet-stream",
-  };
-  const uploadInit: RequestInit & { duplex?: "half" } = {
-    method: "PUT",
-    headers,
-    body,
-  };
-
-  if (contentLength && contentLength > 0) {
-    headers["Content-Length"] = String(contentLength);
-  }
-
-  if (body instanceof ReadableStream) {
-    uploadInit.duplex = "half";
-  }
-
-  let upload: Response;
-
+  let stored: Awaited<ReturnType<typeof putUserFileInBunny>>;
   try {
-    upload = await fetch(uploadUrl, uploadInit);
+    stored = await putUserFileInBunny({
+      body,
+      contentLength,
+      contentType: contentType || "application/octet-stream",
+      extension: filename.split(".").pop()?.toLowerCase() || "bin",
+      uid,
+    });
   } catch (error) {
     if (isPayloadTooLargeError(error)) {
       return NextResponse.json(
@@ -167,6 +128,7 @@ const uploadToBunny = async ({
     );
   }
 
+  const { response: upload, url } = stored;
   if (!upload.ok) {
     const errorText = await upload.text();
     console.error("Bunny upload error:", upload.status, errorText);
@@ -180,7 +142,7 @@ const uploadToBunny = async ({
     );
   }
 
-  return NextResponse.json({ url: `https://${cdnHost}/${uploadPath}` });
+  return NextResponse.json({ url });
 };
 
 export async function POST(request: Request) {
@@ -194,7 +156,7 @@ export async function POST(request: Request) {
 
     const decoded = await requireAuthenticatedUser(request);
 
-    if (!BUNNY_API_KEY) {
+    if (!hasBunnyStorageCredentials()) {
       return NextResponse.json(
         { error: "BUNNY_API_KEY no esta configurada" },
         { status: 500 }

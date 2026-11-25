@@ -48,9 +48,13 @@ const explicitPublicRouteSources = [
 
 const nextConfig: NextConfig = {
   // Keep the native decoder and its executable available in the server build.
-  serverExternalPackages: ["ffmpeg-static"],
+  serverExternalPackages: ["ffmpeg-static", "@derhuerst/ffprobe-static"],
   outputFileTracingIncludes: {
     "/api/media-preview": ["./node_modules/ffmpeg-static/ffmpeg*"],
+    "/api/provider-daily-video": [
+      "./node_modules/ffmpeg-static/ffmpeg*",
+      "./node_modules/@derhuerst/ffprobe-static/ffprobe*",
+    ],
   },
   experimental: {
     proxyClientMaxBodySize: "170mb",

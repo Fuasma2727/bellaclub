@@ -30,9 +30,14 @@ import {
   PROVIDER_PROMOTION_PRICE,
 } from "@/lib/providerPromotion";
 import {
+  DAILY_VIDEO_FORMAT_LABEL,
   DAILY_VIDEO_MAX_SECONDS,
+  DAILY_VIDEO_MAX_UPLOAD_BYTES,
+  DAILY_VIDEO_MAX_UPLOAD_MB,
   DAILY_VIDEO_REWARD_AMOUNT,
+  DAILY_VIDEO_UPLOAD_ACCEPT,
   canReceiveDailyVideoReward,
+  getDailyVideoInputFormat,
 } from "@/lib/providerDailyVideo";
 import {
   MEDIA_UPLOAD_ACCEPT,
@@ -159,7 +164,7 @@ type ProviderPauseResponse = {
 };
 
 type DailyVideoResponse = {
-  dailyVideo?: {
+  dailyVideo: {
     url: string;
     duration?: number | null;
     playbackStatus?: "ready" | "failed" | null;
@@ -589,6 +594,41 @@ const uploadFileWithProgressFallback = async (
   return data.url;
 };
 
+const publishDailyVideoFile = (
+  file: File,
+  format: string,
+  token: string,
+  onProgress: (percent: number | null) => void
+) => new Promise<DailyVideoResponse>((resolve, reject) => {
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/provider-daily-video");
+  xhr.responseType = "json";
+  xhr.timeout = 10 * 60 * 1000;
+  xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+  xhr.setRequestHeader("Content-Type", "application/octet-stream");
+  xhr.setRequestHeader("x-video-format", format);
+
+  xhr.upload.onprogress = ({ lengthComputable, loaded, total }) => {
+    if (lengthComputable && total > 0) onProgress(Math.min(99, Math.round(loaded * 100 / total)));
+  };
+  xhr.upload.onload = () => onProgress(null);
+  xhr.onload = () => {
+    const data = xhr.response as DailyVideoResponse | null;
+    if (xhr.status >= 200 && xhr.status < 300 && data?.dailyVideo?.url) {
+      resolve(data);
+      return;
+    }
+
+    const fallback = xhr.status === 413
+      ? `El servidor rechazó el tamaño del video. Intenta con un archivo de menos de ${DAILY_VIDEO_MAX_UPLOAD_MB} MB.`
+      : "No pudimos publicar el video del día. Intenta de nuevo.";
+    reject(new Error(data?.error || fallback));
+  };
+  xhr.onerror = () => reject(new Error("Se perdió la conexión durante la subida. Intenta de nuevo."));
+  xhr.ontimeout = () => reject(new Error("La subida tardó demasiado. Intenta con un video más liviano."));
+  xhr.send(file);
+});
+
 const getVideoDuration = (file: File) => {
   return new Promise<number>((resolve, reject) => {
     const video = document.createElement("video");
@@ -991,6 +1031,8 @@ export default function PerfilPrestador() {
     null
   );
   const [uploadingDailyVideo, setUploadingDailyVideo] = useState(false);
+  const [dailyVideoUploadProgress, setDailyVideoUploadProgress] = useState<number | null>(0);
+  const [dailyVideoUploadError, setDailyVideoUploadError] = useState("");
   const onboardingInitializedRef = useRef(false);
 
   const mediaList = useMemo<MediaItem[]>(() => {
@@ -2062,39 +2104,24 @@ export default function PerfilPrestador() {
   const uploadDailyVideo = async (file: File) => {
     if (!user) return;
 
+    const format = getDailyVideoInputFormat(file);
+    if (!format) {
+      setDailyVideoUploadError(`Selecciona un video en formato ${DAILY_VIDEO_FORMAT_LABEL}.`);
+      return;
+    }
+    if (!file.size || file.size > DAILY_VIDEO_MAX_UPLOAD_BYTES) {
+      setDailyVideoUploadError(file.size
+        ? `El video supera el límite de ${DAILY_VIDEO_MAX_UPLOAD_MB} MB.`
+        : "El archivo está vacío. Selecciona otro video.");
+      return;
+    }
+
     setUploadingDailyVideo(true);
-    setError("");
+    setDailyVideoUploadProgress(0);
+    setDailyVideoUploadError("");
 
     try {
-      const { mediaType } = validateUploadFile(file);
-
-      if (mediaType !== "video") {
-        throw new Error("Selecciona un video para publicar como video del dia");
-      }
-
-      const duration = await getVideoDuration(file);
-
-      if (duration > DAILY_VIDEO_MAX_SECONDS) {
-        throw new Error(
-          `El video del dia debe durar maximo ${DAILY_VIDEO_MAX_SECONDS} segundos`
-        );
-      }
-
-      const url = await uploadFile(file, await user.getIdToken());
-      const res = await fetch("/api/provider-daily-video", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${await user.getIdToken()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url, duration }),
-      });
-      const data = (await res.json()) as DailyVideoResponse;
-
-      if (!res.ok || !data.dailyVideo) {
-        throw new Error(data.error || "No pudimos guardar el video del dia");
-      }
-
+      const data = await publishDailyVideoFile(file, format, await user.getIdToken(), setDailyVideoUploadProgress);
       setDailyVideoUrl(data.dailyVideo.url);
       setDailyVideoExpiresAt(data.dailyVideo.expiresAt || null);
       setShowDailyVideoUploadModal(false);
@@ -2111,8 +2138,8 @@ export default function PerfilPrestador() {
       const text =
         dailyVideoError instanceof Error
           ? dailyVideoError.message
-          : "No pudimos publicar el video del dia";
-      setError(text);
+          : "No pudimos publicar el video del día.";
+      setDailyVideoUploadError(text);
     } finally {
       setUploadingDailyVideo(false);
     }
@@ -3199,7 +3226,10 @@ export default function PerfilPrestador() {
                   ? `Destácate por 4 horas · Bono de $${DAILY_VIDEO_REWARD_AMOUNT.toLocaleString("es-CO")}`
                   : "Destácate por 4 horas · Bono desde nivel Bronce."
           }
-          onDailyVideo={() => setShowDailyVideoUploadModal(true)}
+          onDailyVideo={() => {
+            setDailyVideoUploadError("");
+            setShowDailyVideoUploadModal(true);
+          }}
           onPublicUpload={() => publicUploadRef.current?.click()}
           onPrivateUpload={() => privateUploadRef.current?.click()}
           uploading={uploadingMedia}
@@ -3488,9 +3518,10 @@ export default function PerfilPrestador() {
                 Publica y gana visibilidad
               </h3>
               <p className="mt-2 text-sm leading-6 text-neutral-400">
-                El video aparecera destacado durante 4 horas y debe durar maximo{" "}
-                {DAILY_VIDEO_MAX_SECONDS} segundos.
+                El video aparecerá destacado durante 4 horas. Máximo{" "}
+                {DAILY_VIDEO_MAX_SECONDS} segundos y {DAILY_VIDEO_MAX_UPLOAD_MB} MB.
               </p>
+              <p className="mt-1 text-xs text-neutral-400">{DAILY_VIDEO_FORMAT_LABEL}</p>
             </div>
 
             <div className="space-y-4 p-5">
@@ -3529,6 +3560,26 @@ export default function PerfilPrestador() {
                 </div>
               )}
 
+              {uploadingDailyVideo && (
+                <div className="space-y-2 text-xs text-sky-100">
+                  <p role="status">
+                    {dailyVideoUploadProgress === null ? "Preparando el video para publicarlo…" : "Subiendo el video…"}
+                  </p>
+                  <progress
+                    aria-label="Progreso de subida del video"
+                    className="block h-2 w-full accent-sky-400"
+                    max={100}
+                    value={dailyVideoUploadProgress ?? undefined}
+                  />
+                </div>
+              )}
+
+              {dailyVideoUploadError && (
+                <p role="alert" className="rounded-md bg-red-400/10 px-3 py-2 text-sm text-red-200">
+                  {dailyVideoUploadError}
+                </p>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -3545,10 +3596,10 @@ export default function PerfilPrestador() {
                       : "cursor-pointer bg-sky-600 hover:bg-sky-500"
                   }`}
                 >
-                  {uploadingDailyVideo ? "Subiendo..." : "Elegir video"}
+                  {uploadingDailyVideo ? "Publicando…" : "Elegir video"}
                   <input
                     type="file"
-                    accept={VIDEO_UPLOAD_ACCEPT}
+                    accept={DAILY_VIDEO_UPLOAD_ACCEPT}
                     hidden
                     disabled={uploadingDailyVideo}
                     onChange={(e) => {

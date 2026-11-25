@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
-import { authRouteError, requireAuthenticatedUser } from "@/lib/serverAuth";
+import { authRouteError, requireAuthenticatedUser, requireUserDocument } from "@/lib/serverAuth";
+import { hasBunnyStorageCredentials } from "@/lib/bunnyStorage";
+import { DailyVideoUploadError, storeDailyVideo } from "@/lib/dailyVideoUpload";
 import { setLedgerEntry } from "@/lib/ledger";
 import {
   guardMutationRequest,
@@ -8,28 +10,29 @@ import {
 } from "@/lib/requestSecurity";
 import {
   DAILY_VIDEO_DURATION_HOURS,
-  DAILY_VIDEO_MAX_SECONDS,
+  DAILY_VIDEO_FORMAT_LABEL,
+  DAILY_VIDEO_MAX_UPLOAD_BYTES,
+  DAILY_VIDEO_MAX_UPLOAD_MB,
   DAILY_VIDEO_REWARD_AMOUNT,
   canReceiveDailyVideoReward,
+  getDailyVideoDemuxer,
   getDailyVideoRewardDateKey,
 } from "@/lib/providerDailyVideo";
 import { isProviderSubscriptionPubliclyActive } from "@/lib/providerSubscription";
-import { isSupportedVideoUrl } from "@/lib/mediaCompatibility";
 import { invalidatePublicProviderCache } from "@/lib/publicProviders";
 
 export const runtime = "nodejs";
 
-type DailyVideoBody = {
-  url?: string;
-  duration?: number;
-};
-
-const isValidVideoUrl = (url: unknown): url is string => {
-  return (
-    typeof url === "string" &&
-    url.startsWith("https://") &&
-    isSupportedVideoUrl(url)
-  );
+const assertDailyVideoProfile = (user: FirebaseFirestore.DocumentData) => {
+  if (user.role !== "prestador") throw new Error("NOT_PROVIDER");
+  if (
+    user.verificationStatus !== "approved" ||
+    user.profileVisible !== true ||
+    user.blocked === true ||
+    !isProviderSubscriptionPubliclyActive(user)
+  ) {
+    throw new Error("PROFILE_NOT_AVAILABLE");
+  }
 };
 
 export async function POST(request: Request) {
@@ -38,42 +41,23 @@ export async function POST(request: Request) {
       rateLimitKey: "provider-daily-video",
       limit: 20,
       windowMs: 10 * 60 * 1000,
-      maxBodyBytes: 16 * 1024,
+      maxBodyBytes: DAILY_VIDEO_MAX_UPLOAD_BYTES,
     });
 
     const decoded = await requireAuthenticatedUser(request);
-    const body = (await request.json()) as DailyVideoBody;
-    const videoUrl = body.url;
-
-    if (!isValidVideoUrl(videoUrl)) {
+    const demuxer = getDailyVideoDemuxer(request.headers.get("x-video-format") || "");
+    if (!demuxer || request.headers.get("content-type") !== "application/octet-stream") {
       return NextResponse.json(
-        {
-          error:
-            "Video invalido. Sube un MP4 compatible antes de publicarlo.",
-        },
-        { status: 400 }
+        { error: `Selecciona un archivo de video en formato ${DAILY_VIDEO_FORMAT_LABEL}.` },
+        { status: 415 }
       );
     }
 
-    const duration = Math.ceil(Number(body.duration || 0));
+    const { ref: userRef, data: userProfile } = await requireUserDocument(decoded.uid);
+    assertDailyVideoProfile(userProfile);
+    if (!hasBunnyStorageCredentials()) throw new Error("Bunny storage is not configured");
 
-    if (!duration || duration <= 0) {
-      return NextResponse.json(
-        { error: "No pudimos leer la duracion del video." },
-        { status: 400 }
-      );
-    }
-
-    if (duration > DAILY_VIDEO_MAX_SECONDS) {
-      return NextResponse.json(
-        {
-          error: `El video del dia debe durar maximo ${DAILY_VIDEO_MAX_SECONDS} segundos.`,
-        },
-        { status: 400 }
-      );
-    }
-
-    const userRef = adminDb.collection("users").doc(decoded.uid);
+    const { url: videoUrl, duration } = await storeDailyVideo(request, decoded.uid, demuxer);
     const expiresAt = new Date(
       Date.now() + DAILY_VIDEO_DURATION_HOURS * 60 * 60 * 1000
     );
@@ -92,15 +76,7 @@ export async function POST(request: Request) {
 
       const user = userSnap.data() || {};
 
-      if (user.role !== "prestador") throw new Error("NOT_PROVIDER");
-      if (
-        user.verificationStatus !== "approved" ||
-        user.profileVisible !== true ||
-        user.blocked === true ||
-        !isProviderSubscriptionPubliclyActive(user)
-      ) {
-        throw new Error("PROFILE_NOT_AVAILABLE");
-      }
+      assertDailyVideoProfile(user);
 
       const rewardEligible = canReceiveDailyVideoReward(user);
       const rewardGranted = rewardEligible && !rewardSnap.exists;
@@ -177,6 +153,15 @@ export async function POST(request: Request) {
       rewardGranted: result.rewardGranted,
     });
   } catch (error) {
+    if (error instanceof DailyVideoUploadError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof Error && error.message === "PAYLOAD_TOO_LARGE") {
+      return NextResponse.json(
+        { error: `El video supera el límite de ${DAILY_VIDEO_MAX_UPLOAD_MB} MB.` },
+        { status: 413 }
+      );
+    }
     const securityError = securityErrorResponse(error);
     if (securityError) return securityError;
 
