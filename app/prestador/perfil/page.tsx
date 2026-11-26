@@ -316,6 +316,11 @@ const createUploadProgressSmoother = (
     publish();
   }, 140);
 
+  const stop = () => {
+    stopped = true;
+    window.clearInterval(interval);
+  };
+
   onProgress(0);
 
   return {
@@ -323,29 +328,10 @@ const createUploadProgressSmoother = (
       target = Math.max(target, Math.min(99, nextTarget));
     },
     finish() {
-      stopped = true;
-      window.clearInterval(interval);
-
-      return new Promise<void>((resolve) => {
-        const finishInterval = window.setInterval(() => {
-          const gap = 100 - shown;
-
-          if (gap <= 0) {
-            window.clearInterval(finishInterval);
-            onProgress(100);
-            resolve();
-            return;
-          }
-
-          shown = Math.min(100, shown + Math.max(4, Math.ceil(gap / 4)));
-          publish();
-        }, 70);
-      });
+      stop();
+      onProgress(100);
     },
-    stop() {
-      stopped = true;
-      window.clearInterval(interval);
-    },
+    stop,
   };
 };
 
@@ -499,10 +485,8 @@ const uploadFileWithProgress = (
       const data = parseUploadResponseText(xhr.status, xhr.responseText || "");
 
       if (xhr.status >= 200 && xhr.status < 300 && data.url) {
-        const uploadedUrl = data.url;
-
-        progress.setTarget(96);
-        progress.finish().then(() => resolve(uploadedUrl));
+        progress.finish();
+        resolve(data.url);
         return;
       }
 
@@ -1768,15 +1752,19 @@ export default function PerfilPrestador() {
           return 0;
         }
 
-        const hasVideos = preparedFiles.some((item) => item.type === "video");
-        const uploadBatchSize = hasVideos ? 1 : 4;
-
-        for (let index = 0; index < preparedFiles.length; index += uploadBatchSize) {
-          const group = preparedFiles.slice(index, index + uploadBatchSize);
-          const groupProgressItems = progressItems.slice(
-            index,
-            index + uploadBatchSize
-          );
+        for (let start = 0; start < preparedFiles.length;) {
+          let end = start + 1;
+          // Upload consecutive photos together and give each video its own group.
+          while (
+            preparedFiles[start].type === "photo" &&
+            end - start < 4 &&
+            preparedFiles[end]?.type === "photo"
+          ) {
+            end += 1;
+          }
+          const group = preparedFiles.slice(start, end);
+          const groupProgressItems = progressItems.slice(start, end);
+          start = end;
           const uploadResults = await Promise.allSettled(
             group.map(async (item, groupIndex) => {
               const progressItem = groupProgressItems[groupIndex];

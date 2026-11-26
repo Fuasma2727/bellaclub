@@ -964,7 +964,15 @@ export default function PrestadoresPage({
           resultCount={filtersFirst ? undefined : filtered.length}
           onDepartmentChange={(value) => {
             setDepartmentFilter(value);
-            setCityFilter("");
+            if (
+              value &&
+              cityFilter &&
+              !prestadores.some(
+                (provider) => provider.department === value && provider.city?.trim() === cityFilter
+              )
+            ) {
+              setCityFilter("");
+            }
             setZoneFilter("");
           }}
           onCityChange={(value) => {

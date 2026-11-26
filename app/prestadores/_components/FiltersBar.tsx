@@ -48,7 +48,7 @@ export default function FiltersBar({
             className="h-10 min-w-0 rounded-md border border-white/[0.08] bg-[#101012] px-3 text-sm font-medium text-neutral-100 outline-none transition hover:border-white/15 focus:border-blue-400/80 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-45 sm:w-52"
             value={cityFilter}
             onChange={(e) => onCityChange(e.target.value)}
-            disabled={!departmentFilter}
+            disabled={cities.length === 0}
           >
             <option value="">Ciudad</option>
             {cities.map((city) => (
