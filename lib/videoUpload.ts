@@ -11,14 +11,13 @@ import ffmpegPath from "ffmpeg-static";
 import ffprobePath from "@derhuerst/ffprobe-static";
 import { withTimeout } from "@/lib/asyncTimeout";
 import { putUserFileInBunny } from "@/lib/bunnyStorage";
-import {
-  DAILY_VIDEO_MAX_SECONDS,
-  DAILY_VIDEO_MAX_UPLOAD_BYTES,
-  DAILY_VIDEO_MAX_UPLOAD_MB,
-} from "@/lib/providerDailyVideo";
+import { VIDEO_UPLOAD_MAX_BYTES, VIDEO_UPLOAD_MAX_MB } from "@/lib/videoUploadFormats";
 
 const runFile = promisify(execFile);
-const activePreparations = new Set<Promise<number>>();
+const processState = globalThis as typeof globalThis & {
+  belaclubVideoPreparations?: Set<Promise<number>>;
+};
+const activePreparations = (processState.belaclubVideoPreparations ??= new Set<Promise<number>>());
 const maxPixels = 8192 * 4320;
 const inputOptions = ["-max_alloc", String(256 * 1024 * 1024), "-protocol_whitelist", "file"];
 const invalidVideo = "No pudimos leer este video. Selecciona otro archivo o vuelve a exportarlo.";
@@ -38,11 +37,17 @@ type VideoStream = {
   disposition?: { attached_pic?: number };
 };
 
-export class DailyVideoUploadError extends Error {
+export class VideoUploadError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
   }
 }
+
+type VideoUploadOptions = {
+  maxSeconds: number;
+  durationError: VideoUploadError;
+  conversionTimeoutMs: number;
+};
 
 async function runMediaTool(executable: string, args: string[], signal: AbortSignal, timeout: number) {
   try {
@@ -51,14 +56,14 @@ async function runMediaTool(executable: string, args: string[], signal: AbortSig
     const failure = error as NodeJS.ErrnoException & { killed?: boolean };
     if (signal.aborted || failure.code === "ENOENT" || failure.code === "EACCES") throw error;
     if (failure.killed) {
-      throw new DailyVideoUploadError("Preparar el video tardó demasiado. Intenta con una versión más liviana.", 422);
+      throw new VideoUploadError("Preparar el video tardó demasiado. Intenta con una versión más liviana.", 422);
     }
-    throw new DailyVideoUploadError(invalidVideo, 422);
+    throw new VideoUploadError(invalidVideo, 422);
   }
 }
 
 async function probeVideo(file: string, demuxer: string, signal: AbortSignal) {
-  if (!ffprobePath) throw new Error("Daily video probe unavailable");
+  if (!ffprobePath) throw new Error("Video probe unavailable");
   const { stdout } = await runMediaTool(ffprobePath, [
     "-v", "error", ...inputOptions, "-f", demuxer,
     "-show_entries", "format=duration:stream=index,codec_type,codec_name,profile,pix_fmt,color_transfer,avg_frame_rate,level,width,height,channels:stream_disposition=attached_pic",
@@ -66,7 +71,7 @@ async function probeVideo(file: string, demuxer: string, signal: AbortSignal) {
   ], signal, 6_000);
   const data = JSON.parse(stdout) as { streams?: VideoStream[]; format?: { duration?: string } };
   const video = data.streams?.find((stream) => stream.codec_type === "video" && !stream.disposition?.attached_pic);
-  if (!video?.width || !video.height) throw new DailyVideoUploadError(invalidVideo, 422);
+  if (!video?.width || !video.height) throw new VideoUploadError(invalidVideo, 422);
 
   return {
     video: { ...video, width: video.width, height: video.height },
@@ -75,18 +80,14 @@ async function probeVideo(file: string, demuxer: string, signal: AbortSignal) {
   };
 }
 
-function checkDuration(duration: number) {
-  if (duration > DAILY_VIDEO_MAX_SECONDS) {
-    throw new DailyVideoUploadError(`El video del día debe durar máximo ${DAILY_VIDEO_MAX_SECONDS} segundos.`, 400);
-  }
-}
-
-async function preparePlaybackFile(source: string, output: string, demuxer: string, signal: AbortSignal) {
-  if (!ffmpegPath) throw new Error("Daily video processor unavailable");
+async function preparePlaybackFile(
+  source: string, output: string, demuxer: string, signal: AbortSignal, options: VideoUploadOptions
+) {
+  if (!ffmpegPath) throw new Error("Video processor unavailable");
   const { video, audio, duration } = await probeVideo(source, demuxer, signal);
-  checkDuration(duration);
+  if (duration > options.maxSeconds) throw options.durationError;
   if (video.width * video.height > maxPixels) {
-    throw new DailyVideoUploadError("La resolución del video es demasiado alta. Intenta con una versión en 1080p.", 422);
+    throw new VideoUploadError("La resolución del video es demasiado alta. Intenta con una versión en 1080p.", 422);
   }
 
   const [frames, seconds] = (video.avg_frame_rate || "").split("/").map(Number);
@@ -109,27 +110,29 @@ async function preparePlaybackFile(source: string, output: string, demuxer: stri
     "-map", `0:${video.index}`, ...(audio ? ["-map", `0:${audio.index}`] : []),
     "-map_metadata", "-1", "-map_metadata:s", "-1", "-map_chapters", "-1",
     // Leave enough output to detect overlong clips when the source has no duration metadata.
-    "-t", String(DAILY_VIDEO_MAX_SECONDS + 1),
+    "-t", String(options.maxSeconds + 1),
     ...(canCopyVideo ? ["-c:v", "copy"] : [
       "-c:v", "libx264", "-threads:v", "2", "-preset", "veryfast", "-crf", "23",
       "-maxrate", "5M", "-bufsize", "10M", "-pix_fmt", "yuv420p", "-fpsmax", "30", "-vf", filters.join(","),
     ]),
     ...(audio ? (canCopyAudio ? ["-c:a", "copy"] : ["-c:a", "aac", "-b:a", "128k", "-ac", "2"]) : []),
     "-movflags", "+faststart", "-f", "mp4", output,
-  ], signal, 40_000);
+  ], signal, options.conversionTimeoutMs);
 
   const playable = await probeVideo(output, "mov", signal);
-  checkDuration(playable.duration);
+  if (playable.duration > options.maxSeconds) throw options.durationError;
   if (!Number.isFinite(playable.duration) || playable.duration <= 0) {
-    throw new DailyVideoUploadError(invalidVideo, 422);
+    throw new VideoUploadError(invalidVideo, 422);
   }
 
   return Math.ceil(playable.duration);
 }
 
-export async function storeDailyVideo(request: Request, uid: string, demuxer: string) {
-  if (!request.body) throw new DailyVideoUploadError("No se recibió ningún video.", 400);
-  const directory = await mkdtemp(join(tmpdir(), "belaclub-daily-video-"));
+export async function storeCompatibleVideo(
+  request: Pick<Request, "body" | "signal">, uid: string, demuxer: string, options: VideoUploadOptions
+) {
+  if (!request.body) throw new VideoUploadError("No se recibió ningún video.", 400);
+  const directory = await mkdtemp(join(tmpdir(), "belaclub-video-"));
   const source = join(directory, "input");
   const output = join(directory, "output.mp4");
   let bytes = 0;
@@ -138,32 +141,32 @@ export async function storeDailyVideo(request: Request, uid: string, demuxer: st
     const boundedBody = request.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
         bytes += chunk.byteLength;
-        if (bytes > DAILY_VIDEO_MAX_UPLOAD_BYTES) {
-          throw new DailyVideoUploadError(`El video supera el límite de ${DAILY_VIDEO_MAX_UPLOAD_MB} MB.`, 413);
+        if (bytes > VIDEO_UPLOAD_MAX_BYTES) {
+          throw new VideoUploadError(`El video supera el límite de ${VIDEO_UPLOAD_MAX_MB} MB.`, 413);
         }
         controller.enqueue(chunk);
       },
     }));
     await pipeline(Readable.fromWeb(boundedBody as NodeReadableStream<Uint8Array>),
       createWriteStream(source), { signal: request.signal });
-    if (!bytes) throw new DailyVideoUploadError("No se recibió ningún video.", 400);
+    if (!bytes) throw new VideoUploadError("No se recibió ningún video.", 400);
 
     if (activePreparations.size >= 2) {
-      await withTimeout(Promise.race(activePreparations), 5_000, "Daily video processor")
+      await withTimeout(Promise.race(activePreparations), 5_000, "Video processor")
         .catch(() => undefined);
     }
     request.signal.throwIfAborted();
     if (activePreparations.size >= 2) {
-      throw new DailyVideoUploadError("El servidor está preparando otros videos. Intenta subir el tuyo en unos segundos.", 503);
+      throw new VideoUploadError("El servidor está preparando otros videos. Intenta subir el tuyo en unos segundos.", 503);
     }
-    const preparation = preparePlaybackFile(source, output, demuxer, request.signal);
+    const preparation = preparePlaybackFile(source, output, demuxer, request.signal, options);
     activePreparations.add(preparation);
     const duration = await preparation.finally(() => { activePreparations.delete(preparation); });
     const { size } = await stat(output);
     const stream = createReadStream(output);
     const closed = finished(stream, { cleanup: true }).catch(() => undefined);
     try {
-      const { response, url } = await putUserFileInBunny({
+      const { response, url, discard } = await putUserFileInBunny({
         body: Readable.toWeb(stream) as ReadableStream<Uint8Array>,
         contentLength: size,
         contentType: "video/mp4",
@@ -173,10 +176,10 @@ export async function storeDailyVideo(request: Request, uid: string, demuxer: st
       });
       await response.body?.cancel();
       if (!response.ok) throw new Error(`Bunny upload failed with status ${response.status}`);
-      return { url, duration };
+      return { url, duration, discard };
     } catch (error) {
-      console.error("Daily video storage error:", error);
-      throw new DailyVideoUploadError("No pudimos guardar el video. Intenta subirlo de nuevo en unos minutos.", 502);
+      console.error("Video storage error:", error);
+      throw new VideoUploadError("No pudimos guardar el video. Intenta subirlo de nuevo en unos minutos.", 502);
     } finally {
       stream.destroy();
       await closed;

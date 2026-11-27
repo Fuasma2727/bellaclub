@@ -40,7 +40,7 @@ import {
   getDailyVideoInputFormat,
 } from "@/lib/providerDailyVideo";
 import {
-  MEDIA_UPLOAD_ACCEPT,
+  IMAGE_UPLOAD_CONTENT_TYPES,
   SUPPORTED_UPLOAD_FORMAT_LABEL,
   SUPPORTED_VIDEO_FORMAT_LABEL,
   VIDEO_UPLOAD_ACCEPT,
@@ -49,6 +49,13 @@ import {
   isSupportedUploadContentType,
   isSupportedVideoFilename,
 } from "@/lib/mediaCompatibility";
+import {
+  VIDEO_INPUT_ACCEPT,
+  VIDEO_INPUT_FORMAT_LABEL,
+  VIDEO_UPLOAD_MAX_BYTES,
+  VIDEO_UPLOAD_MAX_MB,
+  getVideoInputFormat,
+} from "@/lib/videoUploadFormats";
 import {
   PROVIDER_REFERRAL_REWARD,
 } from "@/lib/referralCodes";
@@ -124,7 +131,7 @@ type UploadResponse = {
   details?: string;
 };
 
-type UploadProgressStatus = "preparing" | "uploading" | "saving" | "complete" | "error";
+type UploadProgressStatus = "preparing" | "uploading" | "processing" | "saving" | "complete" | "error";
 
 type MediaUploadProgressItem = {
   id: string;
@@ -138,12 +145,26 @@ type MediaUploadProgressItem = {
 };
 
 const MAX_IMAGE_UPLOAD_MB = 12;
-const MAX_VIDEO_UPLOAD_MB = 150;
+const galleryUploadAccept = [...IMAGE_UPLOAD_CONTENT_TYPES, VIDEO_INPUT_ACCEPT].join(",");
 
 type ProviderMediaResponse = {
   media?: MediaItem[];
   error?: string;
 };
+
+type GalleryVideoReplacement = { id: string; replacesUrl: string };
+type GalleryVideoDetails = GalleryVideoReplacement | {
+  id: string;
+  private: boolean;
+  price: number | null;
+  description: string;
+};
+
+class GalleryVideoUploadError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
 
 type VideoSlotResponse = {
   videoSecondsExtra?: number;
@@ -246,13 +267,30 @@ const validateUploadFile = (file: File) => {
     );
   }
 
-  const maxSize = mediaType === "video" ? MAX_VIDEO_UPLOAD_MB : MAX_IMAGE_UPLOAD_MB;
+  const maxSize = mediaType === "video" ? VIDEO_UPLOAD_MAX_MB : MAX_IMAGE_UPLOAD_MB;
 
   if (file.size > maxSize * 1024 * 1024) {
     throw new Error(`"${file.name}" supera el limite de ${maxSize} MB.`);
   }
 
   return { contentType, mediaType };
+};
+
+const validateGalleryUpload = (file: File) => {
+  const format = getVideoInputFormat(file);
+  if (format) {
+    if (file.size > VIDEO_UPLOAD_MAX_BYTES) {
+      throw new Error(`"${file.name}" supera el límite de ${VIDEO_UPLOAD_MAX_MB} MB.`);
+    }
+    return { file, type: "video" as const, format };
+  }
+
+  const contentType = inferUploadContentType(file);
+  if (getUploadMediaType(contentType) === "photo" && isSupportedUploadContentType(contentType)) {
+    validateUploadFile(file);
+    return { file, type: "photo" as const };
+  }
+  throw new Error(`Formato no permitido para "${file.name}". Usa JPG, PNG, WebP, GIF o video ${VIDEO_INPUT_FORMAT_LABEL}.`);
 };
 
 const parseUploadResponseText = (
@@ -613,51 +651,41 @@ const publishDailyVideoFile = (
   xhr.send(file);
 });
 
-const getVideoDuration = (file: File) => {
-  return new Promise<number>((resolve, reject) => {
-    const video = document.createElement("video");
-    const objectUrl = URL.createObjectURL(file);
-    const timeout = window.setTimeout(() => {
-      URL.revokeObjectURL(objectUrl);
-      reject(
-        new Error(
-          `No pudimos leer la duracion del video. Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
-        )
-      );
-    }, 15000);
+const publishGalleryVideoFile = (
+  file: File,
+  format: string,
+  token: string,
+  details: GalleryVideoDetails,
+  onProgress: (progress: number | null) => void
+) => {
+  return new Promise<MediaItem[]>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/provider-gallery-video");
+    xhr.responseType = "json";
+    xhr.timeout = 10 * 60 * 1000;
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.setRequestHeader("x-video-format", format);
+    xhr.setRequestHeader("x-gallery-video", encodeURIComponent(JSON.stringify(details)));
 
-    const cleanup = () => {
-      window.clearTimeout(timeout);
-      URL.revokeObjectURL(objectUrl);
+    xhr.upload.onprogress = ({ lengthComputable, loaded, total }) => {
+      if (lengthComputable && total > 0) onProgress(Math.min(99, Math.round(loaded * 100 / total)));
     };
-
-    video.preload = "metadata";
-    video.muted = true;
-    video.playsInline = true;
-    video.onloadedmetadata = () => {
-      cleanup();
-
-      if (!Number.isFinite(video.duration) || video.duration <= 0) {
-        reject(
-          new Error(
-            `No pudimos leer la duracion del video. Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
-          )
-        );
+    xhr.upload.onload = () => onProgress(null);
+    xhr.onload = () => {
+      const data = xhr.response as (ProviderMediaResponse & { status?: number }) | null;
+      if (xhr.status >= 200 && xhr.status < 300 && Array.isArray(data?.media)) {
+        resolve(data.media);
         return;
       }
-
-      resolve(Math.ceil(video.duration));
+      const fallback = xhr.status === 413
+        ? `El servidor rechazó el tamaño del video. El límite es de ${VIDEO_UPLOAD_MAX_MB} MB.`
+        : "No pudimos preparar el video. Intenta de nuevo.";
+      reject(new GalleryVideoUploadError(data?.error || fallback, data?.status || xhr.status));
     };
-    video.onerror = () => {
-      cleanup();
-      reject(
-        new Error(
-          `No pudimos leer la duracion del video. Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
-        )
-      );
-    };
-    video.src = objectUrl;
-    video.load();
+    xhr.onerror = () => reject(new Error("Se perdió la conexión durante la subida. Revisa tu galería antes de reintentar."));
+    xhr.ontimeout = () => reject(new Error("La subida tardó demasiado. Revisa tu galería antes de reintentar."));
+    xhr.send(file);
   });
 };
 
@@ -746,17 +774,22 @@ function VerificationGem({
 function ProfileGalleryItem({
   item,
   isDeleting,
+  uploading,
   onOpen,
   onDelete,
+  onReplace,
 }: {
   item: MediaItem;
   isDeleting: boolean;
+  uploading: boolean;
   onOpen: () => void;
   onDelete: () => void;
+  onReplace: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [failed, setFailed] = useState(false);
+  const videoFailed = item.type === "video" && (failed || item.playbackStatus === "failed");
 
   const retrySrc =
     retryCount > 0
@@ -806,11 +839,16 @@ function ProfileGalleryItem({
           controlsList="nodownload noplaybackrate"
           disablePictureInPicture
           onLoadedData={() => setLoaded(true)}
+          onError={() => setFailed(true)}
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}
 
-      {(!loaded || failed) && (
+      {videoFailed ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 px-3 text-center text-xs text-neutral-300">
+          Este video no se puede reproducir. Selecciona el archivo original para repararlo.
+        </div>
+      ) : (!loaded || failed) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/[0.025] px-4 text-center">
           <div className="h-8 w-8 rounded-full border border-white/10 border-t-blue-300/80 animate-spin" />
           <p className="mt-3 text-xs font-semibold text-neutral-300">
@@ -830,10 +868,21 @@ function ProfileGalleryItem({
         </span>
       )}
 
+      {item.type === "video" && (
+        <button
+          type="button"
+          onClick={onReplace}
+          disabled={isDeleting || uploading}
+          className={`absolute left-2 z-20 rounded-full border border-white/10 bg-black/75 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60 ${item.private ? "bottom-10" : "bottom-2"}`}
+        >
+          Reemplazar video
+        </button>
+      )}
+
       <button
         type="button"
         onClick={onDelete}
-        disabled={isDeleting}
+        disabled={isDeleting || uploading}
         className="absolute right-2 top-2 z-20 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-xs font-semibold text-white opacity-90 backdrop-blur transition hover:bg-rose-600 disabled:opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
       >
         {isDeleting ? "..." : "Eliminar"}
@@ -846,7 +895,9 @@ function UploadProgressGalleryItem({ item }: { item: MediaUploadProgressItem }) 
   const safeProgress = Math.max(0, Math.min(100, Math.round(item.progress)));
   const isError = item.status === "error";
   const statusLabel =
-    item.status === "preparing"
+    item.status === "processing"
+      ? "Preparando video…"
+      : item.status === "preparing"
       ? "Preparando"
       : item.status === "saving"
         ? "Guardando"
@@ -884,14 +935,14 @@ function UploadProgressGalleryItem({ item }: { item: MediaUploadProgressItem }) 
       <div className="absolute inset-x-0 bottom-0 p-3">
         <div className="rounded-md border border-white/10 bg-black/70 p-2.5 backdrop-blur">
           <div className="flex items-center justify-between gap-2 text-xs font-semibold text-white">
-            <span className="truncate">{statusLabel}</span>
-            <span>{safeProgress}%</span>
+            <span className="truncate" role="status">{statusLabel}</span>
+            {item.status !== "processing" && <span>{safeProgress}%</span>}
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
             <div
               className={`h-full rounded-full transition-all duration-200 ${
                 isError ? "bg-rose-400" : "bg-blue-300"
-              }`}
+              } ${item.status === "processing" ? "motion-safe:animate-pulse" : ""}`}
               style={{ width: `${safeProgress}%` }}
             />
           </div>
@@ -993,6 +1044,8 @@ export default function PerfilPrestador() {
   const [galleryFilter, setGalleryFilter] = useState<GalleryFilter>("all");
   const publicUploadRef = useRef<HTMLInputElement>(null);
   const privateUploadRef = useRef<HTMLInputElement>(null);
+  const replaceVideoInputRef = useRef<HTMLInputElement>(null);
+  const replaceVideoTarget = useRef<{ details: GalleryVideoReplacement; private: boolean } | null>(null);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [onboardingError, setOnboardingError] = useState("");
   const [inviteCopyMessage, setInviteCopyMessage] = useState("");
@@ -1690,7 +1743,8 @@ export default function PerfilPrestador() {
       files: File[],
       isPrivate: boolean,
       forcedPrice?: number,
-      privateDescription?: string
+      privateDescription?: string,
+      replacement?: GalleryVideoReplacement
     ) => {
       if (!user || files.length === 0) return 0;
 
@@ -1704,62 +1758,42 @@ export default function PerfilPrestador() {
 
       try {
         const token = await user.getIdToken();
-        const initialPreparedFiles = files.map((file) => {
-          const { mediaType } = validateUploadFile(file);
-          return { file, type: mediaType };
-        });
-
-        progressItems = createMediaUploadItems(initialPreparedFiles, isPrivate);
-
-        const preparedFiles = await Promise.all(
-          initialPreparedFiles.map(async (item) => {
-            const duration =
-              item.type === "video"
-                ? await getVideoDuration(item.file).catch(() => {
-                    throw new Error(
-                      `No pudimos leer la duracion de "${item.file.name}". Usa un ${SUPPORTED_VIDEO_FORMAT_LABEL}.`
-                    );
-                  })
-                : null;
-
-            return { ...item, duration };
-          })
-        );
-        const progressIds = progressItems.map((item) => item.id);
-
-        const incomingVideoSeconds = preparedFiles.reduce(
-          (total, item) => total + (item.duration || 0),
-          0
-        );
-
-        if (
-          incomingVideoSeconds > 0 &&
-          videoSecondsUsed + incomingVideoSeconds > videoSecondsLimit
-        ) {
-          const text = `Estos videos suman ${formatVideoTime(
-            incomingVideoSeconds
-          )} y superan tus ${formatVideoTime(
-            videoSecondsLimit
-          )} incluidos. Para subirlos debes comprar tiempo extra.`;
-
-          setShowVideoTimePurchase(true);
-          setError(text);
-          setMediaUploadError(text);
-          updateMediaUploadItems(progressIds, {
-            error: text,
-            status: "error",
-          });
-          return 0;
+        const preparedFiles = files.map(validateGalleryUpload);
+        if (replacement && (preparedFiles.length !== 1 || preparedFiles[0]?.type !== "video")) {
+          throw new Error("Selecciona un archivo de video para reemplazar este contenido.");
         }
+        progressItems = createMediaUploadItems(preparedFiles, isPrivate);
+
+        const markComplete = (ids: string[]) => {
+          savedCount += ids.length;
+          updateMediaUploadItems(ids, { progress: 100, status: "complete" });
+          ids.forEach((id) => completedProgressIds.add(id));
+          removeMediaUploadItems(ids, 900);
+        };
 
         for (let start = 0; start < preparedFiles.length;) {
+          const first = preparedFiles[start];
+          if (first.type === "video") {
+            const { id } = progressItems[start];
+            updateMediaUploadItem(id, { progress: 0, status: "uploading" });
+            const updated = await publishGalleryVideoFile(first.file, first.format, token, replacement || {
+              id,
+              private: isPrivate,
+              price: isPrivate ? forcedPrice || 0 : null,
+              description: privateDescription?.trim() || "",
+            }, (progress) => {
+              updateMediaUploadItem(id, progress === null
+                ? { progress: 100, status: "processing" }
+                : { progress, status: "uploading" });
+            });
+            setMedia(updated);
+            markComplete([id]);
+            start += 1;
+            continue;
+          }
+
           let end = start + 1;
-          // Upload consecutive photos together and give each video its own group.
-          while (
-            preparedFiles[start].type === "photo" &&
-            end - start < 4 &&
-            preparedFiles[end]?.type === "photo"
-          ) {
+          while (end - start < 4 && preparedFiles[end]?.type === "photo") {
             end += 1;
           }
           const group = preparedFiles.slice(start, end);
@@ -1797,11 +1831,10 @@ export default function PerfilPrestador() {
 
               return {
                 id: createMediaId(),
-                type: item.type,
+                type: "photo" as const,
                 url,
                 private: isPrivate,
                 price: isPrivate ? forcedPrice || 0 : null,
-                duration: item.duration,
                 description: isPrivate ? privateDescription?.trim() || "" : "",
               };
             })
@@ -1843,14 +1876,7 @@ export default function PerfilPrestador() {
             }
 
             setMedia(data.media);
-            savedCount += groupItems.length;
-
-            updateMediaUploadItems(successfulProgressIds, {
-              progress: 100,
-              status: "complete",
-            });
-            successfulProgressIds.forEach((id) => completedProgressIds.add(id));
-            removeMediaUploadItems(successfulProgressIds, 900);
+            markComplete(successfulProgressIds);
           }
 
           if (firstUploadError) {
@@ -1869,6 +1895,9 @@ export default function PerfilPrestador() {
 
         return savedCount;
       } catch (uploadError) {
+        if (uploadError instanceof GalleryVideoUploadError && uploadError.status === 402) {
+          setShowVideoTimePurchase(true);
+        }
         const text =
           uploadError instanceof Error
             ? uploadError.message
@@ -1907,8 +1936,6 @@ export default function PerfilPrestador() {
       updateMediaUploadItem,
       updateMediaUploadItems,
       user,
-      videoSecondsLimit,
-      videoSecondsUsed,
     ]
   );
 
@@ -2016,9 +2043,6 @@ export default function PerfilPrestador() {
       );
     }
 
-    if (uploadedCount > 0) {
-      setMediaUploadError("");
-    }
   };
 
   const buyExtraVideoTime = async () => {
@@ -3143,7 +3167,7 @@ export default function PerfilPrestador() {
         <input
           ref={publicUploadRef}
           type="file"
-          accept={MEDIA_UPLOAD_ACCEPT}
+          accept={galleryUploadAccept}
           hidden
           multiple
           disabled={uploadingMedia}
@@ -3159,7 +3183,7 @@ export default function PerfilPrestador() {
         <input
           ref={privateUploadRef}
           type="file"
-          accept={MEDIA_UPLOAD_ACCEPT}
+          accept={galleryUploadAccept}
           hidden
           multiple
           disabled={uploadingMedia}
@@ -3174,6 +3198,22 @@ export default function PerfilPrestador() {
             setPrivateDescriptionError("");
             setMediaUploadError("");
             setShowPriceModal(true);
+          }}
+        />
+        <input
+          ref={replaceVideoInputRef}
+          type="file"
+          accept={VIDEO_INPUT_ACCEPT}
+          hidden
+          disabled={uploadingMedia}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            const target = replaceVideoTarget.current;
+            event.target.value = "";
+            replaceVideoTarget.current = null;
+            if (!file || !target) return;
+            void uploadMediaBatch([file], target.private, undefined, undefined, target.details)
+              .then((count) => { if (count) showSuccess("Video reemplazado"); });
           }}
         />
         <GalleryPanel
@@ -3224,7 +3264,9 @@ export default function PerfilPrestador() {
         >
           {uploadingMedia && (
             <div className="mt-4 rounded-md border border-blue-500/25 bg-blue-500/10 p-3 text-sm text-blue-100">
-              Subiendo contenido...
+              {mediaUploadItems.some((item) => item.status === "processing")
+                ? "Preparando video…"
+                : "Subiendo contenido…"}
             </div>
           )}
 
@@ -3281,8 +3323,16 @@ export default function PerfilPrestador() {
                   key={`${item.url}-${index}`}
                   item={item}
                   isDeleting={deletingIndex === index}
+                  uploading={uploadingMedia}
                   onOpen={() => openExpanded(index + 1)}
                   onDelete={() => void deleteMedia(index)}
+                  onReplace={() => {
+                    replaceVideoTarget.current = {
+                      details: { id: item.id || `legacy-${index}`, replacesUrl: item.url },
+                      private: Boolean(item.private),
+                    };
+                    replaceVideoInputRef.current?.click();
+                  }}
                 />
               ))}
             </div>

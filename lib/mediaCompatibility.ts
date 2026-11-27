@@ -7,11 +7,6 @@ export const IMAGE_UPLOAD_CONTENT_TYPES = [
 
 export const VIDEO_UPLOAD_CONTENT_TYPES = ["video/mp4"] as const;
 
-export const MEDIA_UPLOAD_ACCEPT = [
-  ...IMAGE_UPLOAD_CONTENT_TYPES,
-  ...VIDEO_UPLOAD_CONTENT_TYPES,
-].join(",");
-
 export const VIDEO_UPLOAD_ACCEPT = VIDEO_UPLOAD_CONTENT_TYPES.join(",");
 
 export const SUPPORTED_UPLOAD_FORMAT_LABEL =

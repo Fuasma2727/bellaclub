@@ -15,9 +15,10 @@ import ts from "typescript";
 const run = promisify(execFile);
 const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, "..");
-const setup = () => {
+const setup = ({ beforeTransaction = () => {} } = {}) => {
   const uploads = [];
   const writes = [];
+  const discarded = [];
   let rewardExists = false;
   const profile = { role: "prestador", verificationStatus: "approved", profileVisible: true };
   const userRef = { id: "provider-1" };
@@ -25,15 +26,22 @@ const setup = () => {
     "@/lib/firebaseAdmin": {
       adminDb: {
         collection: (name) => ({ doc: (id) => ({ id, collection: name }) }),
-        runTransaction: async (callback) => callback({
-          get: async (ref) => ref === userRef
-            ? { exists: true, data: () => profile }
-            : { exists: rewardExists },
-          set(ref, data) {
-            if (ref.collection === "dailyVideoRewards") rewardExists = true;
-            writes.push({ ref, data });
-          },
-        }),
+        async runTransaction(callback) {
+          beforeTransaction(profile);
+          return callback({
+            get: async (ref) => ref.id === userRef.id
+              ? { exists: true, data: () => profile }
+              : { exists: rewardExists },
+            set(ref, data) {
+              if (ref.collection === "dailyVideoRewards") rewardExists = true;
+              writes.push({ ref, data });
+            },
+            update(ref, data) {
+              Object.assign(profile, data);
+              writes.push({ ref, data });
+            },
+          });
+        },
       },
       adminFieldValue: { serverTimestamp: () => new Date(), increment: (amount) => amount },
     },
@@ -50,10 +58,14 @@ const setup = () => {
     "next/server": { NextResponse: { json: (body, init) => Response.json(body, init) } },
   };
   const context = vm.createContext({
-    URL, ReadableStream, TransformStream, AbortSignal,
+    URL, Response, ReadableStream, TransformStream, AbortController, AbortSignal, TextEncoder, setInterval, clearInterval,
     process: { env: { BUNNY_API_KEY: "test", BUNNY_CDN_HOST: "cdn.test" } },
     fetch: async (url, init) => {
       assert.match(url, /\/users\/provider-1\/[^/]+\.mp4$/);
+      if (init.method === "DELETE") {
+        discarded.push(url);
+        return new Response(null, { status: 204 });
+      }
       assert.equal(init.method, "PUT");
       assert.equal(init.headers["Content-Type"], "video/mp4");
       assert.equal(init.duplex, "half");
@@ -76,12 +88,28 @@ const setup = () => {
     return loadedModule.exports;
   };
 
-  return { route: load("app/api/provider-daily-video/route.ts"), uploads, writes, profile };
+  return {
+    route: load("app/api/provider-daily-video/route.ts"),
+    gallery: load("app/api/provider-gallery-video/route.ts"),
+    mediaRoute: load("app/api/provider-media/route.ts"),
+    uploads, writes, discarded, profile,
+  };
 };
 
 const uploadRequest = (format, body, headers = {}) => new Request("https://belaclub.test/api/provider-daily-video", {
   method: "POST",
   headers: { "Content-Type": "application/octet-stream", "x-video-format": format, ...headers },
+  body,
+});
+
+const galleryUploadRequest = (format, body, details, headers = {}) => new Request("https://belaclub.test/api/provider-gallery-video", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/octet-stream",
+    "x-video-format": format,
+    "x-gallery-video": encodeURIComponent(JSON.stringify(details)),
+    ...headers,
+  },
   body,
 });
 
@@ -178,4 +206,112 @@ test("a 30-second MP4 keeps its AAC audio and is published at the limit", async 
     "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "json", output,
   ], options);
   assert.equal(JSON.parse(stdout).streams[0].codec_name, "aac");
+});
+
+test("gallery videos use server-measured duration and publish compatible MP4s beyond 30 seconds", async (t) => {
+  const app = setup();
+  const directory = await testDirectory(t);
+  const input = await makeVideo(directory, "gallery.webm", ["-c:v", "libvpx-vp9"], "35");
+  const details = { id: "gallery-1", private: true, price: 15000, description: "Video privado 🎞", duration: 1 };
+  const response = await app.gallery.POST(galleryUploadRequest("webm", input, details));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-accel-buffering"), "no");
+  const reader = response.body.getReader();
+  assert.equal(Buffer.from((await reader.read()).value).toString(), "\n");
+  let result = "";
+  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+    result += Buffer.from(chunk.value).toString();
+  }
+  const { media } = JSON.parse(result);
+  assert.deepEqual(media, [{
+    id: details.id, private: true, price: details.price, description: details.description,
+    type: "video", url: media[0].url, duration: 35, playbackStatus: "ready",
+  }]);
+  assert.match(media[0].url, /\.mp4$/);
+  assert.equal(app.writes.length, 1);
+  assert.equal(app.writes[0].ref.id, "provider-1");
+
+  const output = join(directory, "published.mp4");
+  await writeFile(output, app.uploads[0]);
+  const { stdout } = await run(ffprobe, ["-v", "error", "-show_entries", "stream=codec_name,pix_fmt", "-of", "json", output], options);
+  assert.deepEqual(JSON.parse(stdout).streams, [{ codec_name: "h264", pix_fmt: "yuv420p" }]);
+
+  const retry = await app.gallery.POST(galleryUploadRequest("webm", input, details));
+  assert.deepEqual(await retry.json(), { media });
+  assert.equal(app.uploads.length, 1);
+});
+
+test("gallery replacement keeps the old video's identity, privacy and price", async (t) => {
+  const app = setup();
+  const directory = await testDirectory(t);
+  const input = await makeVideo(directory, "replacement.avi", ["-c:v", "mpeg4"]);
+  const original = {
+    type: "video", url: "https://cdn.test/legacy.avi", private: true,
+    price: 15000, description: "Contenido de la compra", duration: 10, playbackStatus: "failed",
+  };
+  const other = { type: "video", duration: 170 };
+  app.profile.media = [original, other];
+  const details = { id: "legacy-0", replacesUrl: original.url };
+  const response = await app.gallery.POST(galleryUploadRequest("avi", input, details));
+  const { media } = await response.json();
+  assert.deepEqual(media, [{
+    ...original, id: "legacy-0", url: media[0].url, duration: 2, playbackStatus: "ready",
+  }, { ...other, id: "legacy-1" }]);
+  assert.match(media[0].url, /\.mp4$/);
+  assert.equal(app.discarded.length, 0);
+
+  const stale = await app.gallery.POST(galleryUploadRequest("avi", input, details));
+  assert.equal(stale.status, 409);
+  assert.equal(app.writes.length, 1);
+  assert.equal(app.uploads.length, 1);
+});
+
+test("gallery validates the remaining quota again before saving and discards unused uploads", async (t) => {
+  const app = setup({ beforeTransaction(profile) {
+    profile.media = [{ id: "concurrent", type: "video", duration: 179 }];
+  } });
+  const directory = await testDirectory(t);
+  const input = await makeVideo(directory, "gallery.mp4", ["-c:v", "libx264", "-preset", "ultrafast"]);
+  const details = { id: "gallery-race", private: false };
+  const response = await app.gallery.POST(galleryUploadRequest("mp4", input, details));
+  assert.equal((await response.json()).status, 402);
+  assert.equal(app.uploads.length, 1);
+  assert.equal(app.discarded.length, 1);
+  assert.equal(app.writes.length, 0);
+
+  const remainingQuota = await app.gallery.POST(galleryUploadRequest("mp4", input, details));
+  assert.equal((await remainingQuota.json()).status, 402);
+  assert.equal(app.uploads.length, 1);
+  assert.equal(app.writes.length, 0);
+
+  app.profile.videoSecondsExtra = 60;
+  const extraQuota = await app.gallery.POST(galleryUploadRequest("mp4", input, details));
+  assert.equal((await extraQuota.json()).media[1].duration, 2);
+  assert.equal(app.writes.length, 1);
+});
+
+test("gallery rejects broken or unsupported uploads and the photo endpoint cannot publish raw videos", async () => {
+  const app = setup();
+  const details = { id: "invalid-video", private: false };
+  const wrongFormat = await app.gallery.POST(galleryUploadRequest("m3u8", "invalid", details));
+  assert.equal(wrongFormat.status, 415);
+  const invalidFile = await app.gallery.POST(galleryUploadRequest("mp4", "invalid", details));
+  assert.equal((await invalidFile.json()).status, 422);
+  const oversized = await app.gallery.POST(galleryUploadRequest("mp4", "invalid", details, {
+    "Content-Length": String(151 * 1024 * 1024),
+  }));
+  assert.equal(oversized.status, 413);
+
+  const postMedia = (item) => app.mediaRoute.POST(new Request("https://belaclub.test/api/provider-media", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "addMany", items: [item] }),
+  }));
+  const rawVideo = await postMedia({ id: "raw-video", type: "video", url: "https://cdn.test/raw.mp4", duration: 1 });
+  assert.equal(rawVideo.status, 415);
+  assert.equal(app.writes.length, 0);
+  const photo = await postMedia({ id: "photo", type: "photo", url: "https://cdn.test/photo.jpg" });
+  assert.equal(photo.status, 200);
+  assert.equal((await photo.json()).media[0].type, "photo");
+  assert.equal(app.uploads.length, 0);
 });

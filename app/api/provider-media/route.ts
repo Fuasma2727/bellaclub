@@ -7,11 +7,9 @@ import {
 } from "@/lib/requestSecurity";
 import {
   getProviderVideoSecondsLimit,
-  getProviderVideoSecondsUsed,
   isAllowedPrivateContentPrice,
   ProviderMediaItem,
 } from "@/lib/providerMediaLimits";
-import { isSupportedVideoUrl } from "@/lib/mediaCompatibility";
 import { invalidatePublicProviderCache } from "@/lib/publicProviders";
 
 export const runtime = "nodejs";
@@ -44,6 +42,26 @@ const isValidMediaItem = (item: unknown): item is ProviderMediaItem => {
     typeof media.url === "string" &&
     media.url.startsWith("https://")
   );
+};
+
+const preparePhoto = (item: ProviderMediaItem) => {
+  if (item.type !== "photo") throw new Error("VIDEO_UPLOAD_REQUIRED");
+
+  const price = Number(item.price || 0);
+  if (item.private && !isAllowedPrivateContentPrice(price)) {
+    throw new Error("INVALID_PRIVATE_PRICE");
+  }
+
+  return {
+    id: item.id,
+    type: item.type,
+    url: item.url,
+    private: Boolean(item.private),
+    price: item.private ? price : null,
+    duration: null,
+    playbackStatus: null,
+    description: item.private ? String(item.description || "").trim() : "",
+  };
 };
 
 export async function POST(request: Request) {
@@ -95,7 +113,6 @@ export async function POST(request: Request) {
         return { media: updated };
       }
 
-      const videoSecondsUsed = getProviderVideoSecondsUsed(media);
       const videoSecondsLimit = getProviderVideoSecondsLimit(
         user.videoSecondsExtra
       );
@@ -111,48 +128,7 @@ export async function POST(request: Request) {
           throw new Error("INVALID_MEDIA");
         }
 
-        let incomingVideoSeconds = 0;
-        const sanitizedItems = items.map((item) => {
-          const incomingDuration =
-            item.type === "video" ? Math.ceil(Number(item.duration || 0)) : 0;
-
-          if (item.type === "video") {
-            if (!isSupportedVideoUrl(item.url)) {
-              throw new Error("INVALID_VIDEO_FORMAT");
-            }
-
-            if (!incomingDuration || incomingDuration <= 0) {
-              throw new Error("INVALID_VIDEO_DURATION");
-            }
-
-            incomingVideoSeconds += incomingDuration;
-          }
-
-          const privatePrice = Number(item.price || 0);
-
-          if (item.private && !isAllowedPrivateContentPrice(privatePrice)) {
-            throw new Error("INVALID_PRIVATE_PRICE");
-          }
-
-          return {
-            id: item.id,
-            type: item.type,
-            url: item.url,
-            private: Boolean(item.private),
-            price: item.private ? privatePrice : null,
-            duration: item.type === "video" ? incomingDuration : null,
-            playbackStatus: item.type === "video" ? "ready" : null,
-            description: item.private
-              ? String(item.description || "").trim()
-              : "",
-          };
-        });
-
-        if (videoSecondsUsed + incomingVideoSeconds > videoSecondsLimit) {
-          throw new Error("VIDEO_TIME_LIMIT_REACHED");
-        }
-
-        const updated = [...media, ...sanitizedItems];
+        const updated = [...media, ...items.map(preparePhoto)];
 
         tx.update(userRef, {
           media: updated,
@@ -167,43 +143,7 @@ export async function POST(request: Request) {
         throw new Error("INVALID_MEDIA");
       }
 
-      const incomingDuration = Math.ceil(Number(body.item.duration || 0));
-
-      if (body.item.type === "video") {
-        if (!isSupportedVideoUrl(body.item.url)) {
-          throw new Error("INVALID_VIDEO_FORMAT");
-        }
-
-        if (!incomingDuration || incomingDuration <= 0) {
-          throw new Error("INVALID_VIDEO_DURATION");
-        }
-
-        if (videoSecondsUsed + incomingDuration > videoSecondsLimit) {
-          throw new Error("VIDEO_TIME_LIMIT_REACHED");
-        }
-      }
-
-      const privatePrice = Number(body.item.price || 0);
-
-      if (body.item.private && !isAllowedPrivateContentPrice(privatePrice)) {
-        throw new Error("INVALID_PRIVATE_PRICE");
-      }
-
-      const updated = [
-        ...media,
-        {
-          id: body.item.id,
-          type: body.item.type,
-          url: body.item.url,
-          private: Boolean(body.item.private),
-          price: body.item.private ? privatePrice : null,
-          duration: body.item.type === "video" ? incomingDuration : null,
-          playbackStatus: body.item.type === "video" ? "ready" : null,
-          description: body.item.private
-            ? String(body.item.description || "").trim()
-            : "",
-        },
-      ];
+      const updated = [...media, preparePhoto(body.item)];
 
       tx.update(userRef, {
         media: updated,
@@ -231,19 +171,9 @@ export async function POST(request: Request) {
           message: "Precio privado invalido",
           status: 400,
         },
-        INVALID_VIDEO_DURATION: {
-          message: "No pudimos leer la duracion del video",
-          status: 400,
-        },
-        INVALID_VIDEO_FORMAT: {
-          message:
-            "Formato de video no compatible. Sube un MP4 compatible antes de publicarlo.",
-          status: 400,
-        },
-        VIDEO_TIME_LIMIT_REACHED: {
-          message:
-            "Este video supera el tiempo incluido. Compra tiempo extra para subirlo.",
-          status: 402,
+        VIDEO_UPLOAD_REQUIRED: {
+          message: "Actualiza la página y vuelve a subir el video para que podamos prepararlo.",
+          status: 415,
         },
       };
 

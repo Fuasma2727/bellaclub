@@ -55,6 +55,10 @@ const nextConfig: NextConfig = {
       "./node_modules/ffmpeg-static/ffmpeg*",
       "./node_modules/@derhuerst/ffprobe-static/ffprobe*",
     ],
+    "/api/provider-gallery-video": [
+      "./node_modules/ffmpeg-static/ffmpeg*",
+      "./node_modules/@derhuerst/ffprobe-static/ffprobe*",
+    ],
   },
   experimental: {
     proxyClientMaxBodySize: "170mb",
@@ -170,6 +174,15 @@ const nextConfig: NextConfig = {
           {
             key: "X-Robots-Tag",
             value: "noindex, nofollow",
+          },
+        ],
+      },
+      {
+        source: "/api/provider-gallery-video",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store, no-transform",
           },
         ],
       },

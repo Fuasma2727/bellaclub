@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { authRouteError, requireAuthenticatedUser, requireUserDocument } from "@/lib/serverAuth";
 import { hasBunnyStorageCredentials } from "@/lib/bunnyStorage";
-import { DailyVideoUploadError, storeDailyVideo } from "@/lib/dailyVideoUpload";
+import { VideoUploadError, storeCompatibleVideo } from "@/lib/videoUpload";
 import { setLedgerEntry } from "@/lib/ledger";
 import {
   guardMutationRequest,
@@ -13,6 +13,7 @@ import {
   DAILY_VIDEO_FORMAT_LABEL,
   DAILY_VIDEO_MAX_UPLOAD_BYTES,
   DAILY_VIDEO_MAX_UPLOAD_MB,
+  DAILY_VIDEO_MAX_SECONDS,
   DAILY_VIDEO_REWARD_AMOUNT,
   canReceiveDailyVideoReward,
   getDailyVideoDemuxer,
@@ -57,7 +58,11 @@ export async function POST(request: Request) {
     assertDailyVideoProfile(userProfile);
     if (!hasBunnyStorageCredentials()) throw new Error("Bunny storage is not configured");
 
-    const { url: videoUrl, duration } = await storeDailyVideo(request, decoded.uid, demuxer);
+    const { url: videoUrl, duration } = await storeCompatibleVideo(request, decoded.uid, demuxer, {
+      maxSeconds: DAILY_VIDEO_MAX_SECONDS,
+      durationError: new VideoUploadError(`El video del día debe durar máximo ${DAILY_VIDEO_MAX_SECONDS} segundos.`, 400),
+      conversionTimeoutMs: 40_000,
+    });
     const expiresAt = new Date(
       Date.now() + DAILY_VIDEO_DURATION_HOURS * 60 * 60 * 1000
     );
@@ -153,7 +158,7 @@ export async function POST(request: Request) {
       rewardGranted: result.rewardGranted,
     });
   } catch (error) {
-    if (error instanceof DailyVideoUploadError) {
+    if (error instanceof VideoUploadError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     if (error instanceof Error && error.message === "PAYLOAD_TOO_LARGE") {

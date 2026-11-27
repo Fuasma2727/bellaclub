@@ -35,6 +35,22 @@ export async function putUserFileInBunny({
   };
   if (body instanceof ReadableStream) init.duplex = "half";
 
-  const response = await fetch(`https://${storageHost}/${storageZone}/${uploadPath}`, init);
-  return { response, url: `https://${cdnHost}/${uploadPath}` };
+  const storageUrl = `https://${storageHost}/${storageZone}/${uploadPath}`;
+  const response = await fetch(storageUrl, init);
+  return {
+    response,
+    url: `https://${cdnHost}/${uploadPath}`,
+    async discard() {
+      const removed = await fetch(storageUrl, {
+        method: "DELETE",
+        headers: { AccessKey: headers.AccessKey },
+        signal: AbortSignal.timeout(5_000),
+        redirect: "error",
+      });
+      await removed.body?.cancel();
+      if (!removed.ok && removed.status !== 404) {
+        throw new Error(`Bunny cleanup failed with status ${removed.status}`);
+      }
+    },
+  };
 }
