@@ -157,6 +157,7 @@ export default function PrestadoresPage({
   const [highlightPrivateBadges, setHighlightPrivateBadges] = useState(false);
   const hasPageIntroContent = Boolean(initialCity || pageTitle);
   const visibleSignupInvite = !user && signupInvite;
+  const showIntroAfterResults = filtersFirst || Boolean(signupInvite);
   const resolvedPageTitle = pageTitle || `Escorts en ${initialCity}`;
   const resolvedPageDescription =
     pageDescription ||
@@ -942,7 +943,7 @@ export default function PrestadoresPage({
       <Header showSearchLinks={!filtersFirst} />
 
       <main>
-        {!filtersFirst && pageIntro && (
+        {!showIntroAfterResults && pageIntro && (
           <section className="mx-auto w-full max-w-7xl px-3 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5 lg:px-8">
             {pageIntro}
           </section>
@@ -1044,7 +1045,7 @@ export default function PrestadoresPage({
             </>
           )}
 
-          {filtersFirst && pageIntro && (
+          {showIntroAfterResults && pageIntro && (
             <section aria-labelledby="directory-title" className="mt-8 border-t border-white/[0.08] pt-6 sm:mt-10 sm:pt-8">
               {pageIntro}
             </section>

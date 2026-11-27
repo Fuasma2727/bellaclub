@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import CatadorSignupInvite from "@/app/prestadores/_components/CatadorSignupInvite";
 import PrestadoresPage from "@/app/prestadores/page";
 import JsonLd from "@/components/JsonLd";
 import {
@@ -569,6 +570,7 @@ export default async function ProviderCitySearchPage({
         ]}
       />
       <PrestadoresPage
+        signupInvite={<CatadorSignupInvite />}
         initialCity={city.city}
         initialDepartment={city.department}
         pageTitle={title}
