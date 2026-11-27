@@ -215,7 +215,8 @@ export default function ProviderCard({
       className="pointer-events-none select-none object-cover transition duration-300 group-hover:scale-105"
       sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
       quality={72}
-      priority={imagePriority}
+      loading={imagePriority ? "eager" : "lazy"}
+      fetchPriority={imagePriority ? "high" : undefined}
     />
   );
 
@@ -306,7 +307,7 @@ export default function ProviderCard({
               href={profileHref}
               prefetch={false}
               onClick={(event) => event.stopPropagation()}
-              className="block truncate text-[13px] font-semibold leading-[15px] text-neutral-50 transition hover:text-blue-100 sm:text-sm"
+              className="block truncate py-1 text-[13px] font-semibold leading-4 text-neutral-50 transition hover:text-blue-100 sm:text-sm"
             >
               {name}
             </Link>
@@ -315,7 +316,7 @@ export default function ProviderCard({
               {name}
             </h2>
           )}
-          <p className="truncate text-[11px] leading-[15px] text-neutral-500 sm:text-xs">
+          <p className="truncate text-[11px] leading-[15px] text-neutral-400 sm:text-xs">
             {location || "Ubicacion por confirmar"}
           </p>
           {displayPhone && phoneHref ? (
@@ -323,7 +324,7 @@ export default function ProviderCard({
               href={phoneHref}
               prefetch={false}
               onClick={(event) => event.stopPropagation()}
-              className="block truncate text-[11px] leading-[15px] text-neutral-400 transition hover:text-blue-200 sm:text-xs"
+              className="block truncate py-1 text-[11px] leading-4 text-neutral-400 transition hover:text-blue-200 sm:text-xs"
             >
               WhatsApp {displayPhone}
             </Link>
@@ -365,11 +366,11 @@ export default function ProviderCard({
 
             {hasProfileVideo && (
               <span
-                aria-label="Tiene videos en el perfil"
                 title="Tiene videos en el perfil"
                 className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-sky-200/30 bg-sky-400/10 text-sky-100 shadow-lg shadow-sky-950/15 transition hover:-translate-y-0.5 hover:border-sky-100/50 hover:bg-sky-400/18 sm:h-7 sm:w-7"
               >
                 <ProfileVideoIcon />
+                <span className="sr-only">Tiene videos en el perfil</span>
               </span>
             )}
 

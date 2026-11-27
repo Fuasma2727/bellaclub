@@ -1140,7 +1140,7 @@ export default function PrestadoresPage({
         </section>
       </main>
 
-      <footer className="border-t border-white/[0.08] px-4 py-8 text-sm text-neutral-500 sm:px-6 lg:px-8">
+      <footer className="border-t border-white/[0.08] px-4 py-8 text-sm text-neutral-400 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <p>BelaClub · Plataforma para mayores de edad.</p>
           <div className="flex flex-col gap-3 lg:items-end">

@@ -1,4 +1,3 @@
-import { getAuth } from "firebase/auth";
 import {
   getFirestore,
   initializeFirestore,
@@ -9,6 +8,7 @@ import {
 import { app } from "./firebaseApp";
 
 export { app };
+export { auth } from "./firebaseAuth";
 
 const globalForFirestore = globalThis as typeof globalThis & {
   __belaclubFirestore?: Firestore;
@@ -29,4 +29,3 @@ const createFirestore = () => {
 export const db =
   globalForFirestore.__belaclubFirestore ||
   (globalForFirestore.__belaclubFirestore = createFirestore());
-export const auth = getAuth(app);

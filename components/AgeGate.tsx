@@ -166,7 +166,7 @@ export default function AgeGate() {
             </button>
           </div>
 
-          <p className="mt-4 text-center text-xs leading-5 text-neutral-500">
+          <p className="mt-4 text-center text-xs leading-5 text-neutral-400">
             Tu confirmaci&oacute;n se recordar&aacute; por 30 d&iacute;as en
             este dispositivo.
           </p>

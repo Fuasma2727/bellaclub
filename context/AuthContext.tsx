@@ -18,11 +18,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
 
-    void Promise.all([import("firebase/auth"), import("@/lib/firebaseApp")])
-      .then(([{ getAuth, onAuthStateChanged }, { app }]) => {
+    void Promise.all([import("firebase/auth"), import("@/lib/firebaseAuth")])
+      .then(([{ onAuthStateChanged }, { auth }]) => {
         if (cancelled) return;
 
-        unsubscribe = onAuthStateChanged(getAuth(app), (currentUser) => {
+        unsubscribe = onAuthStateChanged(auth, (currentUser) => {
           setUser(currentUser);
           setLoading(false);
         });
