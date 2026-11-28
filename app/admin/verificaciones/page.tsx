@@ -2681,7 +2681,7 @@ export default function AdminVerificationsPage() {
           </button>
         </div>
 
-        {isBlockedView ? (
+        {isBlockedView && provider.blocked ? (
           <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">
             {provider.blockedReason === "subscription_unpaid"
               ? "Perfil bloqueado por mensualidad pendiente. Puedes activarlo manualmente desde aqui aunque no pague."

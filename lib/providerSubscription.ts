@@ -83,10 +83,6 @@ export const isProviderSubscriptionPastDue = (
   },
   now = new Date()
 ) => {
-  if (user.verificationStatus && user.verificationStatus !== "approved") {
-    return false;
-  }
-
   if (
     user.subscriptionManualOverride === true ||
     user.subscriptionStatus === "admin_override" ||
@@ -101,6 +97,10 @@ export const isProviderSubscriptionPastDue = (
     user.subscriptionStatus === "pending_payment"
   ) {
     return true;
+  }
+
+  if (user.verificationStatus && user.verificationStatus !== "approved") {
+    return false;
   }
 
   const nextChargeAt = toDate(user.subscriptionNextChargeAt);
