@@ -265,6 +265,11 @@ type VerificationAction =
 
 type VerificationRequestKind = "profile" | "badge";
 
+const verificationRequestLabel: Record<VerificationRequestKind, string> = {
+  profile: "Solicitud de aprobación del perfil",
+  badge: "Solicitud de insignia",
+};
+
 type ProviderContactUpdate = {
   whatsapp: string;
   department: string;
@@ -279,9 +284,9 @@ const statusClass: Record<VerificationStatus, string> = {
 };
 
 const statusLabel: Record<VerificationStatus, string> = {
-  pending: "Pendiente",
-  approved: "Publicado",
-  rejected: "Rechazado",
+  pending: "Perfil pendiente",
+  approved: "Perfil aprobado",
+  rejected: "Perfil rechazado",
 };
 
 const withdrawalStatusClass: Record<WithdrawalStatus, string> = {
@@ -1175,7 +1180,7 @@ export default function AdminVerificationsPage() {
         action === "block"
           ? "Seguro que quieres bloquear este perfil?"
           : action === "rejectBadgeVerification"
-            ? "Seguro que quieres no aprobar esta evidencia de verificacion?"
+            ? "¿Rechazar la solicitud de insignia?"
           : action === "downgradeBadge"
             ? `Seguro que quieres bajar de nivel a ${
                 provider.name || provider.email || "este prestador"
@@ -1184,7 +1189,7 @@ export default function AdminVerificationsPage() {
             ? `Seguro que quieres subir de nivel a ${
                 provider.name || provider.email || "este prestador"
               }?`
-          : "Seguro que quieres rechazar esta solicitud?"
+          : "¿Rechazar la solicitud de aprobación del perfil?"
       );
 
       if (!confirmed) return;
@@ -2290,8 +2295,8 @@ export default function AdminVerificationsPage() {
       : "photo";
     const evidenceLabel = isBadgeRequest
       ? evidenceType === "video"
-        ? "Video de verificacion privado"
-        : "Foto de verificacion privada"
+        ? "Video para la insignia"
+        : "Foto para la insignia"
       : "Foto enviada para aprobar el perfil";
     const currentBadgeLevel = getProviderBadgeLevel(provider);
     const currentBadge = badgeByLevel(currentBadgeLevel);
@@ -2698,7 +2703,7 @@ export default function AdminVerificationsPage() {
               }}
               className="rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {actionId === provider.id ? "Procesando..." : "Aprobar"}
+              {actionId === provider.id ? "Procesando..." : "Aprobar perfil"}
             </button>
             <button
               type="button"
@@ -2709,7 +2714,7 @@ export default function AdminVerificationsPage() {
               }}
               className="rounded-lg border border-red-500/40 px-4 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Rechazar
+              Rechazar perfil
             </button>
           </div>
         ) : isBadgeRequest ? (
@@ -2723,7 +2728,7 @@ export default function AdminVerificationsPage() {
               }}
               className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {actionId === provider.id ? "Procesando..." : "Aprobar"}
+              {actionId === provider.id ? "Procesando..." : "Aprobar insignia"}
             </button>
             <button
               type="button"
@@ -2734,7 +2739,7 @@ export default function AdminVerificationsPage() {
               }}
               className="rounded-lg border border-red-500/40 px-4 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              No aprobar
+              Rechazar insignia
             </button>
           </div>
         ) : (
@@ -3647,12 +3652,9 @@ export default function AdminVerificationsPage() {
           displayProviders.length > 0 && (
           <section className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {displayProviders.map((provider) => {
-              const requestLabel =
-                provider.requestKind === "profile"
-                  ? "Solicitud de perfil"
-                  : provider.requestKind === "badge"
-                    ? "Solicitud de verificacion"
-                    : "";
+              const requestLabel = provider.requestKind
+                ? verificationRequestLabel[provider.requestKind]
+                : "";
               const privateMediaSummary = getPrivateMediaSummary(provider);
               const dailyVideoNotPublicable = Boolean(
                 provider.dailyVideo?.url &&
@@ -3735,7 +3737,9 @@ export default function AdminVerificationsPage() {
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                    Revision de prestador
+                    {selectedProvider.requestKind
+                      ? verificationRequestLabel[selectedProvider.requestKind]
+                      : "Revisión del perfil"}
                   </p>
                   <h2 className="mt-1 text-lg font-semibold text-white">
                     {selectedProvider.name ||
