@@ -832,6 +832,8 @@ export default function AdminVerificationsPage() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
+  const [searchRequest, setSearchRequest] = useState(0);
   const [activeView, setActiveView] = useState<
     | "requests"
     | "blocked"
@@ -847,7 +849,7 @@ export default function AdminVerificationsPage() {
   const [expandedMedia, setExpandedMedia] = useState<MediaItem | null>(null);
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
 
-  const loadProviders = useCallback(async () => {
+  const loadProviders = useCallback(async (signal: AbortSignal) => {
     if (!user) {
       setLoading(false);
       return;
@@ -858,42 +860,52 @@ export default function AdminVerificationsPage() {
 
     try {
       const token = await user.getIdToken(true);
+      signal.throwIfAborted();
       const params = new URLSearchParams();
-      const summaryPromise = fetch("/api/admin/finance-summary", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-        .then((response) =>
-          readAdminJson<FinanceSummaryResponse>(
-            response,
-            "No pudimos cargar el resumen financiero"
-          )
-        )
-        .then((data) => data.summary || null)
+      if (submittedSearch) params.set("q", submittedSearch);
+
+      const fetchAdminData = async <T extends AdminApiErrorResponse>(
+        path: string,
+        fallback: string
+      ) => {
+        const response = await fetch(path, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal,
+        });
+        const data = await readAdminJson<T>(response, fallback);
+        signal.throwIfAborted();
+        return data;
+      };
+
+      void fetchAdminData<FinanceSummaryResponse>(
+        "/api/admin/finance-summary",
+        "No pudimos cargar el resumen financiero"
+      )
+        .then((data) => setFinanceSummary(data.summary || null))
         .catch((error) => {
-          console.warn("Admin finance summary failed", error);
-          return null;
+          if (!signal.aborted) {
+            setFinanceSummary(null);
+            console.warn("Admin finance summary failed", error);
+          }
         });
 
-      if (search.trim()) params.set("q", search.trim());
+      const fetchList = <T extends AdminApiErrorResponse>(
+        view: string,
+        fallback: string
+      ) => {
+        const query = params.toString();
+        return fetchAdminData<T>(
+          `/api/admin/${view}${query ? `?${query}` : ""}`,
+          fallback
+        );
+      };
 
       if (activeView === "reports") {
         params.set("status", "pending");
-        const queryString = params.toString() ? `?${params.toString()}` : "";
-        const [res, summaryRes] = await Promise.all([
-          fetch(`/api/admin/reports${queryString}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-          summaryPromise,
-        ]);
-        const data = await readAdminJson<ReportsListResponse>(
-          res,
+        const data = await fetchList<ReportsListResponse>(
+          "reports",
           "No pudimos cargar los reportes"
         );
-        setFinanceSummary(summaryRes);
 
         setReports(data.reports || []);
         setProviders([]);
@@ -904,20 +916,10 @@ export default function AdminVerificationsPage() {
       }
 
       if (activeView === "catadores") {
-        const queryString = params.toString() ? `?${params.toString()}` : "";
-        const [res, summaryRes] = await Promise.all([
-          fetch(`/api/admin/catadores${queryString}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-          summaryPromise,
-        ]);
-        const data = await readAdminJson<CatadoresResponse>(
-          res,
+        const data = await fetchList<CatadoresResponse>(
+          "catadores",
           "No pudimos cargar los catadores"
         );
-        setFinanceSummary(summaryRes);
 
         setCatadores(data.catadores || []);
         setAdminUsers([]);
@@ -928,10 +930,7 @@ export default function AdminVerificationsPage() {
       }
 
       if (activeView === "users") {
-        if (!search.trim()) {
-          const summaryData = await summaryPromise;
-          setFinanceSummary(summaryData);
-
+        if (!submittedSearch) {
           setAdminUsers([]);
           setCatadores([]);
           setProviders([]);
@@ -940,20 +939,10 @@ export default function AdminVerificationsPage() {
           return;
         }
 
-        const queryString = params.toString() ? `?${params.toString()}` : "";
-        const [res, summaryRes] = await Promise.all([
-          fetch(`/api/admin/users${queryString}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-          summaryPromise,
-        ]);
-        const data = await readAdminJson<AdminUsersResponse>(
-          res,
+        const data = await fetchList<AdminUsersResponse>(
+          "users",
           "No pudimos cargar los usuarios"
         );
-        setFinanceSummary(summaryRes);
 
         setAdminUsers(data.users || []);
         setCatadores([]);
@@ -965,20 +954,10 @@ export default function AdminVerificationsPage() {
 
       if (activeView === "withdrawals") {
         params.set("status", "reviewable");
-        const queryString = params.toString() ? `?${params.toString()}` : "";
-        const [res, summaryRes] = await Promise.all([
-          fetch(`/api/admin/withdrawals${queryString}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-          summaryPromise,
-        ]);
-        const data = await readAdminJson<WithdrawalsListResponse>(
-          res,
+        const data = await fetchList<WithdrawalsListResponse>(
+          "withdrawals",
           "No pudimos cargar los retiros"
         );
-        setFinanceSummary(summaryRes);
 
         setWithdrawals(data.withdrawals || []);
         setReports([]);
@@ -991,20 +970,10 @@ export default function AdminVerificationsPage() {
       if (activeView === "blocked") params.set("filter", "blocked");
       if (activeView === "past_due") params.set("filter", "past_due");
 
-      const queryString = params.toString() ? `?${params.toString()}` : "";
-      const [res, summaryRes] = await Promise.all([
-        fetch(`/api/admin/verifications${queryString}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-        summaryPromise,
-      ]);
-      const data = await readAdminJson<VerificationListResponse>(
-        res,
+      const data = await fetchList<VerificationListResponse>(
+        "verifications",
         "No pudimos cargar las solicitudes"
       );
-      setFinanceSummary(summaryRes);
 
       setProviders(data.providers || []);
       setReports([]);
@@ -1012,19 +981,23 @@ export default function AdminVerificationsPage() {
       setAdminUsers([]);
       setCatadores([]);
     } catch (error) {
+      if (signal.aborted) return;
+
       const errorMessage =
         error instanceof Error ? error.message : "No pudimos cargar el panel";
       setMessage(errorMessage);
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, [activeView, search, user]);
+  }, [activeView, submittedSearch, user]);
 
   useEffect(() => {
-    if (!authLoading) {
-      void loadProviders();
-    }
-  }, [authLoading, loadProviders]);
+    if (authLoading) return;
+
+    const controller = new AbortController();
+    void loadProviders(controller.signal);
+    return () => controller.abort();
+  }, [authLoading, loadProviders, searchRequest]);
 
   useEffect(() => {
     document.body.style.overflow =
@@ -2754,7 +2727,7 @@ export default function AdminVerificationsPage() {
   const displayProviders =
     activeView === "requests"
       ? providers.flatMap((provider) =>
-          getProviderRequestItems(provider, Boolean(search.trim()))
+          getProviderRequestItems(provider, Boolean(submittedSearch))
         )
       : providers.map((provider) => ({
           ...provider,
@@ -2995,13 +2968,17 @@ export default function AdminVerificationsPage() {
               </Link>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <form
+              className="flex flex-col gap-3 sm:flex-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setSubmittedSearch(search.trim());
+                setSearchRequest((request) => request + 1);
+              }}
+            >
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void loadProviders();
-                }}
                 placeholder={
                   activeView === "reports"
                     ? "Buscar reporte por prestador, correo, WhatsApp o motivo"
@@ -3020,8 +2997,7 @@ export default function AdminVerificationsPage() {
                 className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20"
               />
               <button
-                type="button"
-                onClick={() => void loadProviders()}
+                type="submit"
                 className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
               >
                 Buscar
@@ -3031,20 +3007,21 @@ export default function AdminVerificationsPage() {
                   type="button"
                   onClick={() => {
                     setSearch("");
+                    setSubmittedSearch("");
                   }}
                   className="rounded-lg border border-white/10 px-5 py-3 text-sm font-semibold text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
                 >
                   Limpiar
                 </button>
               )}
-            </div>
+            </form>
           </section>
         )}
 
         {isLoading && (
           <div className="mt-10 rounded-lg border border-white/10 bg-neutral-950 p-8 text-center text-neutral-400">
             {activeView === "users"
-              ? search.trim()
+              ? submittedSearch
                 ? "Buscando usuario..."
                 : "Preparando busqueda..."
               : activeView === "catadores"
@@ -3062,20 +3039,16 @@ export default function AdminVerificationsPage() {
         {user && !isLoading && !hasResults && !message && (
           <section className="mt-10 rounded-lg border border-white/10 bg-neutral-950 p-8 text-center">
             <h2 className="text-xl font-semibold">
-              {search
+              {submittedSearch
                 ? "No hay resultados"
                 : activeView === "reports"
                   ? "No hay reportes"
                 : activeView === "withdrawals"
                   ? "No hay retiros"
                 : activeView === "users"
-                  ? search
-                    ? "No hay resultados"
-                    : "Busca un usuario"
+                  ? "Busca un usuario"
                 : activeView === "catadores"
-                  ? search
-                    ? "No hay resultados"
-                    : "No hay catadores"
+                  ? "No hay catadores"
                 : activeView === "past_due"
                   ? "No hay vencidos"
                 : activeView === "blocked"
@@ -3083,20 +3056,16 @@ export default function AdminVerificationsPage() {
                   : "No hay solicitudes"}
             </h2>
             <p className="mt-2 text-sm text-neutral-400">
-              {search
+              {submittedSearch
                 ? "Prueba con otro nombre, correo o telefono."
                 : activeView === "reports"
                   ? "Cuando un usuario reporte un perfil aparecera aqui."
                 : activeView === "withdrawals"
                   ? "Cuando un prestador solicite retirar saldo aparecera aqui."
                 : activeView === "users"
-                  ? search
-                    ? "Prueba con otro nombre, correo, telefono o ID."
-                    : "Escribe en la barra de busqueda para mostrar solo el usuario que necesitas."
+                  ? "Escribe un nombre, correo, telefono o ID y pulsa Buscar."
                 : activeView === "catadores"
-                  ? search
-                    ? "Prueba con otro nombre, correo, ID o perfil desbloqueado."
-                    : "Cuando un usuario desbloquee su primer contenido privado aparecera aqui con su nivel."
+                  ? "Cuando un usuario desbloquee su primer contenido privado aparecera aqui con su nivel."
                 : activeView === "past_due"
                   ? "No tienes perfiles con mensualidad vencida en este momento."
                 : activeView === "blocked"
@@ -3708,7 +3677,7 @@ export default function AdminVerificationsPage() {
                       )}
                     </div>
                   )}
-                  {activeView === "requests" && search.trim() && (
+                  {activeView === "requests" && submittedSearch && (
                     <div className="mt-2">
                       <ProviderContactEditor
                         key={`card-${getProviderContactKey(provider)}`}
